@@ -1,0 +1,3 @@
+include README.md
+recursive-include floodfilling/static *
+recursive-include floodfilling/fixtures *
