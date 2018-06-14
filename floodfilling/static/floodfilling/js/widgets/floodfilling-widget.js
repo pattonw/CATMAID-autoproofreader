@@ -161,6 +161,7 @@
   };
 
   FloodfillingWidget.prototype.getSomeData = function(){
+    console.log("getting some data");
     const self = this;
     self.oTable.clear();
     return CATMAID.fetch(`${project.id}/nodes/`, 'POST', {
