@@ -25,6 +25,7 @@
       helpText: 'Floodfilling Widget: ',
       controlsID: this.idPrefix + 'controls',
       createControls: function(controls) {
+        /*
         const button = document.createElement('label');
         button.title = 'test button';
         button.id = self.idPrefix + 'button';
@@ -37,6 +38,27 @@
           self.getSomeData();
         };
         button.appendChild(add);
+        */
+        var CS = this;
+				var tabs = CATMAID.DOM.addTabGroup(controls, CS.widgetID, ['Validate', 'Explore']);
+
+				CATMAID.DOM.appendToTab(tabs['Validate'],
+						[[document.createTextNode('From')],
+						 [CATMAID.skeletonListSources.createSelect(CS)],
+						 ['Append', CS.loadSource.bind(CS)],
+						 ['Clear', CS.clear.bind(CS)],
+						 ['Run', CS.run.bind(CS)],
+						]);
+
+				CATMAID.DOM.appendToTab(tabs['Explore'],
+						[[document.createTextNode('From')],
+              [CATMAID.skeletonListSources.createSelect(CS)],
+              ['Append', CS.loadSource.bind(CS)],
+              ['Clear', CS.clear.bind(CS)],
+              ['Run', CS.run.bind(CS)],
+            ]);
+
+				$(controls).tabs();
       },
       contentID: this.idPrefix + 'content',
       createContent: function(container) {
