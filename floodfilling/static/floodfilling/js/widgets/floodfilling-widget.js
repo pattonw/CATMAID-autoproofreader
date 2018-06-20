@@ -3,6 +3,13 @@
 
 (function(CATMAID) {
 
+  /*
+  -------------------------------------------------------------
+  SETUP
+  This section initializes the widget along with configuring
+  the layout
+  */
+
   "use strict";
 
   var FloodfillingWidget = function() {
@@ -32,14 +39,6 @@
       createControls: function(controls) {
         
 				var tabs = CATMAID.DOM.addTabGroup(controls, this.widgetID, ['Server','Validate', 'Explore']);
-
-        let address = document.createElement('input');
-        address.setAttribute("id","server-address")
-        address.addEventListener("keydown", function(event){
-          if (event.which === 13){
-            console.log(address.value);
-          }
-        });
 
         var fileButton = CATMAID.DOM.createFileButton(
           'st-file-dialog-' + this.widgetID, true, function(evt) {
@@ -100,36 +99,6 @@
       init: this.init.bind(this)
     };
   };
-
-  FloodfillingWidget.prototype.append = function(models) {
-    let skids = Object.keys(models);
-    this.appendOrdered(skids, models);
-  };
-
-  FloodfillingWidget.prototype.appendOrdered = function(skids, models) {
-    CATMAID.NeuronNameService.getInstance().registerAll(this, models, (function() {
-      fetchSkeletons(
-          skids,
-          function(skid) { return CATMAID.makeURL(project.id + '/skeletons/' + skid + '/compact-detail'); },
-          function(skid) { return {}; },
-          this.appendOne.bind(this),
-          function(skid) { CATMAID.msg("ERROR", "Failed to load skeleton #" + skid); },
-          this.update.bind(this),
-          "GET");
-    }).bind(this));
-  };
-
-  FloodfillingWidget.prototype.appendOne = function(skid, json){
-    let row = {skeletonID:skid,skeletonSize:json[0].length,skeletonTree:json[0]};
-    this.oTable.rows.add([row]);
-  };
-
-
-  FloodfillingWidget.prototype.clear = function() {
-    this.oTable.clear();
-    this.oTable.draw();
-  };
-
 
   FloodfillingWidget.prototype.init = function() {
     const self = this;
@@ -212,6 +181,35 @@
 
   };
 
+  FloodfillingWidget.prototype.append = function(models) {
+    let skids = Object.keys(models);
+    this.appendOrdered(skids, models);
+  };
+
+  FloodfillingWidget.prototype.appendOrdered = function(skids, models) {
+    CATMAID.NeuronNameService.getInstance().registerAll(this, models, (function() {
+      fetchSkeletons(
+          skids,
+          function(skid) { return CATMAID.makeURL(project.id + '/skeletons/' + skid + '/compact-detail'); },
+          function(skid) { return {}; },
+          this.appendOne.bind(this),
+          function(skid) { CATMAID.msg("ERROR", "Failed to load skeleton #" + skid); },
+          this.update.bind(this),
+          "GET");
+    }).bind(this));
+  };
+
+  FloodfillingWidget.prototype.appendOne = function(skid, json){
+    let row = {skeletonID:skid,skeletonSize:json[0].length,skeletonTree:json[0]};
+    this.oTable.rows.add([row]);
+  };
+
+
+  FloodfillingWidget.prototype.clear = function() {
+    this.oTable.clear();
+    this.oTable.draw();
+  };
+
   FloodfillingWidget.prototype.update = function(){
     this.oTable.draw();
     console.log("update");
@@ -225,6 +223,21 @@
     this.unregisterInstance();
 		this.unregisterSource();
   };
+
+  /*
+  -------------------------------------------------------------
+  CONFIG
+  This section contains everything necessary for the front end
+  to send jobs to a server
+  */
+
+
+
+  /*
+  -------------------------------------------------------------
+  ADMIN
+  This section just registers the widget
+  */
 
   CATMAID.FloodfillingWidget = FloodfillingWidget;
 
