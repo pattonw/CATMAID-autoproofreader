@@ -10,7 +10,13 @@
     this.idPrefix = `floodfilling-widget${this.widgetID}-`;
 
     this.oTable = null;
+
+    this.skeletons = [];
+
   };
+
+  FloodfillingWidget.prototype = Object.create(CATMAID.SkeletonSource.prototype);
+  FloodfillingWidget.prototype.constructor = FloodfillingWidget;
 
   $.extend(FloodfillingWidget.prototype, new InstanceRegistry());
 
@@ -19,45 +25,29 @@
   };
 
   FloodfillingWidget.prototype.getWidgetConfiguration = function() {
-    const self = this;
     const tableID = this.idPrefix + 'datatable';
     return {
       helpText: 'Floodfilling Widget: ',
       controlsID: this.idPrefix + 'controls',
       createControls: function(controls) {
-        /*
-        const button = document.createElement('label');
-        button.title = 'test button';
-        button.id = self.idPrefix + 'button';
-        controls.append(button);
-
-        const add = document.createElement('input');
-        add.setAttribute("type", "button");
-        add.setAttribute("value", "Add");
-        add.onclick = function() {
-          self.getSomeData();
-        };
-        button.appendChild(add);
-        */
-        var CS = this;
-				var tabs = CATMAID.DOM.addTabGroup(controls, CS.widgetID, ['Validate', 'Explore']);
+        
+				var tabs = CATMAID.DOM.addTabGroup(controls, this.widgetID, ['Validate', 'Explore']);
 
 				CATMAID.DOM.appendToTab(tabs['Validate'],
 						[[document.createTextNode('From')],
-						 [CATMAID.skeletonListSources.createSelect(CS)],
-						 ['Append', CS.loadSource.bind(CS)],
-						 ['Clear', CS.clear.bind(CS)],
-						 ['Run', CS.run.bind(CS)],
+						 [CATMAID.skeletonListSources.createSelect(this)],
+						 ['Append', this.loadSource.bind(this)],
+						 ['Clear', this.clear.bind(this)],
+						 ['Run', this.run.bind(this)],
 						]);
 
 				CATMAID.DOM.appendToTab(tabs['Explore'],
 						[[document.createTextNode('From')],
-              [CATMAID.skeletonListSources.createSelect(CS)],
-              ['Append', CS.loadSource.bind(CS)],
-              ['Clear', CS.clear.bind(CS)],
-              ['Run', CS.run.bind(CS)],
+              [CATMAID.skeletonListSources.createSelect(this)],
+              ['Append', this.loadSource.bind(this)],
+              ['Clear', this.clear.bind(this)],
+              ['Run', this.run.bind(this)],
             ]);
-
 				$(controls).tabs();
       },
       contentID: this.idPrefix + 'content',
@@ -66,37 +56,61 @@
         <table cellpadding="0" cellspacing="0" border="0" class="display" id="${tableID}">
           <thead>
             <tr>
-              <th>Creator ID
-                <input type="number" name="searchCreatorId" id="${self.idPrefix}search-creator-id"
-                  value="0" class="search_init"/></th>
-              <th>Node ID
-                <input type="number" name="searchNodeId" id="${self.idPrefix}search-node-id"
-                  value="0" class="search_init"/>
-              </th>
               <th>Skeleton ID
-                <input type="number" name="searchSkeletonId" id="${self.idPrefix}search-skeleton-id"
+                <input type="number" name="searchSkeletonId" id="${this.idPrefix}search-skeleton-id"
+                  value="0" class="search_init"/></th>
+              <th>Skeleton Size
+                <input type="number" name="searchSkeletonSize" id="${this.idPrefix}search-skeleton-size"
                   value="0" class="search_init"/>
               </th>
-              </tr>
+            </tr>
           </thead>
           <tfoot>
             <tr>
-              <th>Creator ID</th>
-              <th>Node ID</th>
               <th>skeleton ID</th>
+              <th>skeleton Size</th>
             </tr>
           </tfoot>
           <tbody>
           </tbody>
         </table>`;
       },
-      init: self.init.bind(self)
+      init: this.init.bind(this)
     };
   };
 
+  FloodfillingWidget.prototype.append = function(models) {
+    let skids = Object.keys(models);
+    this.appendOrdered(skids, models);
+  };
+
+  FloodfillingWidget.prototype.appendOrdered = function(skids, models) {
+    CATMAID.NeuronNameService.getInstance().registerAll(this, models, (function() {
+      fetchSkeletons(
+          skids,
+          function(skid) { return CATMAID.makeURL(project.id + '/skeletons/' + skid + '/compact-detail'); },
+          function(skid) { return {}; },
+          this.appendOne.bind(this),
+          function(skid) { CATMAID.msg("ERROR", "Failed to load skeleton #" + skid); },
+          this.update.bind(this),
+          "GET");
+    }).bind(this));
+  };
+
+  FloodfillingWidget.prototype.appendOne = function(skid, json){
+    let row = {skeletonID:skid,skeletonSize:json[0].length};
+    this.oTable.rows.add([row]);
+  };
+
+
+  FloodfillingWidget.prototype.clear = function() {
+    this.oTable.clear();
+    this.oTable.draw();
+  };
+
+
   FloodfillingWidget.prototype.init = function() {
     const self = this;
-    console.log("initialized");
     const tableID = this.idPrefix + 'datatable';
     const $table = $('#' + tableID);
 
@@ -115,25 +129,18 @@
       deferRender: true,
       columns: [
         {
-          data: 'creatorID',
-          render: Math.floor,
-          orderable: true,
-          searchable: true,
-          className: "center"
-        },
-        {
-          data: 'nodeID',
-          render: Math.floor,
-          orderable: true,
-          searchable: true,
-          className: "center"
-        },
-        {
           data: 'skeletonID',
           render: Math.floor,
           orderable: true,
           searchable: true,
-          className: "center"
+          className: "skeletonID"
+        },
+        {
+          data: 'skeletonSize',
+          render: Math.floor,
+          orderable: true,
+          searchable: true,
+          className: "skeletonSize"
         }
       ]
     });
@@ -153,9 +160,8 @@
       }
     };
 
-    $(`#${self.idPrefix}search-creator-id`).keydown(exactNumSearch);
-    $(`#${self.idPrefix}search-node-id`).keydown(exactNumSearch);
     $(`#${self.idPrefix}search-skeleton-id`).keydown(exactNumSearch);
+    $(`#${self.idPrefix}search-skeleton-size`).keydown(exactNumSearch);
 
     const $headerInput = $table.find('thead input');
 
@@ -175,38 +181,20 @@
   };
 
   FloodfillingWidget.prototype.update = function(){
+    this.oTable.draw();
     console.log("update");
+  }
+
+  FloodfillingWidget.prototype.run = function(){
+    console.log("run");
   }
 
   FloodfillingWidget.prototype.destroy = function() {
     this.unregisterInstance();
+		this.unregisterSource();
   };
 
-  FloodfillingWidget.prototype.getSomeData = function(){
-    console.log("getting some data");
-    const self = this;
-    self.oTable.clear();
-    return CATMAID.fetch(`${project.id}/nodes/`, 'POST', {
-      limit : 2,
-      left : 0,
-      top : 0,
-      z1 : 0,
-      right : 10000,
-      bottom : 10000,
-      z2 : 1
-    })
-      .then(function(response) {
-        let nodes = response[0];
-        for (let node of nodes){
-          let row = {creatorID:node[9],nodeID:node[0],skeletonID:node[7],parentId:node[1]};
-          self.oTable.rows.add([row]);
-        }
-        self.oTable.draw();
-      })
-      .catch(function(error){
-        console.log(error);
-      });
-  }
+  CATMAID.FloodfillingWidget = FloodfillingWidget;
 
   CATMAID.registerWidget({
     name: 'floodfilling Widget',
