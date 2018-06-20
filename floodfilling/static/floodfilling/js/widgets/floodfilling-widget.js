@@ -40,8 +40,19 @@
             console.log(address.value);
           }
         });
+
+        var fileButton = CATMAID.DOM.createFileButton(
+          'st-file-dialog-' + this.widgetID, true, function(evt) {
+            self.loadConfigFromJSON(evt.target.files);
+          });
+        var open = document.createElement('input');
+        open.setAttribute("type", "button");
+        open.setAttribute("value", "Open Config JSON");
+        open.onclick = function() { fileButton.click(); };
+
+      
         CATMAID.DOM.appendToTab(tabs['Server'],
-						[[address],
+						[[open],
             ]);
 
 				CATMAID.DOM.appendToTab(tabs['Validate'],
