@@ -31,7 +31,18 @@
       controlsID: this.idPrefix + 'controls',
       createControls: function(controls) {
         
-				var tabs = CATMAID.DOM.addTabGroup(controls, this.widgetID, ['Validate', 'Explore']);
+				var tabs = CATMAID.DOM.addTabGroup(controls, this.widgetID, ['Server','Validate', 'Explore']);
+
+        let address = document.createElement('input');
+        address.setAttribute("id","server-address")
+        address.addEventListener("keydown", function(event){
+          if (event.which === 13){
+            console.log(address.value);
+          }
+        });
+        CATMAID.DOM.appendToTab(tabs['Server'],
+						[[address],
+            ]);
 
 				CATMAID.DOM.appendToTab(tabs['Validate'],
 						[[document.createTextNode('From')],
@@ -98,7 +109,7 @@
   };
 
   FloodfillingWidget.prototype.appendOne = function(skid, json){
-    let row = {skeletonID:skid,skeletonSize:json[0].length};
+    let row = {skeletonID:skid,skeletonSize:json[0].length,skeletonTree:json[0]};
     this.oTable.rows.add([row]);
   };
 
@@ -145,6 +156,16 @@
       ]
     });
 
+    $(`#${tableID} tbody`).on( 'click', 'tr', function () {
+      if ( $(this).hasClass('selected') ) {
+          $(this).removeClass('selected');
+      }
+      else {
+          self.oTable.$('tr.selected').removeClass('selected');
+          $(this).addClass('selected');
+      }
+    });
+
     const exactNumSearch = function(event) {
       if (event.which == 13) {
         event.stopPropagation();
@@ -186,7 +207,7 @@
   }
 
   FloodfillingWidget.prototype.run = function(){
-    console.log("run");
+    console.log(this.oTable.row('.selected').data());
   }
 
   FloodfillingWidget.prototype.destroy = function() {
