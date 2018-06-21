@@ -51,7 +51,9 @@
 
       
         CATMAID.DOM.appendToTab(tabs['Server'],
-						[[open],
+            [[open],
+            ['Create Config JSON', this.createConfig.bind(this)],
+            ['Save Config JSON', this.saveConfig.bind(this)],
             ]);
 
 				CATMAID.DOM.appendToTab(tabs['Validate'],
@@ -231,7 +233,31 @@
   to send jobs to a server
   */
 
+  /**
+   * Save the current list of skeletons including their colors to a file.
+   */
+  FloodfillingWidget.prototype.createConfig = function() {
+    console.log("create");
+  };
 
+  /**
+   * Save the current list of skeletons including their colors to a file.
+   */
+  FloodfillingWidget.prototype.saveConfig = function() {
+    var today = new Date();
+    var defaultFileName = 'catmaid-config-' + today.getFullYear() + '-' +
+        (today.getMonth() + 1) + '-' + today.getDate() + '.json';
+    var filename = prompt('File name', defaultFileName);
+    if (!filename) return;
+
+    var data = {
+        'server': 'example.int.janelia.org',
+        'username': 'person',
+        'password': 'passw0rd'
+    };
+
+    saveAs(new Blob([JSON.stringify(data, null, ' ')], {type: 'text/plain'}), filename);
+  };
 
   /*
   -------------------------------------------------------------
