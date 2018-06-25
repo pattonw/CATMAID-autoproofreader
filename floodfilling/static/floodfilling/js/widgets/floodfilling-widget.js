@@ -38,22 +38,37 @@
       controlsID: this.idPrefix + 'controls',
       createControls: function(controls) {
         
-				var tabs = CATMAID.DOM.addTabGroup(controls, this.widgetID, ['Server','Validate', 'Explore']);
+        var tabs = CATMAID.DOM.addTabGroup(controls, this.widgetID, ['Server','Model','Validate', 'Explore']);
+        controls.firstChild.onclick = this.refocus.bind(this);
 
         var fileButton = CATMAID.DOM.createFileButton(
           'st-file-dialog-' + this.widgetID, true, function(evt) {
             self.loadConfigFromJSON(evt.target.files);
           });
-        var open = document.createElement('input');
-        open.setAttribute("type", "button");
-        open.setAttribute("value", "Open Config JSON");
-        open.onclick = function() { fileButton.click(); };
+
+        var openConfig = document.createElement('input');
+        openConfig.setAttribute("type", "button");
+        openConfig.setAttribute("id", "open-config");
+        openConfig.setAttribute("value", "Open Config JSON");
+        openConfig.onclick = function() { fileButton.click(); };
 
       
         CATMAID.DOM.appendToTab(tabs['Server'],
-            [[open],
+            [[openConfig],
             ['Create Config JSON', this.createConfig.bind(this)],
             ['Save Config JSON', this.saveConfig.bind(this)],
+            ]);
+  
+        var openModel = document.createElement('input');
+        openModel.setAttribute("type", "button");
+        openModel.setAttribute("id", "open-model");
+        openModel.setAttribute("value", "Open Model JSON");
+        openModel.onclick = function() { fileButton.click(); };
+
+        CATMAID.DOM.appendToTab(tabs['Model'],
+            [[openModel],
+            ['Create Config JSON', this.createModel.bind(this)],
+            ['Save Config JSON', this.saveModel.bind(this)],
             ]);
 
 				CATMAID.DOM.appendToTab(tabs['Validate'],
@@ -71,32 +86,42 @@
               ['Clear', this.clear.bind(this)],
               ['Run', this.run.bind(this)],
             ]);
-				$(controls).tabs();
+        $(controls).tabs();
       },
       contentID: this.idPrefix + 'content',
       createContent: function(container) {
         container.innerHTML = `
-        <table cellpadding="0" cellspacing="0" border="0" class="display" id="${tableID}">
-          <thead>
-            <tr>
-              <th>Skeleton ID
-                <input type="number" name="searchSkeletonId" id="${this.idPrefix}search-skeleton-id"
-                  value="0" class="search_init"/></th>
-              <th>Skeleton Size
-                <input type="number" name="searchSkeletonSize" id="${this.idPrefix}search-skeleton-size"
-                  value="0" class="search_init"/>
-              </th>
-            </tr>
-          </thead>
-          <tfoot>
-            <tr>
-              <th>skeleton ID</th>
-              <th>skeleton Size</th>
-            </tr>
-          </tfoot>
-          <tbody>
-          </tbody>
-        </table>`;
+        <div id="content-wrapper">
+          <div class="table">
+            <table cellpadding="0" cellspacing="0" border="0" class="display" id="${tableID}">
+              <thead>
+                <tr>
+                  <th>Skeleton ID
+                    <input type="number" name="searchSkeletonId" id="${this.idPrefix}search-skeleton-id"
+                      value="0" class="search_init"/></th>
+                  <th>Skeleton Size
+                    <input type="number" name="searchSkeletonSize" id="${this.idPrefix}search-skeleton-size"
+                      value="0" class="search_init"/>
+                  </th>
+                </tr>
+              </thead>
+              <tfoot>
+                <tr>
+                  <th>skeleton ID</th>
+                  <th>skeleton Size</th>
+                </tr>
+              </tfoot>
+              <tbody>
+              </tbody>
+            </table>
+          </div>
+          <div class="config">
+            <p> config stuff </p>
+          </div>
+          <div class="model">
+            <p> model stuff </p>
+          </div>
+        </div>`;
       },
       init: this.init.bind(this)
     };
@@ -181,6 +206,8 @@
       }
     });
 
+    this.refocus();
+
   };
 
   FloodfillingWidget.prototype.append = function(models) {
@@ -221,10 +248,63 @@
     console.log(this.oTable.row('.selected').data());
   }
 
-  FloodfillingWidget.prototype.destroy = function() {
+  FloodfillingWidget.prototype.destroy = function(){
     this.unregisterInstance();
 		this.unregisterSource();
   };
+
+  FloodfillingWidget.prototype.refocus = function(){
+    let content = document.getElementById("content-wrapper");
+    let views = {
+      "Model":"model",
+      "Server":"config",
+      "Validate":"table",
+      "Explore":"table"
+    };
+    let mode = $("ul.ui-tabs-nav").children(".ui-state-active").text();
+    for (let child of content.childNodes){
+      if(child.nodeType === Node.ELEMENT_NODE && child.className === views[mode]){
+        child.style.display = 'block';
+      } else if (child.nodeType === Node.ELEMENT_NODE){
+        child.style.display = 'none';
+      }
+    }
+  }
+
+  
+  /*
+  -------------------------------------------------------------
+  MODEL
+  This section contains everything necessary for the front end
+  to send jobs to a server
+  */
+
+  /**
+   * Save the current list of skeletons including their colors to a file.
+   */
+  FloodfillingWidget.prototype.createModel = function() {
+    console.log("create");
+  };
+
+  /**
+   * Save the current list of skeletons including their colors to a file.
+   */
+  FloodfillingWidget.prototype.saveModel = function() {
+    var today = new Date();
+    var defaultFileName = 'catmaid-model-' + today.getFullYear() + '-' +
+        (today.getMonth() + 1) + '-' + today.getDate() + '.json';
+    var filename = prompt('File name', defaultFileName);
+    if (!filename) return;
+
+    var data = {
+        'server': 'example.int.janelia.org',
+        'username': 'person',
+        'password': 'passw0rd'
+    };
+
+    saveAs(new Blob([JSON.stringify(data, null, ' ')], {type: 'text/plain'}), filename);
+  };
+
 
   /*
   -------------------------------------------------------------
