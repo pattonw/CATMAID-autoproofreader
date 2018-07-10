@@ -1,7 +1,7 @@
 /* -*- mode: espresso; espresso-indent-level: 8; indent-tabs-mode: t -*- */
 /* vim: set softtabstop=2 shiftwidth=2 tabstop=2 expandtab: */
 
-(function(CATMAID) {
+(function (CATMAID) {
 
   /*
   -------------------------------------------------------------
@@ -12,11 +12,12 @@
 
   "use strict";
 
-  var FloodfillingWidget = function() {
+  var FloodfillingWidget = function () {
     this.widgetID = this.registerInstance();
     this.idPrefix = `floodfilling-widget${this.widgetID}-`;
 
     this.oTable = null;
+    this.configJsons = {};
 
     this.skeletons = [];
 
@@ -27,69 +28,84 @@
 
   $.extend(FloodfillingWidget.prototype, new InstanceRegistry());
 
-  FloodfillingWidget.prototype.getName = function() {
+  FloodfillingWidget.prototype.getName = function () {
     return 'Floodfilling Widget ' + this.widgetID;
   };
 
-  FloodfillingWidget.prototype.getWidgetConfiguration = function() {
+  FloodfillingWidget.prototype.getWidgetConfiguration = function () {
     const tableID = this.idPrefix + 'datatable';
+    let self = this;
     return {
       helpText: 'Floodfilling Widget: ',
       controlsID: this.idPrefix + 'controls',
-      createControls: function(controls) {
-        
-        var tabs = CATMAID.DOM.addTabGroup(controls, this.widgetID, ['Server','Model','Validate', 'Explore']);
+      createControls: function (controls) {
+
+        // Create the tabs
+        var tabs = CATMAID.DOM.addTabGroup(controls, this.widgetID, ['Server', 'Model', 'Validate', 'Explore']);
+        // Change content based on currently active tab
         controls.firstChild.onclick = this.refocus.bind(this);
 
-        var fileButton = CATMAID.DOM.createFileButton(
-          'st-file-dialog-' + this.widgetID, true, function(evt) {
-            self.loadConfigFromJSON(evt.target.files);
+        // Create a button to load files
+        var loadConfigButton = CATMAID.DOM.createFileButton(
+          'st-file-dialog-' + this.widgetID, true, function (evt) {
+            self.loadConfig(evt.target.files);
           });
 
+        // file button for config files
         var openConfig = document.createElement('input');
         openConfig.setAttribute("type", "button");
         openConfig.setAttribute("id", "open-config");
         openConfig.setAttribute("value", "Open Config JSON");
-        openConfig.onclick = function() { fileButton.click(); };
+        openConfig.onclick = function () { loadConfigButton.click(); };
 
-      
+        // create Server tab
         CATMAID.DOM.appendToTab(tabs['Server'],
-            [[openConfig],
-            ['Create Config JSON', this.createConfig.bind(this)],
-            ['Save Config JSON', this.saveConfig.bind(this)],
-            ]);
-  
+          [[openConfig],
+          ['Create Config JSON', this.createConfig.bind(this)],
+          ['Save Config JSON', this.saveConfig.bind(this)],
+          ]);
+
+        // Create a button to load files
+        var loadModelButton = CATMAID.DOM.createFileButton(
+          'st-file-dialog-' + this.widgetID, true, function (evt) {
+            self.loadModel(evt.target.files);
+          });
+
+        // file button for model files
         var openModel = document.createElement('input');
         openModel.setAttribute("type", "button");
         openModel.setAttribute("id", "open-model");
-        openModel.setAttribute("value", "Open Model JSON");
-        openModel.onclick = function() { fileButton.click(); };
+        openModel.setAttribute("value", "Open Model TOML");
+        openModel.onclick = function () { loadModelButton.click(); };
 
+        // create Model tab
         CATMAID.DOM.appendToTab(tabs['Model'],
-            [[openModel],
-            ['Create Config JSON', this.createModel.bind(this)],
-            ['Save Config JSON', this.saveModel.bind(this)],
-            ]);
+          [[openModel],
+          ['Create Model TOML', this.createModel.bind(this)],
+          ['Save Model TOML', this.saveModel.bind(this)],
+          ]);
 
-				CATMAID.DOM.appendToTab(tabs['Validate'],
-						[[document.createTextNode('From')],
-						 [CATMAID.skeletonListSources.createSelect(this)],
-						 ['Append', this.loadSource.bind(this)],
-						 ['Clear', this.clear.bind(this)],
-						 ['Run', this.run.bind(this)],
-						]);
+        // create validation tab
+        CATMAID.DOM.appendToTab(tabs['Validate'],
+          [[document.createTextNode('From')],
+          [CATMAID.skeletonListSources.createSelect(this)],
+          ['Append', this.loadSource.bind(this)],
+          ['Clear', this.clear.bind(this)],
+          ['Run', this.run.bind(this)],
+          ]);
 
-				CATMAID.DOM.appendToTab(tabs['Explore'],
-						[[document.createTextNode('From')],
-              [CATMAID.skeletonListSources.createSelect(this)],
-              ['Append', this.loadSource.bind(this)],
-              ['Clear', this.clear.bind(this)],
-              ['Run', this.run.bind(this)],
-            ]);
+        // create explore tab
+        CATMAID.DOM.appendToTab(tabs['Explore'],
+          [[document.createTextNode('From')],
+          [CATMAID.skeletonListSources.createSelect(this)],
+          ['Append', this.loadSource.bind(this)],
+          ['Clear', this.clear.bind(this)],
+          ['Run', this.run.bind(this)],
+          ]);
         $(controls).tabs();
       },
       contentID: this.idPrefix + 'content',
-      createContent: function(container) {
+      createContent: function (container) {
         container.innerHTML = `
         <div id="content-wrapper">
           <div class="table">
@@ -116,10 +132,21 @@
             </table>
           </div>
           <div class="config">
-            <p> config stuff </p>
+            <p> Server Configuration: </p>
+            <div id="config-form">
+              <label for="address">Server Address</label>
+              <input type="text" id="address" value="cardona-gpu1.int.janelia.org"><br>
+              <label for="username">Username</label>
+              <input type="text" id="username" value="example_person"><br>
+              <label for="password">Password</label>
+              <input type="text" id="password" value="p4ssw0rd"><br>
+              <input type="submit" value="create">
+            </div>
           </div>
           <div class="model">
-            <p> model stuff </p>
+            <p> Model Configuration: </p>
+            <div id="model-form">
+            </div>
           </div>
         </div>`;
       },
@@ -127,7 +154,10 @@
     };
   };
 
-  FloodfillingWidget.prototype.init = function() {
+  /**
+   * initialize the widget
+   */
+  FloodfillingWidget.prototype.init = function () {
     const self = this;
     const tableID = this.idPrefix + 'datatable';
     const $table = $('#' + tableID);
@@ -163,17 +193,17 @@
       ]
     });
 
-    $(`#${tableID} tbody`).on( 'click', 'tr', function () {
-      if ( $(this).hasClass('selected') ) {
-          $(this).removeClass('selected');
+    $(`#${tableID} tbody`).on('click', 'tr', function () {
+      if ($(this).hasClass('selected')) {
+        $(this).removeClass('selected');
       }
       else {
-          self.oTable.$('tr.selected').removeClass('selected');
-          $(this).addClass('selected');
+        self.oTable.$('tr.selected').removeClass('selected');
+        $(this).addClass('selected');
       }
     });
 
-    const exactNumSearch = function(event) {
+    const exactNumSearch = function (event) {
       if (event.which == 13) {
         event.stopPropagation();
         event.preventDefault();
@@ -207,71 +237,99 @@
     });
 
     this.refocus();
+    $("div.config-form > [type='submit']").click(this.createConfig.bind(this));
+    $("div.model-form > [type='submit']").click(this.createModel.bind(this));
 
   };
 
-  FloodfillingWidget.prototype.append = function(models) {
+  FloodfillingWidget.prototype.append = function (models) {
     let skids = Object.keys(models);
     this.appendOrdered(skids, models);
   };
 
-  FloodfillingWidget.prototype.appendOrdered = function(skids, models) {
-    CATMAID.NeuronNameService.getInstance().registerAll(this, models, (function() {
+  FloodfillingWidget.prototype.appendOrdered = function (skids, models) {
+    CATMAID.NeuronNameService.getInstance().registerAll(this, models, (function () {
       fetchSkeletons(
-          skids,
-          function(skid) { return CATMAID.makeURL(project.id + '/skeletons/' + skid + '/compact-detail'); },
-          function(skid) { return {}; },
-          this.appendOne.bind(this),
-          function(skid) { CATMAID.msg("ERROR", "Failed to load skeleton #" + skid); },
-          this.update.bind(this),
-          "GET");
+        skids,
+        function (skid) { return CATMAID.makeURL(project.id + '/skeletons/' + skid + '/compact-detail'); },
+        function (skid) { return {}; },
+        this.appendOne.bind(this),
+        function (skid) { CATMAID.msg("ERROR", "Failed to load skeleton #" + skid); },
+        this.update.bind(this),
+        "GET");
     }).bind(this));
   };
 
-  FloodfillingWidget.prototype.appendOne = function(skid, json){
-    let row = {skeletonID:skid,skeletonSize:json[0].length,skeletonTree:json[0]};
+  FloodfillingWidget.prototype.appendOne = function (skid, json) {
+    let row = { skeletonID: skid, skeletonSize: json[0].length, skeletonTree: json[0] };
     this.oTable.rows.add([row]);
   };
 
 
-  FloodfillingWidget.prototype.clear = function() {
+  FloodfillingWidget.prototype.clear = function () {
     this.oTable.clear();
     this.oTable.draw();
   };
 
-  FloodfillingWidget.prototype.update = function(){
+  FloodfillingWidget.prototype.update = function () {
     this.oTable.draw();
-    console.log("update");
   }
 
-  FloodfillingWidget.prototype.run = function(){
-    console.log(this.oTable.row('.selected').data());
+  FloodfillingWidget.prototype.run = function () {
+
+    CATMAID.crop(project.id, project.getStackViewer(project.id).primaryStack.id, 5, 5, 5, 10, 10, 10, 1, 0, false);
+
+    /*
+    let skeletonData = this.oTable.row('.selected').data()['skeletonTree'];
+    let lines = [];
+    skeletonData.forEach(function (node, index) {
+      let nid = node[0];
+      let pnid = node[1];
+      let x = node[3];
+      let y = node[4];
+      let z = node[5];
+      let line = nid + ',' + pnid + ',' + x + ',' + y + ',' + z;
+      lines.push(line);
+    })
+    let csv = lines.join('\n');
+
+    if (!csv.match(/^data:text\/csv/i)) {
+      csv = 'data:text/csv;charset=utf-8,' + csv;
+    }
+    let data = encodeURI(csv);
+
+    let link = document.createElement('a');
+    link.setAttribute('href', data);
+    link.setAttribute('download', 'skeleton.csv');
+    link.click();
+    */
   }
 
-  FloodfillingWidget.prototype.destroy = function(){
+  FloodfillingWidget.prototype.destroy = function () {
     this.unregisterInstance();
-		this.unregisterSource();
+    this.unregisterSource();
   };
 
-  FloodfillingWidget.prototype.refocus = function(){
+  FloodfillingWidget.prototype.refocus = function () {
     let content = document.getElementById("content-wrapper");
     let views = {
-      "Model":"model",
-      "Server":"config",
-      "Validate":"table",
-      "Explore":"table"
+      "Model": "model",
+      "Server": "config",
+      "Validate": "table",
+      "Explore": "table"
     };
     let mode = $("ul.ui-tabs-nav").children(".ui-state-active").text();
-    for (let child of content.childNodes){
-      if(child.nodeType === Node.ELEMENT_NODE && child.className === views[mode]){
+    for (let child of content.childNodes) {
+      if (child.nodeType === Node.ELEMENT_NODE && child.className === views[mode]) {
         child.style.display = 'block';
-      } else if (child.nodeType === Node.ELEMENT_NODE){
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
         child.style.display = 'none';
       }
     }
   }
 
-  
+
+
   /*
   -------------------------------------------------------------
   MODEL
@@ -282,27 +340,35 @@
   /**
    * Save the current list of skeletons including their colors to a file.
    */
-  FloodfillingWidget.prototype.createModel = function() {
-    console.log("create");
+  FloodfillingWidget.prototype.createModel = function () {
+    console.log("TODO: createModel");
+  };
+
+  /**
+   * Load in a model file
+   */
+  FloodfillingWidget.prototype.loadModel = function (file) {
+    console.log("TODO: loadModel")
+    this.parseToml(file, 'model');
   };
 
   /**
    * Save the current list of skeletons including their colors to a file.
    */
-  FloodfillingWidget.prototype.saveModel = function() {
+  FloodfillingWidget.prototype.saveModel = function () {
     var today = new Date();
     var defaultFileName = 'catmaid-model-' + today.getFullYear() + '-' +
-        (today.getMonth() + 1) + '-' + today.getDate() + '.json';
+      (today.getMonth() + 1) + '-' + today.getDate() + '.json';
     var filename = prompt('File name', defaultFileName);
     if (!filename) return;
 
     var data = {
-        'server': 'example.int.janelia.org',
-        'username': 'person',
-        'password': 'passw0rd'
+      'server': 'example.int.janelia.org',
+      'username': 'person',
+      'password': 'passw0rd'
     };
 
-    saveAs(new Blob([JSON.stringify(data, null, ' ')], {type: 'text/plain'}), filename);
+    saveAs(new Blob([JSON.stringify(data, null, ' ')], { type: 'text/plain' }), filename);
   };
 
 
@@ -316,28 +382,153 @@
   /**
    * Save the current list of skeletons including their colors to a file.
    */
-  FloodfillingWidget.prototype.createConfig = function() {
-    console.log("create");
+  FloodfillingWidget.prototype.createConfig = function () {
+    console.log("TODO: createConfig");
+  };
+
+
+  /**
+   * Load in a config file
+   */
+  FloodfillingWidget.prototype.loadConfig = function (file) {
+    console.log("TODO: loadConfig");
   };
 
   /**
    * Save the current list of skeletons including their colors to a file.
    */
-  FloodfillingWidget.prototype.saveConfig = function() {
+  FloodfillingWidget.prototype.saveConfig = function () {
     var today = new Date();
     var defaultFileName = 'catmaid-config-' + today.getFullYear() + '-' +
-        (today.getMonth() + 1) + '-' + today.getDate() + '.json';
+      (today.getMonth() + 1) + '-' + today.getDate() + '.json';
     var filename = prompt('File name', defaultFileName);
     if (!filename) return;
 
     var data = {
-        'server': 'example.int.janelia.org',
-        'username': 'person',
-        'password': 'passw0rd'
+      'server': 'example.int.janelia.org',
+      'username': 'person',
+      'password': 'passw0rd'
     };
 
-    saveAs(new Blob([JSON.stringify(data, null, ' ')], {type: 'text/plain'}), filename);
+    saveAs(new Blob([JSON.stringify(data, null, ' ')], { type: 'text/plain' }), filename);
   };
+
+  /*
+  ---------------------------------------
+  TOML PARSER
+  */
+  FloodfillingWidget.prototype.parseToml = function (file, content) {
+    let reader = new FileReader();
+    let self = this;
+    reader.onload = function (e) {
+      self.configJsons[content] = toml.parse(reader.result);
+      self.updateJsons();
+    }
+    reader.readAsText(file[0]);
+
+  }
+
+  FloodfillingWidget.prototype.updateJsons = function(){
+    let model = this.configJsons.model;
+    let server = this.configJsons.server;
+    if (model){
+      this.updateModelForm(model);
+    }
+    if (server){
+      this.updateServerForm(server);
+    }
+  }
+
+  FloodfillingWidget.prototype.updateModelForm = function(model){
+    console.log(model);
+    let form = document.getElementById('model-form');
+    form.classList.add("selected-setting")
+    let keys = Object.keys(model);
+    for (let i = 0; i < keys.length; i++){
+      addElement(form, keys[i], model[keys[i]]);
+    }
+    
+    function createSubContainer(container, key){
+      let subContainer = document.createElement('div');
+      subContainer.style.borderColor = "red";
+      subContainer.style.borderStyle = "solid";
+      subContainer.style.padding = "3px";
+      subContainer.style.margin = "3px";
+
+      subContainer.setAttribute("class", "model-form-box");
+      if (container.classList.contains('selected-setting')){
+        subContainer.classList.add('seen-setting');
+      } else {
+        subContainer.classList.add('hidden-setting');
+        subContainer.style.display = "none"
+      }
+
+      subContainer.onclick = function(e){
+        if ($(this).hasClass('selected-setting')) {
+          $('div.seen-setting,'+
+            'div.selected-setting,'+
+            'label.seen-setting,'+
+            'label.selected-setting', this)
+            .removeClass('seen-setting')
+            .removeClass('selected-setting')
+            .addClass('hidden-setting')
+            .css('display', 'none');
+          $(this).removeClass('selected-setting');
+          $(this).addClass('seen-setting');
+          console.log(this.firstElementChild.innerHTML + " deselect");
+          e.stopPropagation();
+        } else {
+          $(this).children().removeClass('hidden-setting')
+            .addClass('seen-setting')
+            .css('display', 'block');
+          $(this).removeClass('seen-setting');
+          $(this).addClass('selected-setting');
+          console.log(this.firstElementChild.innerHTML + " selected");
+          e.stopPropagation();
+        }
+      };
+      let title = document.createElement('p');
+      title.innerHTML = key;
+      subContainer.append(title);
+      return subContainer;
+    }
+
+    function createField(container, key, item){
+      let fieldLabel;
+      if (typeof(item) === 'string' | typeof(item) === 'number'){
+        fieldLabel = document.createElement('label');
+        fieldLabel.append(document.createTextNode(key + ": "));
+        let field = document.createElement('input');
+        field.setAttribute('type', 'text');
+        field.setAttribute('value', item);
+        fieldLabel.append(field);
+        if (container.classList.contains("selected-setting")){
+          fieldLabel.setAttribute('class','seen-setting');
+          fieldLabel.style.display = 'block';
+        } else {
+          fieldLabel.setAttribute('class', 'hidden-setting');
+          fieldLabel.style.display = 'none';
+        }
+      } 
+      return fieldLabel
+    }
+
+    function addElement(container, key, item){
+      if (typeof(item) === 'object' && !Array.isArray(item)){
+        let subContainer = createSubContainer(container, key);
+        let subKeys = Object.keys(item);
+        for (let j = 0; j < subKeys.length; j++){
+          addElement(subContainer, subKeys[j], item[subKeys[j]]);
+        }
+        container.append(subContainer);
+      } else {
+        let field = createField(container, key, item);
+        if (field){
+          container.append(field);
+        }
+      }
+    }
+  }
 
   /*
   -------------------------------------------------------------
@@ -355,3 +546,344 @@
   });
 
 })(CATMAID);
+
+
+var toml = (function () {
+
+  var parseGroup = function (context, str) {
+    var result = context.result;
+    var current = result;
+    var group = parseGroupName(str);
+    var groups = parseSubGroups(group);
+    addGroups(groups);
+
+    function parseGroupName(str) {
+      var start = str.indexOf('['), end = str.indexOf(']');
+      return str.substring(start + 1, end);
+    }
+
+    function parseSubGroups(str) {
+      return str.split('.');
+    }
+
+    function addGroup(group) {
+      if (current[group]) {
+        current = current[group];
+      } else {
+        current = current[group] = {};
+      }
+      context.currentGroup = current;
+    }
+
+    function addGroups(groups) {
+      groups.forEach(function (current) {
+        addGroup(current);
+      });
+    }
+  };
+
+  var parseExpression = function (context, line) {
+    var pair = parseNameValueGroup(line);
+    var value = parseValue(pair.value);
+    var currentGroup = getCurrentGroup(context, pair.group);
+    currentGroup[pair.name] = value;
+
+    function getCurrentGroup(context, groups){
+      let current = context.currentGroup || context.result;
+      groups.forEach(function(group){
+        if (current[group]){
+          current = current[group];
+        } else {
+          current = current[group] = {};
+        }
+      });
+      return current;
+    }
+
+    function parseNameValueGroup(line) {
+      var equal = line.split('=');
+      equal[0] = equal[0].split('.')
+
+      return {
+        group: equal[0].slice(0,equal[0].length - 1),
+        name: equal[0][equal[0].length - 1],
+        value: equal[1]
+      };
+    }
+
+    function parseValue(value) {
+      if (array(value)) {
+        return parseArray(value);
+      }
+
+      return parsePrimitive(value);
+
+      function array(value) {
+        return value.charAt(0) === '[' && value.charAt(value.length - 1) === ']';
+      }
+    }
+
+    function parseArray(value) {
+      var values = parseArrayValues(value);
+      return values.map(function (v) {
+        return parseValue(v);
+      });
+
+      function parseArrayValues(value) {
+        var parsed = [];
+        var array = value.substring(1, value.length - 1);
+        var map = commasMap(array);
+        map.reduce(function (prev, next) {
+          let entry = array.substring(prev + 1, next);
+          if (entry){
+            parsed.push(array.substring(prev + 1, next));
+          }
+          return next;
+        }, -1);
+
+        return parsed;
+
+        function commasMap(value) {
+          var map = [];
+          var inArray = false, depth = 0;
+          for (var index = 0; index < value.length; index++) {
+            var element = value[index];
+            if (element === '[') {
+              depth++;
+            } else if (element === ']') {
+              depth--;
+            }
+
+            if (element === ',' && depth === 0) {
+              map.push(index);
+            }
+          }
+
+          map.push(value.length);
+
+          return map;
+        }
+      }
+    }
+
+    function parsePrimitive(value) {
+      if (date(value)) {
+        return new Date(value);
+      }
+
+      return eval(value);
+
+      function date(value) {
+        return (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/).test(value);
+      }
+    }
+  };
+
+  var parseArrayOfTables = function (context, str) {
+    var result = context.result;
+    var current = result;
+    var group = parseArrayName(str);
+    var groups = parseSubGroups(group);
+    addGroups(groups);
+
+    function parseArrayName(str) {
+      var start = str.indexOf('['), end = str.indexOf(']');
+      return str.substring(start + 2, end);
+    }
+
+    function parseSubGroups(str) {
+      return str.split('.');
+    }
+
+    function addGroup(group, last) {
+      if (current[group]) {
+        current = current[group];
+      } else if (last) {
+        current = current[group] = [];
+        current.push({});
+        current = current[current.length - 1];
+      } else {
+        current = current[group] = {};
+      }
+      context.currentGroup = current;
+    }
+
+    function addGroups(groups) {
+      for (let i = 0; i < groups.length; i++){
+        let last = i === groups.length - 1 ? true : false;
+        addGroup(groups[i], last);
+      }
+    }
+  }
+
+  var parseLine = function (context, line) {
+    if (group(line)) {
+      parseGroup(context, line);
+    } else if (expression(line)) {
+      parseExpression(context, line);
+    } else if (arrayOfTables(line)) {
+      parseArrayOfTables(context, line);
+    }
+
+    function group(line) {
+      return line.charAt(0) === '[' && line.charAt(1) !== '[';
+    }
+
+    function expression(line) {
+      return line.indexOf('=') > 0;
+    }
+
+    function arrayOfTables(line) {
+      return line.charAt(0) === '[' && line.charAt(1) === '[';
+    }
+  };
+
+  var parse = function (context, lines) {
+    let i = 0;
+    while (i < lines.length){
+      lines[i] = replaceWhitespaces(stripComments(lines[i]));
+      if (lines[i].length === 0){
+        lines.splice(i,1);
+      } else {
+        i++;
+      }
+    }
+    mergeMultilines(lines).forEach(function (line) {
+      parseLine(context, line);
+    });
+
+    function replaceWhitespaces(line) {
+      return line.replace(/\s/g, '');
+    }
+
+    function stripComments(line) {
+      return line.split('#')[0];
+    }
+
+    function mergeMultilines(lines) {
+      var merged = [], acc = [], capture = false, merge = false;
+      lines.forEach(function (line) {
+        if (multilineArrayStart(line)) {
+          capture = true;
+        }
+
+        if (capture && multilineArrayEnd(line)) {
+          merge = true;
+        }
+
+        if (capture) {
+          acc.push(line);
+        } else {
+          merged.push(line);
+        }
+
+        if (merge) {
+          capture = false; merge = false;
+          merged.push(acc.join(''));
+          acc = [];
+        }
+      });
+
+      return merged;
+
+      function multilineArrayStart(line) {
+        return line.indexOf('[') !== -1 && line.indexOf(']') === -1;
+      }
+
+      function multilineArrayEnd(line) {
+        return line.indexOf(']') !== -1;
+      }
+    }
+  };
+
+  var startParser = function (str) {
+    var context = {}; context.result = {};
+    var lines = str.toString().split('\n');
+
+    parse(context, lines);
+
+    return context.result;
+  };
+
+  String.prototype.replaceAll = function (find, replace) {
+    var str = this;
+    return str.replace(new RegExp(find, 'g'), replace);
+  };
+
+  var escapeString = function (str) {
+    return str
+      .replaceAll('\b', '\\b')
+      .replaceAll('\t', '\\t')
+      .replaceAll('\n', '\\n')
+      .replaceAll('\f', '\\f')
+      .replaceAll('\r', '\\r')
+      .replaceAll('\"', '\\"');
+  };
+
+  var isSimpleType = function (value) {
+    var type = typeof value;
+    var strType = Object.prototype.toString.call(value);
+    return type === 'string' || type === 'number' || type === 'boolean' || strType === '[object Date]' || strType === '[object Array]';
+  };
+
+  var dumpObject = function (value, context) {
+    context = context || [];
+    var type = Object.prototype.toString.call(value);
+    if (type === '[object Date]') {
+      return value.toISOString();
+    } else if (type === '[object Array]') {
+      if (value.length === 0) {
+        return null;
+      }
+      var bracket = '[';
+      for (var index = 0; index < value.length; ++index) {
+        bracket += dump(value[index]) + ', ';
+      }
+      return bracket.substring(0, bracket.length - 2) + ']';
+    }
+
+    var result = '', simleProps = '';
+    var propertyName;
+
+    for (propertyName in value) {
+      if (isSimpleType(value[propertyName])) {
+        simleProps += propertyName + ' = ' + dump(value[propertyName]) + '\n';
+      }
+    }
+
+    if (simleProps) {
+      if (context.length > 0) {
+        var contextName = context.join('.');
+        result += '[' + contextName + ']\n';
+      }
+      result += simleProps + '\n';
+    }
+
+    for (propertyName in value) {
+      if (!isSimpleType(value[propertyName])) {
+        result += dump(value[propertyName], context.concat(propertyName));
+      }
+    }
+
+    return result;
+  };
+
+  var dump = function (value, context) {
+    switch (typeof value) {
+      case 'string':
+        return '"' + escapeString(value) + '"';
+      case 'number':
+        return '' + value;
+      case 'boolean':
+        return value ? 'true' : 'false';
+      case 'object':
+        return dumpObject(value, context);
+    }
+  };
+
+  return {
+    parse: startParser,
+    dump: dump
+  };
+
+})();

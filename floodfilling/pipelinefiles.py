@@ -16,6 +16,8 @@ Globs can be used to pick up multiple source files.
 
 from collections import OrderedDict
 
+import six
+
 STYLESHEETS = OrderedDict()
 
 STYLESHEETS['floodfilling'] = {
@@ -25,11 +27,21 @@ STYLESHEETS['floodfilling'] = {
     'output_filename': 'css/floodfilling.css'
 }
 
+libraries_js = OrderedDict([
+    ('jsfeat', ['*.js']),
+    ])
+
 JAVASCRIPT = OrderedDict()
 
 JAVASCRIPT['floodfilling'] = {
     'source_filenames': (
         'floodfilling/js/widgets/*.js',
     ),
-    'output_filename': 'js/floodfilling.js'
+    'output_filename': 'js/floodfilling.js',
 }
+
+for k, v in six.iteritems(libraries_js):
+    JAVASCRIPT[k + '-lib'] = {
+        'source_filenames': ['floodfilling/libs/%s/%s' % (k, f) for f in v],
+        'output_filename': 'js/libs/%s-lib.js' % k,
+    }

@@ -1,0 +1,24 @@
+{
+  "name": "CATMAID-floodfilling",
+  "version": "1.0.0",
+  "description": "[![Build Status](https://travis-ci.org/willp24/CATMAID-floodfilling.svg?branch=master)](https://travis-ci.org/willp24/CATMAID-floodfilling) [![Coverage Status](https://coveralls.io/repos/github/willp24/CATMAID-floodfilling/badge.svg?branch=master)](https://coveralls.io/github/willp24/CATMAID-floodfilling?branch=master)",
+  "main": "index.js",
+  "dependencies": {
+    "jsfeat": "^0.0.8"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/willp24/CATMAID-floodfilling.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/willp24/CATMAID-floodfilling/issues"
+  },
+  "homepage": "https://github.com/willp24/CATMAID-floodfilling#readme"
+}
