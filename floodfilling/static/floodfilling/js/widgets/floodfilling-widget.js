@@ -41,7 +41,7 @@
       createControls: function (controls) {
 
         // Create the tabs
-        var tabs = CATMAID.DOM.addTabGroup(controls, this.widgetID, ['Server', 'Model', 'Validate', 'Explore']);
+        var tabs = CATMAID.DOM.addTabGroup(controls, this.widgetID, ['Server', 'Model', 'Volumes', 'Validate', 'Explore']);
         // Change content based on currently active tab
         controls.firstChild.onclick = this.refocus.bind(this);
 
@@ -52,16 +52,15 @@
           });
 
         // file button for config files
-        var openConfig = document.createElement('input');
-        openConfig.setAttribute("type", "button");
-        openConfig.setAttribute("id", "open-config");
-        openConfig.setAttribute("value", "Open Config JSON");
-        openConfig.onclick = function () { loadConfigButton.click(); };
+        var uploadConfig = document.createElement('input');
+        uploadConfig.setAttribute("type", "button");
+        uploadConfig.setAttribute("id", "upload-config");
+        uploadConfig.setAttribute("value", "Upload Config JSON");
+        uploadConfig.onclick = function () { loadConfigButton.click(); };
 
         // create Server tab
         CATMAID.DOM.appendToTab(tabs['Server'],
-          [[openConfig],
-          ['Create Config JSON', this.createConfig.bind(this)],
+          [[uploadConfig],
           ['Save Config JSON', this.saveConfig.bind(this)],
           ]);
 
@@ -72,17 +71,22 @@
           });
 
         // file button for model files
-        var openModel = document.createElement('input');
-        openModel.setAttribute("type", "button");
-        openModel.setAttribute("id", "open-model");
-        openModel.setAttribute("value", "Open Model TOML");
-        openModel.onclick = function () { loadModelButton.click(); };
+        var uploadModel = document.createElement('input');
+        uploadModel.setAttribute("type", "button");
+        uploadModel.setAttribute("id", "upload-model");
+        uploadModel.setAttribute("value", "Upload Model TOML");
+        uploadModel.onclick = function () { loadModelButton.click(); };
 
         // create Model tab
         CATMAID.DOM.appendToTab(tabs['Model'],
-          [[openModel],
-          ['Create Model TOML', this.createModel.bind(this)],
+          [[uploadModel],
           ['Save Model TOML', this.saveModel.bind(this)],
+          ]);
+
+        CATMAID.DOM.appendToTab(tabs['Volumes'],
+          [['Upload Volume TOML', this.saveVolumes.bind(this)],
+          ['Load Stack Volume', this.saveVolumes.bind(this)],
+          ['Save Volume TOML', this.saveVolumes.bind(this)],
           ]);
 
         // create validation tab
@@ -154,6 +158,10 @@
     };
   };
 
+  FloodfillingWidget.prototype.downloadTomls = function() {
+    console.log("download tomls");
+    this.saveVolumes();
+  }
   /**
    * initialize the widget
    */
@@ -237,9 +245,6 @@
     });
 
     this.refocus();
-    $("div.config-form > [type='submit']").click(this.createConfig.bind(this));
-    $("div.model-form > [type='submit']").click(this.createModel.bind(this));
-
   };
 
   FloodfillingWidget.prototype.append = function (models) {
@@ -276,10 +281,29 @@
   }
 
   FloodfillingWidget.prototype.run = function () {
+    var tileLayers = project.focusedStackViewer.getLayersOfType(CATMAID.TileLayer);
+    for (var l=0; l<tileLayers.length; ++l) {
+      var tileLayer = tileLayers[l];
+      // Only show visible tile layers
+      if (!tileLayer.visible) {
+        continue;
+      }
+      var tileSource = tileLayer.stack.createTileSourceForMirror(tileLayer.mirrorIndex);
+      var img = document.createElement("img");
+      img.onload = function () {
+        var canvas = document.createElement("canvas");
+        canvas.setAttribute('height', img.width);
+        canvas.setAttribute('width', img.height);
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img,0,0);
+        $('#content-wrapper').append(canvas);
+      };
+      //img.setAttribute("src", tileSource.getTileURL(project.id, tileLayer.stack,[0],0,0,0));
+      img.setAttribute("src", "https://neurocean.janelia.org/ssd-tiles-no-cache/0111-8/115/0/18_13.jpg");
+    }
+  }
 
-    CATMAID.crop(project.id, project.getStackViewer(project.id).primaryStack.id, 5, 5, 5, 10, 10, 10, 1, 0, false);
-
-    /*
+  FloodfillingWidget.prototype.downloadSkeletonTree = function () {
     let skeletonData = this.oTable.row('.selected').data()['skeletonTree'];
     let lines = [];
     skeletonData.forEach(function (node, index) {
@@ -302,7 +326,6 @@
     link.setAttribute('href', data);
     link.setAttribute('download', 'skeleton.csv');
     link.click();
-    */
   }
 
   FloodfillingWidget.prototype.destroy = function () {
@@ -338,17 +361,9 @@
   */
 
   /**
-   * Save the current list of skeletons including their colors to a file.
-   */
-  FloodfillingWidget.prototype.createModel = function () {
-    console.log("TODO: createModel");
-  };
-
-  /**
    * Load in a model file
    */
   FloodfillingWidget.prototype.loadModel = function (file) {
-    console.log("TODO: loadModel")
     this.parseToml(file, 'model');
   };
 
@@ -380,14 +395,6 @@
   */
 
   /**
-   * Save the current list of skeletons including their colors to a file.
-   */
-  FloodfillingWidget.prototype.createConfig = function () {
-    console.log("TODO: createConfig");
-  };
-
-
-  /**
    * Load in a config file
    */
   FloodfillingWidget.prototype.loadConfig = function (file) {
@@ -413,15 +420,49 @@
     saveAs(new Blob([JSON.stringify(data, null, ' ')], { type: 'text/plain' }), filename);
   };
 
+
+  /*
+  -------------------------------------------------------------
+  VOLUMES
+  This section deals with the volume toml
+  */
+
+  /**
+   * Gather the information for the volume toml
+   */
+  FloodfillingWidget.prototype.getVolumes = function () {
+    var tileLayers = project.focusedStackViewer.getLayersOfType(CATMAID.TileLayer);
+    this.configJsons.volumes = {'DataSet':[]};
+    for (var l=0; l<tileLayers.length; ++l) {
+      var tileLayer = tileLayers[l];
+      this.configJsons.volumes['DataSet'].push(tileLayer.stack.mirrors[tileLayer.mirrorIndex]);
+    }
+    this.saveVolumes();
+  }
+
+  /**
+   * Save the current list of skeletons including their colors to a file.
+   */
+  FloodfillingWidget.prototype.saveVolumes = function () {
+    var defaultFileName = 'volumes.toml';
+    var filename = prompt('File name', defaultFileName);
+    if (!filename) return;
+    if (!('volumes' in this.configJsons)) this.getVolumes();
+    var data = toml.dump(this.configJsons.volumes);
+    saveAs(new Blob([data], { type: 'text/plain' }), filename);
+  };
+
   /*
   ---------------------------------------
   TOML PARSER
   */
+
   FloodfillingWidget.prototype.parseToml = function (file, content) {
     let reader = new FileReader();
     let self = this;
     reader.onload = function (e) {
       self.configJsons[content] = toml.parse(reader.result);
+      console.log(toml.dump(self.configJsons[content]));
       self.updateJsons();
     }
     reader.readAsText(file[0]);
@@ -440,7 +481,6 @@
   }
 
   FloodfillingWidget.prototype.updateModelForm = function(model){
-    console.log(model);
     let form = document.getElementById('model-form');
     form.classList.add("selected-setting")
     let keys = Object.keys(model);
@@ -547,6 +587,12 @@
 
 })(CATMAID);
 
+/*
+-----------------------------------------------------------------
+TOML's
+This section is code for reading and writing toml files
+*/
+
 
 var toml = (function () {
 
@@ -602,7 +648,23 @@ var toml = (function () {
 
     function parseNameValueGroup(line) {
       var equal = line.split('=');
-      equal[0] = equal[0].split('.')
+      equal[0] = equal[0].split('.');
+      temp = [];
+      let seenMark = false;
+      let start = 0;
+      for (var index = 0; index < equal[0].length; ++index){
+        if (!seenMark & equal[0][index].indexOf('"')>-1){
+          seenMark = true;
+          seen = index;
+        } else if (seenMark & equal[0][index].indexOf('"')>0){
+          seenMark = false;
+          let comb = equal[0].slice(start, index + 1).join(".");
+          temp.push(comb)
+        } else if (!seenMark){
+          temp.push(equal[0][index]);
+        }
+      }
+      equal[0] = temp;
 
       return {
         group: equal[0].slice(0,equal[0].length - 1),
@@ -823,23 +885,37 @@ var toml = (function () {
   var isSimpleType = function (value) {
     var type = typeof value;
     var strType = Object.prototype.toString.call(value);
-    return type === 'string' || type === 'number' || type === 'boolean' || strType === '[object Date]' || strType === '[object Array]';
+    if (strType === '[object Array]'){
+      return isSimpleType(value[0]);
+    }
+    return type === 'string' || type === 'number' || type === 'boolean' || strType === '[object Date]';
   };
 
-  var dumpObject = function (value, context) {
+  var isArrayOfTables = function(value) {
+    var strType = Object.prototype.toString.call(value);
+    if (strType === '[object Array]'){
+      return !isSimpleType(value[0]);
+    } else {
+      return false;
+    }
+  }
+
+  var dumpObject = function (value, context, aot) {
     context = context || [];
+    aot = aot || false;
     var type = Object.prototype.toString.call(value);
     if (type === '[object Date]') {
       return value.toISOString();
     } else if (type === '[object Array]') {
       if (value.length === 0) {
-        return null;
+        return [];
+      } else if (isSimpleType(value[0])){
+        var bracket = '[';
+        for (var index = 0; index < value.length; ++index) {
+          bracket += dump(value[index]) + ', ';
+        }
+        return bracket.substring(0, bracket.length - 2) + ']';
       }
-      var bracket = '[';
-      for (var index = 0; index < value.length; ++index) {
-        bracket += dump(value[index]) + ', ';
-      }
-      return bracket.substring(0, bracket.length - 2) + ']';
     }
 
     var result = '', simleProps = '';
@@ -853,14 +929,24 @@ var toml = (function () {
 
     if (simleProps) {
       if (context.length > 0) {
-        var contextName = context.join('.');
-        result += '[' + contextName + ']\n';
+        if (aot) {
+          var contextName = context.join('.');
+          result += '[[' + contextName + ']]\n';
+        } else {
+          var contextName = context.join('.');
+          result += '[' + contextName + ']\n';
+        }
       }
       result += simleProps + '\n';
     }
 
     for (propertyName in value) {
-      if (!isSimpleType(value[propertyName])) {
+      if (isArrayOfTables(value[propertyName])){
+        for (var index = 0; index < value[propertyName].length; ++index) {
+          result += dump(value[propertyName][index], context.concat(propertyName), true);
+        }
+      }
+      else if (!isSimpleType(value[propertyName])) {
         result += dump(value[propertyName], context.concat(propertyName));
       }
     }
@@ -868,7 +954,7 @@ var toml = (function () {
     return result;
   };
 
-  var dump = function (value, context) {
+  var dump = function (value, context, aot) {
     switch (typeof value) {
       case 'string':
         return '"' + escapeString(value) + '"';
@@ -877,7 +963,7 @@ var toml = (function () {
       case 'boolean':
         return value ? 'true' : 'false';
       case 'object':
-        return dumpObject(value, context);
+        return dumpObject(value, context, aot);
     }
   };
 
