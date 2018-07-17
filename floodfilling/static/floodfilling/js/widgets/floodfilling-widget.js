@@ -85,7 +85,7 @@
 
         CATMAID.DOM.appendToTab(tabs['Volumes'],
           [['Upload Volume TOML', this.saveVolumes.bind(this)],
-          ['Load Stack Volume', this.saveVolumes.bind(this)],
+          ['Load Stack Volume', this.getVolumes.bind(this)],
           ['Save Volume TOML', this.saveVolumes.bind(this)],
           ]);
 
@@ -432,12 +432,22 @@
    */
   FloodfillingWidget.prototype.getVolumes = function () {
     var tileLayers = project.focusedStackViewer.getLayersOfType(CATMAID.TileLayer);
-    this.configJsons.volumes = {'DataSet':[]};
+    this.configJsons.volumes = {'ImageStack':[], 'HDF5':[]};
     for (var l=0; l<tileLayers.length; ++l) {
       var tileLayer = tileLayers[l];
-      this.configJsons.volumes['DataSet'].push(tileLayer.stack.mirrors[tileLayer.mirrorIndex]);
+      var stackInfo = Object.assign({},tileLayer.stack.mirrors[tileLayer.mirrorIndex]);
+      delete stackInfo.id;
+      delete stackInfo.position;
+      stackInfo['resolution'] = [tileLayer.stack.resolution.x,
+                                 tileLayer.stack.resolution.y,
+                                 tileLayer.stack.resolution.z];
+      stackInfo['dimensions'] = [tileLayer.stack.dimension.x,
+                                 tileLayer.stack.dimension.y,
+                                 tileLayer.stack.dimension.z];
+      stackInfo['broken_slices'] = tileLayer.stack.broken_slices;
+      this.configJsons.volumes['ImageStack'].push(stackInfo);
     }
-    this.saveVolumes();
+    console.log(toml.dump(this.configJsons.volumes));
   }
 
   /**
