@@ -100,7 +100,7 @@
 
         CATMAID.DOM.appendToTab (tabs['Volumes'], [
           ['Upload Volume TOML', this.saveVolumes.bind (this)],
-          ['Load Stack Volume', this.getVolumes.bind (this)],
+          ['Load Stack Volume', this.getVolume.bind (this)],
           ['Save Volume TOML', this.saveVolumes.bind (this)],
         ]);
 
@@ -289,10 +289,19 @@
   };
 
   FloodfillingWidget.prototype.appendOne = function (skid, json) {
+    var arborParser = new CATMAID.ArborParser ();
+
+    // this object will calculate treenode depth
+    var arbor = arborParser.init ('compact-skeleton', json).arbor;
     let row = {
       skeletonID: skid,
       skeletonSize: json[0].length,
-      skeletonTree: json[0],
+      data: json,
+      vertices: json[0].reduce ((vs, vertex) => {
+        vs[vertex[0]] = new THREE.Vector3 (...vertex.slice (3, 6));
+        return vs;
+      }, {}),
+      arbor: arbor,
     };
     this.oTable.rows.add ([row]);
   };
@@ -307,6 +316,9 @@
   };
 
   FloodfillingWidget.prototype.run = function () {
+    this.downloadSkeletonTree ();
+    return;
+
     let tileLayers = project.focusedStackViewer.getLayersOfType (
       CATMAID.TileLayer
     );
@@ -336,29 +348,68 @@
     }
   };
 
-  FloodfillingWidget.prototype.downloadSkeletonTree = function () {
-    let skeletonData = this.oTable.row ('.selected').data ()['skeletonTree'];
-    let lines = [];
-    skeletonData.forEach (function (node, index) {
-      let nid = node[0];
-      let pnid = node[1];
-      let x = node[3];
-      let y = node[4];
-      let z = node[5];
-      let line = nid + ',' + pnid + ',' + x + ',' + y + ',' + z;
-      lines.push (line);
-    });
-    let csv = lines.join ('\n');
+  FloodfillingWidget.prototype.downloadSkeletonTree = function (
+    smooth_skeleton_sigma,
+    resampling_delta
+  ) {
+    resampling_delta = resampling_delta || 1000;
+    smooth_skeleton_sigma = smooth_skeleton_sigma || resampling_delta / 4;
+    let arbor = this.oTable.row ('.selected').data ()['arbor'];
+    let vs = this.oTable.row ('.selected').data ()['vertices'];
+    let downsampled_skeleton = arbor.resampleSlabs (
+      vs,
+      smooth_skeleton_sigma,
+      resampling_delta
+    );
+    console.log (downsampled_skeleton);
+    // console.log (this.checkDistances (vs, downsampled_skeleton));
 
-    if (!csv.match (/^data:text\/csv/i)) {
-      csv = 'data:text/csv;charset=utf-8,' + csv;
+    let csv = 'start: ';
+    for (
+      let i = 0;
+      i < Object.keys (downsampled_skeleton.positions).length;
+      i++
+    ) {
+      csv +=
+        i +
+        ', ' +
+        (downsampled_skeleton.arbor.edges[i] === downsampled_skeleton.arbor.root
+          ? 'none'
+          : downsampled_skeleton.arbor.edges[i]) +
+        ', ' +
+        downsampled_skeleton.positions[i].z +
+        ', ' +
+        downsampled_skeleton.positions[i].y +
+        ', ' +
+        downsampled_skeleton.positions[i].x +
+        '\n';
     }
+
+    console.log (csv);
+
     let data = encodeURI (csv);
 
     let link = document.createElement ('a');
     link.setAttribute ('href', data);
     link.setAttribute ('download', 'skeleton.csv');
     link.click ();
+  };
+
+  FloodfillingWidget.prototype.checkDistances = function (vs, downsampled) {
+    let min_distances = [];
+    for (let i in downsampled.positions) {
+      let min_dist = Infinity;
+      for (let j in vs) {
+        min_dist = Math.min (
+          min_dist,
+          downsampled.positions[i].distanceTo (vs[j])
+        );
+      }
+      min_distances.push (min_dist);
+    }
+    console.log (min_distances.reduce ((a, b) => Math.max (a, b)));
+    console.log (min_distances.reduce ((a, b) => a + b) / min_distances.length);
+    return min_distances;
   };
 
   FloodfillingWidget.prototype.destroy = function () {
@@ -480,7 +531,7 @@
   /**
    * Gather the information for the volume toml
    */
-  FloodfillingWidget.prototype.getVolumes = function () {
+  FloodfillingWidget.prototype.getVolume = function () {
     let tileLayers = project.focusedStackViewer.getLayersOfType (
       CATMAID.TileLayer
     );
@@ -516,7 +567,7 @@
     let defaultFileName = 'volumes.toml';
     let filename = prompt ('File name', defaultFileName);
     if (!filename) return;
-    if (!('volumes' in this.configJsons)) this.getVolumes ();
+    if (!('volumes' in this.configJsons)) this.getVolume ();
     let data = toml.dump (this.configJsons.volumes);
     saveAs (new Blob ([data], {type: 'text/plain'}), filename);
   };
