@@ -17,6 +17,7 @@
     this.oTable = null;
     this.configJsons = {};
     this.settings = {};
+    this.volumes = {};
 
     this.skeletons = [];
   };
@@ -45,6 +46,7 @@
           'Settings',
           'Validate',
           'Explore',
+          'Test',
         ]);
         // Change content based on currently active tab
         controls.firstChild.onclick = this.refocus.bind (this);
@@ -65,6 +67,13 @@
           ['Append', this.loadSource.bind (this)],
           ['Clear', this.clear.bind (this)],
           ['Run', this.run.bind (this)],
+        ]);
+
+        // create validation tab
+        CATMAID.DOM.appendToTab (tabs['Test'], [
+          ['test1', this.test1.bind (this)],
+          ['test2', this.test2.bind (this)],
+          ['test3', this.test3.bind (this)],
         ]);
         $ (controls).tabs ();
       },
@@ -247,6 +256,49 @@
     this.oTable.draw ();
   };
 
+  /*
+
+  TESTING
+
+  */
+
+  FloodfillingWidget.prototype.test1 = function () {
+    var post_data = new FormData ();
+    let setting_values = this.getSettingValues ();
+    Object.keys (setting_values).forEach (function (key) {
+      let filename = key + '.toml';
+      let data = toml.dump (setting_values[key]);
+      let file = new File ([new Blob ([data], {type: 'text/plain'})], filename);
+      post_data.append (file.name, file, file.name);
+    });
+
+    post_data.forEach (function (file) {
+      console.log (file);
+    });
+
+    CATMAID.fetch (
+      'flood-fill',
+      'POST',
+      post_data,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {'Content-type': null}
+    ).then (function (e) {
+      console.log (e);
+    });
+  };
+
+  FloodfillingWidget.prototype.test2 = function () {
+    console.log (this.getSettingValues ());
+  };
+
+  FloodfillingWidget.prototype.test3 = function () {
+    let request = CATMAID.fetch ('flood-fill', 'POST', params);
+    console.log (request);
+  };
+
   FloodfillingWidget.prototype.run = function () {
     console.log (this.settings);
     return;
@@ -406,6 +458,9 @@
      * to populate the settings page automatically.
      * @param {*} args
      */
+
+    let self = this;
+
     let addSettingTemplate = function (args) {
       let fields = {
         type: args.type,
@@ -442,7 +497,7 @@
           let newValue = this.checked;
           settings[label].value = newValue;
         };
-      } else if (type === 'integer_list') {
+      } else if (type === 'integer_list' || type === 'float_list') {
         return function () {
           let newValue = this.value
             .split (',')
@@ -906,6 +961,83 @@
 
     let createDiluvianTrainingDefaults = function (settings) {
       let sub_settings = getSubSettings (settings, 'training');
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'numeric_spinner_int',
+        label: 'num_gpus',
+        name: 'Number of GPUs',
+        helptext: 'Number of GPUs to use for data-parallelism.',
+        value: 1,
+        min: 0,
+        step: 1,
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'numeric_spinner_int',
+        label: 'num_workers',
+        name: 'Number of workers',
+        helptext: 'Number of worker queues to use for generating training data.',
+        value: 4,
+        min: 0,
+        step: 1,
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'numeric_spinner_int',
+        label: 'gpu_batch_size',
+        name: 'GPU batch size',
+        helptext: 'Per-GPU batch size. The effective batch size will be ' +
+          'this times ``num_gpus``.',
+        value: 8,
+        min: 0,
+        step: 1,
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'numeric_spinner_int',
+        label: 'training_size',
+        name: 'Training sample size',
+        helptext: 'Number of samples to use for training **from each volume**.',
+        value: 256,
+        min: 0,
+        step: 1,
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'numeric_spinner_int',
+        label: 'validation_size',
+        name: 'Validation sample size',
+        helptext: 'Number of samples to use for validation **from each volume**.',
+        value: 256,
+        min: 0,
+        step: 1,
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'numeric_spinner_int',
+        label: 'total_epochs',
+        name: 'Total epochs',
+        helptext: 'Maximum number of training epochs.',
+        value: 100,
+        min: 0,
+        step: 1,
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'checkbox',
+        label: 'reset_generators',
+        name: 'Reset generators',
+        helptext: 'Reset training generators after each epoch, so that the training ' +
+          'examples at each epoch are identical.',
+        value: false,
+      });
     };
 
     let createDiluvianPostprocessingDefaults = function (settings) {
@@ -934,6 +1066,108 @@
       createDiluvianPostprocessingDefaults (sub_settings);
     };
 
+    /**
+     * This probably shouldn't be in settings since the behavior
+     * of these files is slightly different. We want two arrays of
+     * objects rather than simple key value pairs.
+     * 
+     * TODO: change how volumes are handled
+     * @param {*} settings 
+     */
+    let createVolumeDefaults = function (settings) {
+      let sub_settings = getSubSettings (settings, 'volume');
+      let volumes = self.getVolumes ();
+      let volume;
+      if (volumes['ImageStack'].length > 0) {
+        volume = volumes['ImageStack'][0];
+      } else if (volumes['HDF5'].length > 0) {
+        volume = volumes['HDF5'][0];
+      } else {
+        CATMAID.msg ('warn', 'No volumes found');
+        return;
+      }
+
+      console.log (volume);
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'string',
+        label: 'file_extension',
+        name: 'File extension',
+        value: volume['file_extension'],
+        helptext: 'File extension for the images.',
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'string',
+        label: 'image_base',
+        name: 'Image base',
+        value: volume['image_base'],
+        helptext: 'Base url for the images.',
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'string',
+        label: 'title',
+        name: 'Mirror title',
+        value: volume['title'],
+        helptext: 'Name of the mirror.',
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'numeric_spinner_int',
+        label: 'tile_height',
+        name: 'Tile height',
+        value: volume['tile_height'],
+        helptext: 'Height of each tile in pixels.',
+        min: 1,
+        step: 1,
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'numeric_spinner_int',
+        label: 'tile_width',
+        name: 'Tile width',
+        value: volume['tile_width'],
+        helptext: 'Width of each tile in pixels.',
+        min: 1,
+        step: 1,
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'numeric_spinner_int',
+        label: 'tile_source_type',
+        name: 'Tile source type',
+        value: volume['tile_source_type'],
+        helptext: 'Each tile source type represents a common storage scheme for easy access.',
+        min: 1,
+        max: 10,
+        step: 1,
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'integer_list',
+        label: 'dimensions',
+        name: 'Volume dimensions',
+        value: volume['dimensions'],
+        helptext: 'The dimensions of the volume in pixels.',
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'float_list',
+        label: 'resolution',
+        name: 'Volume resolution',
+        value: volume['resolution'],
+        helptext: 'The resolution of the volume in nm per pixel.',
+      });
+    };
+
     let createRunDefaults = function (settings) {
       let sub_settings = getSubSettings (settings, 'run');
     };
@@ -942,8 +1176,10 @@
       // Add all settings
       createServerDefaults (settings);
       createDiluvianDefaults (settings);
+      // TODO: change how volumes are handled
+      createVolumeDefaults (settings);
       createRunDefaults (settings);
-    }.bind (this);
+    };
 
     createDefaults (this.settings);
   };
@@ -994,6 +1230,15 @@
       );
     };
 
+    let createFloatListInput = function (args) {
+      return CATMAID.DOM.createInputSetting (
+        args.name,
+        args.value.join (', '),
+        args.helptext,
+        args.change
+      );
+    };
+
     let createStringInput = function (args) {
       return CATMAID.DOM.createInputSetting (
         args.name,
@@ -1026,6 +1271,8 @@
         container.append (createNumericInputSpinner (setting));
       } else if (setting.type === 'integer_list') {
         container.append (createIntegerListInput (setting));
+      } else if (setting.type === 'float_list') {
+        container.append (createFloatListInput (setting));
       } else if (setting.type === 'string') {
         container.append (createStringInput (setting));
       } else if (setting.type === 'checkbox') {
@@ -1112,6 +1359,30 @@
     }.bind (this);
 
     refresh (this.settings);
+  };
+
+  FloodfillingWidget.prototype.getSettingValues = function () {
+    let get_values = function (setting_values, settings) {
+      setting_values = setting_values || {};
+      let keys = Object.keys (settings);
+      if (keys.length > 0) {
+        for (let key of keys) {
+          if (key) {
+            if ('value' in settings[key]) {
+              setting_values[key] = settings[key]['value'];
+            } else if (Object.keys (settings[key]).length > 0) {
+              setting_values[key] = get_values (
+                setting_values[key],
+                settings[key]
+              );
+            }
+          }
+        }
+      }
+      return setting_values;
+    };
+
+    return get_values ({}, this.settings);
   };
 
   /*
@@ -1207,11 +1478,11 @@
   /**
    * Gather the information for the volume toml
    */
-  FloodfillingWidget.prototype.getVolume = function () {
+  FloodfillingWidget.prototype.getVolumes = function () {
     let tileLayers = project.focusedStackViewer.getLayersOfType (
       CATMAID.TileLayer
     );
-    this.configJsons.volumes = {ImageStack: [], HDF5: []};
+    let volumes = {ImageStack: [], HDF5: []};
     for (let l = 0; l < tileLayers.length; ++l) {
       let tileLayer = tileLayers[l];
       let stackInfo = Object.assign (
@@ -1231,9 +1502,9 @@
         tileLayer.stack.dimension.z,
       ];
       stackInfo['broken_slices'] = tileLayer.stack.broken_slices;
-      this.configJsons.volumes['ImageStack'].push (stackInfo);
+      volumes['ImageStack'].push (stackInfo);
     }
-    console.log (toml.dump (this.configJsons.volumes));
+    return volumes;
   };
 
   /**
@@ -1243,8 +1514,8 @@
     let defaultFileName = 'volumes.toml';
     let filename = prompt ('File name', defaultFileName);
     if (!filename) return;
-    if (!('volumes' in this.configJsons)) this.getVolume ();
-    let data = toml.dump (this.configJsons.volumes);
+    if (!('volumes' in this.configJsons)) this.getVolumes ();
+    let data = toml.dump (this.getVolumes ());
     saveAs (new Blob ([data], {type: 'text/plain'}), filename);
   };
 
