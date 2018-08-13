@@ -72,7 +72,7 @@ let toml = (function () {
       return {
         group: equal[0].slice (0, equal[0].length - 1),
         name: equal[0][equal[0].length - 1],
-        value: equal[1],
+        value: equal.slice (1, equal.length).join ('='),
       };
     }
 
@@ -81,12 +81,44 @@ let toml = (function () {
         return parseArray (value);
       }
 
+      if (object (value)) {
+        return parseObject (value);
+      }
+
       return parsePrimitive (value);
 
       function array (value) {
         return (
           value.charAt (0) === '[' && value.charAt (value.length - 1) === ']'
         );
+      }
+
+      function object (value) {
+        return (
+          value.charAt (0) === '{' && value.charAt (value.length - 1) === '}'
+        );
+      }
+    }
+
+    function parseObject (value) {
+      let values = parseObjectValues (value);
+      return values.map (function (v) {
+        return parseExpression (context, v);
+      });
+
+      function parseObjectValues (value) {
+        let parsed = [];
+        let array = value.substring (1, value.length - 1);
+        let map = commasMap (array);
+        map.reduce (function (prev, next) {
+          let entry = array.substring (prev + 1, next);
+          if (entry) {
+            parsed.push (array.substring (prev + 1, next));
+          }
+          return next;
+        }, -1);
+
+        return parsed;
       }
     }
 
@@ -109,28 +141,28 @@ let toml = (function () {
         }, -1);
 
         return parsed;
+      }
+    }
 
-        function commasMap (value) {
-          let map = [];
-          let inArray = false, depth = 0;
-          for (let index = 0; index < value.length; index++) {
-            let element = value[index];
-            if (element === '[') {
-              depth++;
-            } else if (element === ']') {
-              depth--;
-            }
+    function commasMap (value) {
+      let map = [];
+      let depth = 0;
+      for (let index = 0; index < value.length; index++) {
+        let element = value[index];
+        if (element === '[' || element === '{') {
+          depth++;
+        } else if (element === ']' || element === '}') {
+          depth--;
+        }
 
-            if (element === ',' && depth === 0) {
-              map.push (index);
-            }
-          }
-
-          map.push (value.length);
-
-          return map;
+        if (element === ',' && depth === 0) {
+          map.push (index);
         }
       }
+
+      map.push (value.length);
+
+      return map;
     }
 
     function parsePrimitive (value) {
@@ -184,6 +216,7 @@ let toml = (function () {
   };
 
   let parseLine = function (context, line) {
+    console.log(line)
     if (group (line)) {
       parseGroup (context, line);
     } else if (expression (line)) {
@@ -323,8 +356,17 @@ let toml = (function () {
         return [];
       } else if (isSimpleType (value[0])) {
         let bracket = '[';
+        let integers = 0;
         for (let index = 0; index < value.length; ++index) {
-          bracket += dump (value[index]) + ', ';
+          if (typeof value[index] === 'number') {
+            if (Number.isInteger (value[index])) {
+              integers += 1;
+            }
+          }
+        }
+        let all_int = integers === value.length;
+        for (let index = 0; index < value.length; ++index) {
+          bracket += dump (value[index], undefined, undefined, all_int) + ', ';
         }
         return bracket.substring (0, bracket.length - 2) + ']';
       }
@@ -369,12 +411,18 @@ let toml = (function () {
     return result;
   };
 
-  let dump = function (value, context, aot) {
+  let dump = function (value, context, aot, all_int) {
     switch (typeof value) {
       case 'string':
         return '"' + escapeString (value) + '"';
       case 'number':
-        return '' + value;
+        if (all_int) {
+          return '' + value;
+        } else if (Number.isInteger (value)) {
+          return '' + value + '.0';
+        } else {
+          return '' + value;
+        }
       case 'boolean':
         return value ? 'true' : 'false';
       case 'object':

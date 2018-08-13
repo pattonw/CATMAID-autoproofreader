@@ -5,8 +5,6 @@
   /*
   -------------------------------------------------------------
   SETUP
-  This section initializes the widget along with configuring
-  the layout
   */
 
   'use strict';
@@ -17,7 +15,7 @@
     this.oTable = null;
     this.configJsons = {};
     this.settings = {};
-    this.volumes = {};
+    this.volumes = {ImageStack: [], HDF5: []};
 
     this.skeletons = [];
   };
@@ -116,6 +114,355 @@
    * initialize the widget
    */
   FloodfillingWidget.prototype.init = function () {
+    this.initTable ();
+
+    this.initSettings ();
+
+    this.refocus ();
+  };
+
+  /**
+   * Change the widget layout to show the appropriate content per tab.
+   */
+  FloodfillingWidget.prototype.refocus = function () {
+    let content = document.getElementById ('content-wrapper');
+    let views = {
+      Test: 'test',
+      Validate: 'table',
+      Explore: 'table',
+      Settings: 'settings',
+    };
+    let mode = $ ('ul.ui-tabs-nav').children ('.ui-state-active').text ();
+    for (let child of content.childNodes) {
+      if (
+        child.nodeType === Node.ELEMENT_NODE &&
+        child.className === views[mode]
+      ) {
+        child.style.display = 'block';
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        child.style.display = 'none';
+      }
+    }
+  };
+
+  /*
+  ---------------------------------------------------------------
+  TESTING
+  */
+
+  FloodfillingWidget.prototype.test1 = function () {
+    let add_file = function (container, data, file_name) {
+      let file = new File (
+        [
+          new Blob ([data], {
+            type: 'text/plain',
+          }),
+        ],
+        file_name
+      );
+      container.append (file.name, file, file.name);
+    };
+    var post_data = new FormData ();
+    let setting_values = this.getSettingValues ();
+    add_file (post_data, toml.dump (setting_values['diluvian']), 'config.toml');
+    add_file (post_data, toml.dump (this.getVolumes ()), 'volume.toml');
+    add_file (post_data, this.sampleSkeleton (), 'skeleton.csv');
+
+    CATMAID.fetch (
+      'flood-fill',
+      'POST',
+      post_data,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {'Content-type': null}
+    ).then (function (e) {
+      console.log (e);
+    });
+  };
+
+  FloodfillingWidget.prototype.test2 = function () {
+    console.log (this.getSettingValues ());
+  };
+
+  FloodfillingWidget.prototype.test3 = function () {
+    let request = CATMAID.fetch ('flood-fill', 'POST', params);
+    console.log (request);
+  };
+
+  /**
+   * Checks how far downsampled nodes are from the original skeleton nodes
+   * @param {*} vs 
+   * @param {*} downsampled 
+   */
+  FloodfillingWidget.prototype.checkDistances = function (vs, downsampled) {
+    let min_distances = [];
+    for (let i in downsampled.positions) {
+      let min_dist = Infinity;
+      for (let j in vs) {
+        min_dist = Math.min (
+          min_dist,
+          downsampled.positions[i].distanceTo (vs[j])
+        );
+      }
+      min_distances.push (min_dist);
+    }
+    console.log (min_distances.reduce ((a, b) => Math.max (a, b)));
+    console.log (min_distances.reduce ((a, b) => a + b) / min_distances.length);
+    return min_distances;
+  };
+
+  FloodfillingWidget.prototype.run = function () {
+    console.log (this.settings);
+    return;
+    this.sampleSkeleton (1000);
+    return;
+
+    let tileLayers = project.focusedStackViewer.getLayersOfType (
+      CATMAID.TileLayer
+    );
+    for (let l = 0; l < tileLayers.length; ++l) {
+      let tileLayer = tileLayers[l];
+      // Only show visible tile layers
+      if (!tileLayer.visible) {
+        continue;
+      }
+      let tileSource = tileLayer.stack.createTileSourceForMirror (
+        tileLayer.mirrorIndex
+      );
+      let img = document.createElement ('img');
+      img.onload = function () {
+        let canvas = document.createElement ('canvas');
+        canvas.setAttribute ('height', img.width);
+        canvas.setAttribute ('width', img.height);
+        let ctx = canvas.getContext ('2d');
+        ctx.drawImage (img, 0, 0);
+        $ ('#content-wrapper').append (canvas);
+      };
+      //img.setAttribute("src", tileSource.getTileURL(project.id, tileLayer.stack,[0],0,0,0));
+      img.setAttribute (
+        'src',
+        'https://neurocean.janelia.org/ssd-tiles-no-cache/0111-8/115/0/18_13.jpg'
+      );
+    }
+  };
+
+  /*
+  -----------------------------------------------------
+  SKELETONS
+  */
+
+  FloodfillingWidget.prototype.sampleSkeleton = function (
+    resampling_delta,
+    smooth_skeleton_sigma
+  ) {
+    resampling_delta = resampling_delta || 1000;
+    smooth_skeleton_sigma = smooth_skeleton_sigma || resampling_delta / 4;
+    let arbor = this.oTable.row ('.selected').data ()['arbor'];
+    let vs = this.oTable.row ('.selected').data ()['vertices'];
+    let downsampled_skeleton = arbor.resampleSlabs (
+      vs,
+      smooth_skeleton_sigma,
+      resampling_delta
+    );
+
+    let csv = '';
+    for (
+      let i = 0;
+      i < Object.keys (downsampled_skeleton.positions).length;
+      i++
+    ) {
+      csv +=
+        i +
+        ',' +
+        (i === downsampled_skeleton.arbor.root
+          ? 'none'
+          : downsampled_skeleton.arbor.edges[i]) +
+        ',' +
+        (downsampled_skeleton.positions[i].z / 50 - 121) +
+        ',' +
+        downsampled_skeleton.positions[i].y / 3.8 +
+        ',' +
+        downsampled_skeleton.positions[i].x / 3.8 +
+        '\n';
+    }
+
+    /*    
+    let skeleton = this.oTable.row ('.selected').data ()['data'][0];
+    console.log (skeleton);
+    // console.log (this.checkDistances (vs, downsampled_skeleton));
+
+    let csv = '';
+    for (let i = 0; i < skeleton.length; i++) {
+      csv +=
+        skeleton[i][0] +
+        ',' +
+        skeleton[i][1] +
+        ',' +
+        (skeleton[i][5] / 50 - 121) +
+        ',' +
+        skeleton[i][4] / 3.8 +
+        ',' +
+        skeleton[i][3] / 3.8 +
+        '\n';
+    }
+    */
+
+    return csv;
+
+    let data = encodeURI (csv);
+
+    let link = document.createElement ('a');
+    link.setAttribute ('href', data);
+    link.setAttribute ('download', 'skeleton.csv');
+    link.click ();
+  };
+
+  FloodfillingWidget.prototype.getSkeletonCSV = function () {
+    let csv = '';
+    for (
+      let i = 0;
+      i < Object.keys (downsampled_skeleton.positions).length;
+      i++
+    ) {
+      csv +=
+        i +
+        ',' +
+        (i === downsampled_skeleton.arbor.root
+          ? 'none'
+          : downsampled_skeleton.arbor.edges[i]) +
+        ',' +
+        (downsampled_skeleton.positions[i].z / 50 - 121) +
+        ',' +
+        downsampled_skeleton.positions[i].y / 3.8 +
+        ',' +
+        downsampled_skeleton.positions[i].x / 3.8 +
+        '\n';
+    }
+  };
+
+  /*
+  -------------------------------------------------------------
+  VOLUMES
+  This section deals with the volume toml
+  */
+
+  FloodfillingWidget.prototype.addCurrentImageStackVolumes = function () {
+    let tileLayers = project.focusedStackViewer.getLayersOfType (
+      CATMAID.TileLayer
+    );
+    let volumes = this.volumes;
+    for (let l = 0; l < tileLayers.length; ++l) {
+      let tileLayer = tileLayers[l];
+      let stackInfo = Object.assign (
+        {},
+        tileLayer.stack.mirrors[tileLayer.mirrorIndex]
+      );
+      delete stackInfo.id;
+      delete stackInfo.position;
+      stackInfo['resolution'] = [
+        tileLayer.stack.resolution.x,
+        tileLayer.stack.resolution.y,
+        tileLayer.stack.resolution.z,
+      ];
+      stackInfo['dimensions'] = [
+        tileLayer.stack.dimension.x,
+        tileLayer.stack.dimension.y,
+        tileLayer.stack.dimension.z,
+      ];
+      stackInfo['broken_slices'] = tileLayer.stack.broken_slices;
+      volumes['ImageStack'].push (stackInfo);
+    }
+  };
+
+  /**
+   * Gather the information for the volume toml
+   */
+  FloodfillingWidget.prototype.getVolumes = function () {
+    if (
+      this.volumes['ImageStack'].length === 0 &&
+      this.volumes['HDF5'].length === 0
+    ) {
+      this.addCurrentImageStackVolumes ();
+    }
+    return this.volumes;
+  };
+
+  /**
+   * Save the volume data in a toml
+   */
+  FloodfillingWidget.prototype.saveVolumes = function () {
+    if (!('volumes' in this.configJsons)) this.getVolumes ();
+    this.saveToml (this.getVolumes (), 'volumes');
+  };
+
+  /*
+  ---------------------------------------
+  TOML PARSER
+  */
+
+  /**
+   * Save an object as a toml file
+   */
+  FloodfillingWidget.prototype.saveToml = function (object, name) {
+    let filename = name + '.toml';
+    if (!filename) return;
+    let data = toml.dump (object);
+    saveAs (new Blob ([data], {type: 'text/plain'}), filename);
+  };
+
+  FloodfillingWidget.prototype.uploadSettingsToml = function (files, settings) {
+    let self = this;
+    if (!CATMAID.containsSingleValidFile (files, 'toml')) {
+      return;
+    }
+
+    let reader = new FileReader ();
+    reader.onload = function (e) {
+      let uploaded_settings = toml.parse (reader.result);
+
+      /**
+       * This function assumes any setting found in new settings is already
+       * a field in old settings. Thus it just overwrites the values in 
+       * old_settings with the values from new settings
+       * @param {*} old_settings 
+       * @param {*} new_settings 
+       */
+      let update_settings = function (old_settings, new_settings) {
+        Object.keys (new_settings).forEach (function (key) {
+          // first check if the key is in the old_settings
+          if (key in old_settings) {
+            // if the key is part of the old settings, check if it
+            // is a field that can have its value overwritten
+            if ('value' in old_settings[key]) {
+              old_settings[key]['value'] = new_settings[key];
+            } else {
+              // key must be an overarching catagory that contains fields.
+              // Thus fill in each of its fields or sub-catagories.
+              update_settings (old_settings[key], new_settings[key]);
+            }
+          } else {
+            CATMAID.msg (
+              'warn',
+              'The settings field ' +
+                key +
+                ' has not yet been properly implemented'
+            );
+          }
+        });
+      };
+      update_settings (settings, uploaded_settings);
+      self.refreshSettings ();
+    };
+    reader.readAsText (files[0]);
+  };
+
+  /*
+  ------------------------------------------------------------
+  TABLE
+  */
+  FloodfillingWidget.prototype.initTable = function () {
     const self = this;
     const tableID = this.idPrefix + 'datatable';
     const $table = $ ('#' + tableID);
@@ -192,10 +539,6 @@
         this.value = '';
       }
     });
-
-    this.initSettings ();
-
-    this.refocus ();
   };
 
   FloodfillingWidget.prototype.append = function (models) {
@@ -232,8 +575,6 @@
   FloodfillingWidget.prototype.appendOne = function (skid, json) {
     let arborParser = new CATMAID.ArborParser ();
 
-    // this object will calculate treenode depth
-    let arbor = arborParser.init ('compact-skeleton', json).arbor;
     let row = {
       skeletonID: skid,
       skeletonSize: json[0].length,
@@ -242,8 +583,9 @@
         vs[vertex[0]] = new THREE.Vector3 (...vertex.slice (3, 6));
         return vs;
       }, {}),
-      arbor: arbor,
+      arbor: arborParser.init ('compact-skeleton', json).arbor,
     };
+    console.log (row);
     this.oTable.rows.add ([row]);
   };
 
@@ -257,207 +599,243 @@
   };
 
   /*
-
-  TESTING
-
-  */
-
-  FloodfillingWidget.prototype.test1 = function () {
-    var post_data = new FormData ();
-    let setting_values = this.getSettingValues ();
-    Object.keys (setting_values).forEach (function (key) {
-      let filename = key + '.toml';
-      let data = toml.dump (setting_values[key]);
-      let file = new File ([new Blob ([data], {type: 'text/plain'})], filename);
-      post_data.append (file.name, file, file.name);
-    });
-
-    post_data.forEach (function (file) {
-      console.log (file);
-    });
-
-    CATMAID.fetch (
-      'flood-fill',
-      'POST',
-      post_data,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      {'Content-type': null}
-    ).then (function (e) {
-      console.log (e);
-    });
-  };
-
-  FloodfillingWidget.prototype.test2 = function () {
-    console.log (this.getSettingValues ());
-  };
-
-  FloodfillingWidget.prototype.test3 = function () {
-    let request = CATMAID.fetch ('flood-fill', 'POST', params);
-    console.log (request);
-  };
-
-  FloodfillingWidget.prototype.run = function () {
-    console.log (this.settings);
-    return;
-    this.downloadSkeletonTree (1000);
-    return;
-
-    let tileLayers = project.focusedStackViewer.getLayersOfType (
-      CATMAID.TileLayer
-    );
-    for (let l = 0; l < tileLayers.length; ++l) {
-      let tileLayer = tileLayers[l];
-      // Only show visible tile layers
-      if (!tileLayer.visible) {
-        continue;
-      }
-      let tileSource = tileLayer.stack.createTileSourceForMirror (
-        tileLayer.mirrorIndex
-      );
-      let img = document.createElement ('img');
-      img.onload = function () {
-        let canvas = document.createElement ('canvas');
-        canvas.setAttribute ('height', img.width);
-        canvas.setAttribute ('width', img.height);
-        let ctx = canvas.getContext ('2d');
-        ctx.drawImage (img, 0, 0);
-        $ ('#content-wrapper').append (canvas);
-      };
-      //img.setAttribute("src", tileSource.getTileURL(project.id, tileLayer.stack,[0],0,0,0));
-      img.setAttribute (
-        'src',
-        'https://neurocean.janelia.org/ssd-tiles-no-cache/0111-8/115/0/18_13.jpg'
-      );
-    }
-  };
-
-  FloodfillingWidget.prototype.downloadSkeletonTree = function (
-    resampling_delta,
-    smooth_skeleton_sigma
-  ) {
-    resampling_delta = resampling_delta || 1000;
-    smooth_skeleton_sigma = smooth_skeleton_sigma || resampling_delta / 4;
-    let arbor = this.oTable.row ('.selected').data ()['arbor'];
-    let vs = this.oTable.row ('.selected').data ()['vertices'];
-    let downsampled_skeleton = arbor.resampleSlabs (
-      vs,
-      smooth_skeleton_sigma,
-      resampling_delta
-    );
-
-    let csv = '';
-    for (
-      let i = 0;
-      i < Object.keys (downsampled_skeleton.positions).length;
-      i++
-    ) {
-      csv +=
-        i +
-        ',' +
-        (i === downsampled_skeleton.arbor.root
-          ? 'none'
-          : downsampled_skeleton.arbor.edges[i]) +
-        ',' +
-        (downsampled_skeleton.positions[i].z / 50 - 121) +
-        ',' +
-        downsampled_skeleton.positions[i].y / 3.8 +
-        ',' +
-        downsampled_skeleton.positions[i].x / 3.8 +
-        '\n';
-    }
-
-    /*    
-    let skeleton = this.oTable.row ('.selected').data ()['data'][0];
-    console.log (skeleton);
-    // console.log (this.checkDistances (vs, downsampled_skeleton));
-
-    let csv = '';
-    for (let i = 0; i < skeleton.length; i++) {
-      csv +=
-        skeleton[i][0] +
-        ',' +
-        skeleton[i][1] +
-        ',' +
-        (skeleton[i][5] / 50 - 121) +
-        ',' +
-        skeleton[i][4] / 3.8 +
-        ',' +
-        skeleton[i][3] / 3.8 +
-        '\n';
-    }
-    */
-
-    console.log (csv);
-    return;
-
-    let data = encodeURI (csv);
-
-    let link = document.createElement ('a');
-    link.setAttribute ('href', data);
-    link.setAttribute ('download', 'skeleton.csv');
-    link.click ();
-  };
-
-  FloodfillingWidget.prototype.checkDistances = function (vs, downsampled) {
-    let min_distances = [];
-    for (let i in downsampled.positions) {
-      let min_dist = Infinity;
-      for (let j in vs) {
-        min_dist = Math.min (
-          min_dist,
-          downsampled.positions[i].distanceTo (vs[j])
-        );
-      }
-      min_distances.push (min_dist);
-    }
-    console.log (min_distances.reduce ((a, b) => Math.max (a, b)));
-    console.log (min_distances.reduce ((a, b) => a + b) / min_distances.length);
-    return min_distances;
-  };
-
-  FloodfillingWidget.prototype.destroy = function () {
-    this.unregisterInstance ();
-    this.unregisterSource ();
-  };
-
-  FloodfillingWidget.prototype.refocus = function () {
-    let content = document.getElementById ('content-wrapper');
-    let views = {
-      Model: 'model',
-      Server: 'config',
-      Validate: 'table',
-      Explore: 'table',
-      Settings: 'settings',
-    };
-    let mode = $ ('ul.ui-tabs-nav').children ('.ui-state-active').text ();
-    for (let child of content.childNodes) {
-      if (
-        child.nodeType === Node.ELEMENT_NODE &&
-        child.className === views[mode]
-      ) {
-        child.style.display = 'block';
-      } else if (child.nodeType === Node.ELEMENT_NODE) {
-        child.style.display = 'none';
-      }
-    }
-  };
-
-  /*
   -------------------------------------------------------------
   SETTINGS
   This section contains the settings
   */
 
+  FloodfillingWidget.prototype.initSettings = function () {
+    this.createDefaultSettings ();
+
+    this.refreshSettings ();
+  };
+
+  FloodfillingWidget.prototype.refreshSettings = function () {
+    let self = this;
+
+    let createNumericInputSpinner = function (args) {
+      let input = CATMAID.DOM.createInputSetting (
+        args.name,
+        args.value,
+        args.helptext
+      );
+
+      $ (input).find ('input').spinner ({
+        min: args.min,
+        max: args.max,
+        step: args.step,
+        change: args.change,
+        stop: args.change,
+      });
+
+      return input;
+    };
+
+    let createOptionDropdown = function (args) {
+      let dropdown = $ ('<select/>');
+      args.options.forEach (function (o) {
+        this.append (new Option (o.name, o.id));
+      }, dropdown);
+      dropdown.val (args.value);
+
+      dropdown.on ('change', args.change);
+
+      return CATMAID.DOM.createLabeledControl (
+        args.name,
+        dropdown,
+        args.helptext
+      );
+    };
+
+    let createIntegerListInput = function (args) {
+      return CATMAID.DOM.createInputSetting (
+        args.name,
+        args.value.join (', '),
+        args.helptext,
+        args.change
+      );
+    };
+
+    let createFloatListInput = function (args) {
+      return CATMAID.DOM.createInputSetting (
+        args.name,
+        args.value.join (', '),
+        args.helptext,
+        args.change
+      );
+    };
+
+    let createStringInput = function (args) {
+      return CATMAID.DOM.createInputSetting (
+        args.name,
+        args.value,
+        args.helptext,
+        args.change
+      );
+    };
+
+    let createCheckbox = function (args) {
+      return CATMAID.DOM.createCheckboxSetting (
+        args.name,
+        args.value,
+        args.helptext,
+        args.change
+      );
+    };
+
+    let renderSetting = function (container, setting) {
+      if (setting.type === 'option_dropdown') {
+        container.append (createOptionDropdown (setting));
+      } else if (setting.type === 'numeric_spinner_int') {
+        container.append (createNumericInputSpinner (setting));
+      } else if (setting.type === 'numeric_spinner_float') {
+        container.append (createNumericInputSpinner (setting));
+      } else if (setting.type === 'integer_list') {
+        container.append (createIntegerListInput (setting));
+      } else if (setting.type === 'float_list') {
+        container.append (createFloatListInput (setting));
+      } else if (setting.type === 'string') {
+        container.append (createStringInput (setting));
+      } else if (setting.type === 'checkbox') {
+        container.append (createCheckbox (setting));
+      } else {
+        CATMAID.msg ('warn', 'unknown setting type ' + setting.type);
+      }
+    };
+
+    let createSection = function (container, key, values, collapsed) {
+      let section = CATMAID.DOM.addSettingsContainer (
+        container,
+        key + ' settings',
+        collapsed
+      );
+      let depth = section.parents ('div.settings-container').length;
+
+      var fileButton = CATMAID.DOM.createFileButton (
+        undefined,
+        false,
+        function (evt) {
+          self.uploadSettingsToml (evt.target.files, values);
+        }
+      );
+
+      let uploadbutton = $ ('<button class="uploadSettingsFile" />')
+        .button ({
+          icons: {
+            primary: 'ui-icon-arrowthick-1-n',
+          },
+          text: false,
+        })
+        .click (function () {
+          fileButton.click ();
+        });
+      uploadbutton.css ('position', 'absolute');
+      uploadbutton.css ('right', depth + 'em');
+      uploadbutton.css ('margin', '-1.6em 0 0 0');
+
+      let downloadbutton = $ ('<button class="downloadSettingsFile" />')
+        .button ({
+          icons: {
+            primary: 'ui-icon-arrowthick-1-s',
+          },
+          text: false,
+        })
+        .click (function () {
+          self.saveToml (self.getSettingValues ({}, values), key);
+        });
+      downloadbutton.css ('position', 'absolute');
+      downloadbutton.css ('right', depth + 3 + 'em');
+      downloadbutton.css ('margin', '-1.6em 0 0 0');
+
+      section.parent ().width ('100%');
+      $ ('p:first', section.parent ()).after (uploadbutton);
+      section.parent ().width ('100%');
+      $ ('p:first', section.parent ()).after (downloadbutton);
+
+      return section;
+    };
+
+    let renderSettings = function (container, settings) {
+      for (let setting in settings) {
+        if (!('type' in settings[setting])) {
+          let ds = createSection (container, setting, settings[setting], true);
+          renderSettings (ds, settings[setting]);
+        } else {
+          renderSetting (container, settings[setting]);
+        }
+      }
+    };
+
+    let refresh = function (settings) {
+      // get the settings page and clear it
+      let space = $ ('#content-wrapper > #settings');
+      space.width ('100%');
+      space.css ('margin', '0em .5em .5em .5em');
+      $ (space).empty ();
+
+      // Add all settings
+      renderSettings (space, this.settings);
+
+      // Add collapsing support to all settings containers
+      $ ('p.title', space).click (function () {
+        let section = this;
+        $ (section).next ().next ().next ('.content').animate (
+          {
+            height: 'toggle',
+            opacity: 'toggle',
+          },
+          {
+            complete: function () {
+              // change open/close indicator box
+              let open_elements = $ ('.extend-box-open', section);
+              if (open_elements.length > 0) {
+                open_elements.attr ('class', 'extend-box-closed');
+              } else {
+                $ ('.extend-box-closed', section).attr (
+                  'class',
+                  'extend-box-open'
+                );
+              }
+            },
+          }
+        );
+      });
+    }.bind (this);
+
+    refresh (this.settings);
+  };
+
+  FloodfillingWidget.prototype.getSettingValues = function (
+    setting_values,
+    settings
+  ) {
+    setting_values = setting_values || {};
+    settings = settings || this.settings;
+    let keys = Object.keys (settings);
+    if (keys.length > 0) {
+      for (let key of keys) {
+        if (key) {
+          if ('value' in settings[key]) {
+            setting_values[key] = settings[key]['value'];
+          } else if (Object.keys (settings[key]).length > 0) {
+            setting_values[key] = this.getSettingValues (
+              setting_values[key],
+              settings[key]
+            );
+          }
+        }
+      }
+    }
+    return setting_values;
+  };
+
   FloodfillingWidget.prototype.createDefaultSettings = function () {
     /**
-     * Adds necessary information for a new setting into the
-     * default settings variable. This will later be used
-     * to populate the settings page automatically.
-     * @param {*} args
-     */
+   * Adds necessary information for a new setting into the
+   * default settings variable. This will later be used
+   * to populate the settings page automatically.
+   * @param {*} args
+   */
 
     let self = this;
 
@@ -1066,108 +1444,6 @@
       createDiluvianPostprocessingDefaults (sub_settings);
     };
 
-    /**
-     * This probably shouldn't be in settings since the behavior
-     * of these files is slightly different. We want two arrays of
-     * objects rather than simple key value pairs.
-     * 
-     * TODO: change how volumes are handled
-     * @param {*} settings 
-     */
-    let createVolumeDefaults = function (settings) {
-      let sub_settings = getSubSettings (settings, 'volume');
-      let volumes = self.getVolumes ();
-      let volume;
-      if (volumes['ImageStack'].length > 0) {
-        volume = volumes['ImageStack'][0];
-      } else if (volumes['HDF5'].length > 0) {
-        volume = volumes['HDF5'][0];
-      } else {
-        CATMAID.msg ('warn', 'No volumes found');
-        return;
-      }
-
-      console.log (volume);
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'string',
-        label: 'file_extension',
-        name: 'File extension',
-        value: volume['file_extension'],
-        helptext: 'File extension for the images.',
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'string',
-        label: 'image_base',
-        name: 'Image base',
-        value: volume['image_base'],
-        helptext: 'Base url for the images.',
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'string',
-        label: 'title',
-        name: 'Mirror title',
-        value: volume['title'],
-        helptext: 'Name of the mirror.',
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_int',
-        label: 'tile_height',
-        name: 'Tile height',
-        value: volume['tile_height'],
-        helptext: 'Height of each tile in pixels.',
-        min: 1,
-        step: 1,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_int',
-        label: 'tile_width',
-        name: 'Tile width',
-        value: volume['tile_width'],
-        helptext: 'Width of each tile in pixels.',
-        min: 1,
-        step: 1,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_int',
-        label: 'tile_source_type',
-        name: 'Tile source type',
-        value: volume['tile_source_type'],
-        helptext: 'Each tile source type represents a common storage scheme for easy access.',
-        min: 1,
-        max: 10,
-        step: 1,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'integer_list',
-        label: 'dimensions',
-        name: 'Volume dimensions',
-        value: volume['dimensions'],
-        helptext: 'The dimensions of the volume in pixels.',
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'float_list',
-        label: 'resolution',
-        name: 'Volume resolution',
-        value: volume['resolution'],
-        helptext: 'The resolution of the volume in nm per pixel.',
-      });
-    };
-
     let createRunDefaults = function (settings) {
       let sub_settings = getSubSettings (settings, 'run');
     };
@@ -1176,476 +1452,10 @@
       // Add all settings
       createServerDefaults (settings);
       createDiluvianDefaults (settings);
-      // TODO: change how volumes are handled
-      createVolumeDefaults (settings);
       createRunDefaults (settings);
     };
 
     createDefaults (this.settings);
-  };
-
-  FloodfillingWidget.prototype.initSettings = function () {
-    this.createDefaultSettings ();
-
-    let createNumericInputSpinner = function (args) {
-      let input = CATMAID.DOM.createInputSetting (
-        args.name,
-        args.value,
-        args.helptext
-      );
-
-      $ (input).find ('input').spinner ({
-        min: args.min,
-        max: args.max,
-        step: args.step,
-        change: args.change,
-        stop: args.change,
-      });
-
-      return input;
-    };
-
-    let createOptionDropdown = function (args) {
-      let dropdown = $ ('<select/>');
-      args.options.forEach (function (o) {
-        this.append (new Option (o.name, o.id));
-      }, dropdown);
-      dropdown.val (args.value);
-
-      dropdown.on ('change', args.change);
-
-      return CATMAID.DOM.createLabeledControl (
-        args.name,
-        dropdown,
-        args.helptext
-      );
-    };
-
-    let createIntegerListInput = function (args) {
-      return CATMAID.DOM.createInputSetting (
-        args.name,
-        args.value.join (', '),
-        args.helptext,
-        args.change
-      );
-    };
-
-    let createFloatListInput = function (args) {
-      return CATMAID.DOM.createInputSetting (
-        args.name,
-        args.value.join (', '),
-        args.helptext,
-        args.change
-      );
-    };
-
-    let createStringInput = function (args) {
-      return CATMAID.DOM.createInputSetting (
-        args.name,
-        args.value,
-        args.helptext,
-        args.change
-      );
-    };
-
-    let createCheckbox = function (args) {
-      return CATMAID.DOM.createCheckboxSetting (
-        args.name,
-        args.value,
-        args.helptext,
-        args.change
-      );
-    };
-
-    let getInitialSetting = function (settings, title, value) {
-      settings[title] = title in settings ? settings[title] : value;
-      return settings[title];
-    };
-
-    let renderSetting = function (container, setting) {
-      if (setting.type === 'option_dropdown') {
-        container.append (createOptionDropdown (setting));
-      } else if (setting.type === 'numeric_spinner_int') {
-        container.append (createNumericInputSpinner (setting));
-      } else if (setting.type === 'numeric_spinner_float') {
-        container.append (createNumericInputSpinner (setting));
-      } else if (setting.type === 'integer_list') {
-        container.append (createIntegerListInput (setting));
-      } else if (setting.type === 'float_list') {
-        container.append (createFloatListInput (setting));
-      } else if (setting.type === 'string') {
-        container.append (createStringInput (setting));
-      } else if (setting.type === 'checkbox') {
-        container.append (createCheckbox (setting));
-      } else {
-        CATMAID.msg ('warn', 'unknown setting type ' + setting.type);
-      }
-    };
-
-    let createSection = function (container, setting, collapsed) {
-      let section = CATMAID.DOM.addSettingsContainer (
-        container,
-        setting + ' settings',
-        collapsed
-      );
-      let depth = section.parents ('div.settings-container').length;
-
-      let button = $ ('<button class="uploadSettingsFile" />')
-        .button ({
-          icons: {
-            primary: 'ui-icon-document',
-          },
-          text: false,
-        })
-        .click (function () {
-          console.log ('clicked');
-        });
-      button.css ('position', 'absolute');
-      button.css ('right', depth + 'em');
-      button.css ('margin', '-1.6em 0 0 0');
-
-      section.parent ().width ('100%');
-      $ ('p:first', section.parent ()).after (button);
-
-      return section;
-    };
-
-    let renderSettings = function (container, settings) {
-      for (let setting in settings) {
-        if (!('type' in settings[setting])) {
-          let sub_settings = getInitialSetting (settings, setting, {});
-          let ds = createSection (container, setting, true);
-          renderSettings (ds, sub_settings);
-        } else {
-          renderSetting (container, settings[setting]);
-        }
-      }
-    };
-
-    let refresh = function (settings) {
-      // get the settings page and clear it
-      let space = $ ('#content-wrapper > #settings');
-      space.width ('100%');
-      space.css ('margin', '0em .5em .5em .5em');
-      $ (space).empty ();
-
-      // Add all settings
-      renderSettings (space, this.settings);
-
-      // Add collapsing support to all settings containers
-      $ ('p.title', space).click (function () {
-        let section = this;
-        $ (section).next ().next ('.content').animate (
-          {
-            height: 'toggle',
-            opacity: 'toggle',
-          },
-          {
-            complete: function () {
-              // change open/close indicator box
-              let open_elements = $ ('.extend-box-open', section);
-              if (open_elements.length > 0) {
-                open_elements.attr ('class', 'extend-box-closed');
-              } else {
-                $ ('.extend-box-closed', section).attr (
-                  'class',
-                  'extend-box-open'
-                );
-              }
-            },
-          }
-        );
-      });
-    }.bind (this);
-
-    refresh (this.settings);
-  };
-
-  FloodfillingWidget.prototype.getSettingValues = function () {
-    let get_values = function (setting_values, settings) {
-      setting_values = setting_values || {};
-      let keys = Object.keys (settings);
-      if (keys.length > 0) {
-        for (let key of keys) {
-          if (key) {
-            if ('value' in settings[key]) {
-              setting_values[key] = settings[key]['value'];
-            } else if (Object.keys (settings[key]).length > 0) {
-              setting_values[key] = get_values (
-                setting_values[key],
-                settings[key]
-              );
-            }
-          }
-        }
-      }
-      return setting_values;
-    };
-
-    return get_values ({}, this.settings);
-  };
-
-  /*
-  -------------------------------------------------------------
-  MODEL
-  This section contains everything necessary for the front end
-  to send jobs to a server
-  */
-
-  /**
-   * Load in a model file
-   */
-  FloodfillingWidget.prototype.loadModelConfig = function (file) {
-    this.parseToml (file, 'model');
-  };
-
-  /**
-   * Save the current list of skeletons including their colors to a file.
-   */
-  FloodfillingWidget.prototype.saveModelConfig = function () {
-    let today = new Date ();
-    let defaultFileName =
-      'catmaid-model-' +
-      today.getFullYear () +
-      '-' +
-      (today.getMonth () + 1) +
-      '-' +
-      today.getDate () +
-      '.json';
-    let filename = prompt ('File name', defaultFileName);
-    if (!filename) return;
-
-    let data = {
-      server: 'example.int.janelia.org',
-      username: 'person',
-      password: 'passw0rd',
-    };
-
-    saveAs (
-      new Blob ([JSON.stringify (data, null, ' ')], {type: 'text/plain'}),
-      filename
-    );
-  };
-
-  /*
-  -------------------------------------------------------------
-  SERVER
-  This section contains everything necessary for the front end
-  to send jobs to a server
-  */
-
-  /**
-   * Load in a config file
-   */
-  FloodfillingWidget.prototype.loadServerConfig = function (file) {
-    console.log ('TODO: loadConfig');
-  };
-
-  /**
-   * Save the current list of skeletons including their colors to a file.
-   */
-  FloodfillingWidget.prototype.saveServerConfig = function () {
-    let today = new Date ();
-    let defaultFileName =
-      'catmaid-config-' +
-      today.getFullYear () +
-      '-' +
-      (today.getMonth () + 1) +
-      '-' +
-      today.getDate () +
-      '.json';
-    let filename = prompt ('File name', defaultFileName);
-    if (!filename) return;
-
-    let data = {
-      server: 'example.int.janelia.org',
-      username: 'person',
-      password: 'passw0rd',
-    };
-
-    saveAs (
-      new Blob ([JSON.stringify (data, null, ' ')], {type: 'text/plain'}),
-      filename
-    );
-  };
-
-  /*
-  -------------------------------------------------------------
-  VOLUMES
-  This section deals with the volume toml
-  */
-
-  /**
-   * Gather the information for the volume toml
-   */
-  FloodfillingWidget.prototype.getVolumes = function () {
-    let tileLayers = project.focusedStackViewer.getLayersOfType (
-      CATMAID.TileLayer
-    );
-    let volumes = {ImageStack: [], HDF5: []};
-    for (let l = 0; l < tileLayers.length; ++l) {
-      let tileLayer = tileLayers[l];
-      let stackInfo = Object.assign (
-        {},
-        tileLayer.stack.mirrors[tileLayer.mirrorIndex]
-      );
-      delete stackInfo.id;
-      delete stackInfo.position;
-      stackInfo['resolution'] = [
-        tileLayer.stack.resolution.x,
-        tileLayer.stack.resolution.y,
-        tileLayer.stack.resolution.z,
-      ];
-      stackInfo['dimensions'] = [
-        tileLayer.stack.dimension.x,
-        tileLayer.stack.dimension.y,
-        tileLayer.stack.dimension.z,
-      ];
-      stackInfo['broken_slices'] = tileLayer.stack.broken_slices;
-      volumes['ImageStack'].push (stackInfo);
-    }
-    return volumes;
-  };
-
-  /**
-   * Save the current list of skeletons including their colors to a file.
-   */
-  FloodfillingWidget.prototype.saveVolumes = function () {
-    let defaultFileName = 'volumes.toml';
-    let filename = prompt ('File name', defaultFileName);
-    if (!filename) return;
-    if (!('volumes' in this.configJsons)) this.getVolumes ();
-    let data = toml.dump (this.getVolumes ());
-    saveAs (new Blob ([data], {type: 'text/plain'}), filename);
-  };
-
-  /*
-  ---------------------------------------
-  TOML PARSER
-  */
-
-  FloodfillingWidget.prototype.downloadTomls = function () {
-    console.log ('download tomls');
-    this.saveVolumes ();
-    this.saveServerConfig ();
-    this.saveModelConfig ();
-  };
-
-  FloodfillingWidget.prototype.parseToml = function (file, content) {
-    let reader = new FileReader ();
-    let self = this;
-    reader.onload = function (e) {
-      self.configJsons[content] = toml.parse (reader.result);
-      console.log (toml.dump (self.configJsons[content]));
-      self.updateJsons ();
-    };
-    reader.readAsText (file[0]);
-  };
-
-  FloodfillingWidget.prototype.updateJsons = function () {
-    let model = this.configJsons.model;
-    let server = this.configJsons.server;
-    if (model) {
-      this.updateModelForm (model);
-    }
-    if (server) {
-      this.updateServerForm (server);
-    }
-  };
-
-  FloodfillingWidget.prototype.updateModelForm = function (model) {
-    let form = document.getElementById ('model-form');
-    form.classList.add ('selected-setting');
-    let keys = Object.keys (model);
-    for (let i = 0; i < keys.length; i++) {
-      addElement (form, keys[i], model[keys[i]]);
-    }
-
-    function createSubContainer (container, key) {
-      let subContainer = document.createElement ('div');
-      subContainer.style.borderColor = 'red';
-      subContainer.style.borderStyle = 'solid';
-      subContainer.style.padding = '3px';
-      subContainer.style.margin = '3px';
-
-      subContainer.setAttribute ('class', 'model-form-box');
-      if (container.classList.contains ('selected-setting')) {
-        subContainer.classList.add ('seen-setting');
-      } else {
-        subContainer.classList.add ('hidden-setting');
-        subContainer.style.display = 'none';
-      }
-
-      subContainer.onclick = function (e) {
-        if ($ (this).hasClass ('selected-setting')) {
-          $ (
-            'div.seen-setting,' +
-              'div.selected-setting,' +
-              'label.seen-setting,' +
-              'label.selected-setting',
-            this
-          )
-            .removeClass ('seen-setting')
-            .removeClass ('selected-setting')
-            .addClass ('hidden-setting')
-            .css ('display', 'none');
-          $ (this).removeClass ('selected-setting');
-          $ (this).addClass ('seen-setting');
-          console.log (this.firstElementChild.innerHTML + ' deselect');
-          e.stopPropagation ();
-        } else {
-          $ (this)
-            .children ()
-            .removeClass ('hidden-setting')
-            .addClass ('seen-setting')
-            .css ('display', 'block');
-          $ (this).removeClass ('seen-setting');
-          $ (this).addClass ('selected-setting');
-          console.log (this.firstElementChild.innerHTML + ' selected');
-          e.stopPropagation ();
-        }
-      };
-      let title = document.createElement ('p');
-      title.innerHTML = key;
-      subContainer.append (title);
-      return subContainer;
-    }
-
-    function createField (container, key, item) {
-      let fieldLabel;
-      if ((typeof item === 'string') | (typeof item === 'number')) {
-        fieldLabel = document.createElement ('label');
-        fieldLabel.append (document.createTextNode (key + ': '));
-        let field = document.createElement ('input');
-        field.setAttribute ('type', 'text');
-        field.setAttribute ('value', item);
-        fieldLabel.append (field);
-        if (container.classList.contains ('selected-setting')) {
-          fieldLabel.setAttribute ('class', 'seen-setting');
-          fieldLabel.style.display = 'block';
-        } else {
-          fieldLabel.setAttribute ('class', 'hidden-setting');
-          fieldLabel.style.display = 'none';
-        }
-      }
-      return fieldLabel;
-    }
-
-    function addElement (container, key, item) {
-      if (typeof item === 'object' && !Array.isArray (item)) {
-        let subContainer = createSubContainer (container, key);
-        let subKeys = Object.keys (item);
-        for (let j = 0; j < subKeys.length; j++) {
-          addElement (subContainer, subKeys[j], item[subKeys[j]]);
-        }
-        container.append (subContainer);
-      } else {
-        let field = createField (container, key, item);
-        if (field) {
-          container.append (field);
-        }
-      }
-    }
   };
 
   /*
@@ -1653,6 +1463,11 @@
   ADMIN
   This section just registers the widget
   */
+
+  FloodfillingWidget.prototype.destroy = function () {
+    this.unregisterInstance ();
+    this.unregisterSource ();
+  };
 
   CATMAID.FloodfillingWidget = FloodfillingWidget;
 
