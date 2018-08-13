@@ -585,7 +585,6 @@
       }, {}),
       arbor: arborParser.init ('compact-skeleton', json).arbor,
     };
-    console.log (row);
     this.oTable.rows.add ([row]);
   };
 
