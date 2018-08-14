@@ -3,7 +3,7 @@
 
 (function (CATMAID) {
   /*
-  -------------------------------------------------------------
+  --------------------------------------------------------------------------------
   SETUP
   */
 
@@ -72,6 +72,7 @@
           ['test1', this.test1.bind (this)],
           ['test2', this.test2.bind (this)],
           ['test3', this.test3.bind (this)],
+          ['test4', this.test4.bind (this)],
         ]);
         $ (controls).tabs ();
       },
@@ -146,7 +147,7 @@
   };
 
   /*
-  ---------------------------------------------------------------
+  --------------------------------------------------------------------------------
   TESTING
   */
 
@@ -167,6 +168,8 @@
     add_file (post_data, toml.dump (setting_values['diluvian']), 'config.toml');
     add_file (post_data, toml.dump (this.getVolumes ()), 'volume.toml');
     add_file (post_data, this.sampleSkeleton (), 'skeleton.csv');
+    post_data.append ('job_name', 'default');
+    post_data.append ('server_id', this.getServer ());
 
     CATMAID.fetch (
       'flood-fill',
@@ -183,12 +186,37 @@
   };
 
   FloodfillingWidget.prototype.test2 = function () {
-    console.log (this.getSettingValues ());
+    let params = {
+      address: 'cardona-gpu1.int.janelia.org',
+      diluvian_path: 'code/diluvian',
+      env_source: '.virtualenv/cardona-gpu1-py35-tf18/bin/activate',
+    };
+    CATMAID.fetch (
+      project.id + '/add-compute-server',
+      'POST',
+      params
+    ).then (function (e) {
+      console.log (e);
+    });
   };
 
   FloodfillingWidget.prototype.test3 = function () {
-    let request = CATMAID.fetch ('flood-fill', 'POST', params);
-    console.log (request);
+    CATMAID.fetch (project.id + '/compute-servers', 'GET').then (function (e) {
+      console.log (e);
+    });
+  };
+
+  FloodfillingWidget.prototype.test4 = function () {
+    CATMAID.fetch (project.id + '/compute-servers', 'GET').then (function (e) {
+      e.forEach (function (server) {
+        CATMAID.fetch (
+          project.id + '/remove-compute-server/' + server.id,
+          'DELETE'
+        ).then (function (e) {
+          console.log (e);
+        });
+      });
+    });
   };
 
   /**
@@ -249,7 +277,7 @@
   };
 
   /*
-  -----------------------------------------------------
+  --------------------------------------------------------------------------------
   SKELETONS
   */
 
@@ -343,7 +371,7 @@
   };
 
   /*
-  -------------------------------------------------------------
+  --------------------------------------------------------------------------------
   VOLUMES
   This section deals with the volume toml
   */
@@ -398,7 +426,17 @@
   };
 
   /*
-  ---------------------------------------
+  --------------------------------------------------------------------------------
+  Server
+  */
+
+  FloodfillingWidget.prototype.getServer = function () {
+    let server = this.settings.server.compute_server.value;
+    return server;
+  };
+
+  /*
+  --------------------------------------------------------------------------------
   TOML PARSER
   */
 
@@ -459,7 +497,7 @@
   };
 
   /*
-  ------------------------------------------------------------
+  --------------------------------------------------------------------------------
   TABLE
   */
   FloodfillingWidget.prototype.initTable = function () {
@@ -598,7 +636,7 @@
   };
 
   /*
-  -------------------------------------------------------------
+  --------------------------------------------------------------------------------
   SETTINGS
   This section contains the settings
   */
@@ -839,6 +877,9 @@
     let self = this;
 
     let addSettingTemplate = function (args) {
+      if (args.label === 'compute_server') {
+        console.log (args);
+      }
       let fields = {
         type: args.type,
         name: args.name,
@@ -897,6 +938,25 @@
 
     let createServerDefaults = function (settings) {
       let sub_settings = getSubSettings (settings, 'server');
+
+      CATMAID.fetch (project.id + '/compute-servers', 'GET').then (function (
+        e
+      ) {
+        let options = [];
+        e.forEach (function (server) {
+          options.push ({name: server.address, id: server.id});
+        });
+        addSettingTemplate ({
+          settings: sub_settings,
+          type: 'option_dropdown',
+          label: 'compute_server',
+          name: 'Compute server',
+          options: options,
+          helptext: 'The server to use for heavy computations',
+          value: 1,
+        });
+        self.refreshSettings ();
+      });
     };
 
     let createDiluvianVolumeDefaults = function (settings) {
@@ -1458,7 +1518,7 @@
   };
 
   /*
-  -------------------------------------------------------------
+  --------------------------------------------------------------------------------
   ADMIN
   This section just registers the widget
   */

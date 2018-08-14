@@ -216,7 +216,6 @@ let toml = (function () {
   };
 
   let parseLine = function (context, line) {
-    console.log(line)
     if (group (line)) {
       parseGroup (context, line);
     } else if (expression (line)) {
