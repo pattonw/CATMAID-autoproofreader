@@ -73,6 +73,8 @@
           ['test2', this.test2.bind (this)],
           ['test3', this.test3.bind (this)],
           ['test4', this.test4.bind (this)],
+          ['test5', this.test5.bind (this)],
+          ['test6', this.test6.bind (this)],
         ]);
         $ (controls).tabs ();
       },
@@ -169,10 +171,12 @@
     add_file (post_data, toml.dump (this.getVolumes ()), 'volume.toml');
     add_file (post_data, this.sampleSkeleton (), 'skeleton.csv');
     post_data.append ('job_name', 'default');
-    post_data.append ('server_id', this.getServer ());
+    for (let key in setting_values.server) {
+      post_data.append (key, setting_values.server[key]);
+    }
 
     CATMAID.fetch (
-      'flood-fill',
+      project.id + '/flood-fill',
       'POST',
       post_data,
       undefined,
@@ -186,10 +190,10 @@
   };
 
   FloodfillingWidget.prototype.test2 = function () {
+    let self = this;
     let params = {
+      name: 'cardona-gpu1 - diluvian',
       address: 'cardona-gpu1.int.janelia.org',
-      diluvian_path: 'code/diluvian',
-      env_source: '.virtualenv/cardona-gpu1-py35-tf18/bin/activate',
     };
     CATMAID.fetch (
       project.id + '/add-compute-server',
@@ -197,6 +201,7 @@
       params
     ).then (function (e) {
       console.log (e);
+      self.refreshServers ();
     });
   };
 
@@ -207,6 +212,7 @@
   };
 
   FloodfillingWidget.prototype.test4 = function () {
+    let self = this;
     CATMAID.fetch (project.id + '/compute-servers', 'GET').then (function (e) {
       e.forEach (function (server) {
         CATMAID.fetch (
@@ -216,6 +222,21 @@
           console.log (e);
         });
       });
+      self.refreshServers ();
+    });
+  };
+
+  FloodfillingWidget.prototype.test5 = function () {
+    CATMAID.fetch (project.id + '/tasks', 'GET').then (function (e) {
+      console.log (e);
+    });
+  };
+
+  FloodfillingWidget.prototype.test6 = function () {
+    CATMAID.fetch (project.id + '/create-task', 'POST', {
+      time: 60,
+    }).then (function (e) {
+      console.log (e);
     });
   };
 
@@ -427,12 +448,28 @@
 
   /*
   --------------------------------------------------------------------------------
-  Server
+  SERVER
   */
 
   FloodfillingWidget.prototype.getServer = function () {
-    let server = this.settings.server.compute_server.value;
+    let server = this.getSettingValues ({}, this.settings.server);
+    console.log (server);
     return server;
+  };
+
+  FloodfillingWidget.prototype.refreshServers = function () {
+    let self = this;
+    CATMAID.fetch (project.id + '/compute-servers', 'GET').then (function (e) {
+      let options = [];
+      e.forEach (function (server) {
+        options.push ({name: server.name, id: server.id});
+      });
+      self.settings.server.compute_server.options = options;
+      self.settings.server.compute_server.value = options.length > 0
+        ? options[0].id
+        : undefined;
+      self.refreshSettings ();
+    });
   };
 
   /*
@@ -877,9 +914,6 @@
     let self = this;
 
     let addSettingTemplate = function (args) {
-      if (args.label === 'compute_server') {
-        console.log (args);
-      }
       let fields = {
         type: args.type,
         name: args.name,
@@ -939,23 +973,34 @@
     let createServerDefaults = function (settings) {
       let sub_settings = getSubSettings (settings, 'server');
 
-      CATMAID.fetch (project.id + '/compute-servers', 'GET').then (function (
-        e
-      ) {
-        let options = [];
-        e.forEach (function (server) {
-          options.push ({name: server.address, id: server.id});
-        });
-        addSettingTemplate ({
-          settings: sub_settings,
-          type: 'option_dropdown',
-          label: 'compute_server',
-          name: 'Compute server',
-          options: options,
-          helptext: 'The server to use for heavy computations',
-          value: 1,
-        });
-        self.refreshSettings ();
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'option_dropdown',
+        label: 'compute_server',
+        name: 'Compute server',
+        options: [],
+        helptext: 'The server to use for heavy computations',
+        value: undefined,
+      });
+
+      self.refreshServers ();
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'string',
+        label: 'server_diluvian_path',
+        name: 'Diluvian path',
+        value: 'code/diluvian',
+        helptext: 'The path to the diluvian directory on the compute server',
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'string',
+        label: 'server_env_source',
+        name: 'Virtual Environment Source',
+        value: '.virtualenv/cardona-gpu1-py35-tf18/bin/activate',
+        helptext: 'The path to activate your desired virtual environment',
       });
     };
 
