@@ -150,10 +150,58 @@
 
   /*
   --------------------------------------------------------------------------------
+  RUNNING
+  */
+
+  FloodfillingWidget.prototype.floodfill = function () {
+    let add_file = function (container, data, file_name) {
+      let file = new File (
+        [
+          new Blob ([data], {
+            type: 'text/plain',
+          }),
+        ],
+        file_name
+      );
+      container.append (file.name, file, file.name);
+    };
+    var post_data = new FormData ();
+    let setting_values = this.getSettingValues ();
+    add_file (post_data, toml.dump (setting_values['diluvian']), 'config.toml');
+    add_file (post_data, toml.dump (this.getVolumes ()), 'volume.toml');
+    add_file (
+      post_data,
+      this.getSkeleton ({skeleton_id:'1'}),
+      'skeleton.csv'
+    );
+    return;
+
+    for (let key in setting_values.server) {
+      post_data.append (key, setting_values.server[key]);
+    }
+
+    CATMAID.fetch (
+      project.id + '/flood-fill',
+      'POST',
+      post_data,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {'Content-type': null}
+    ).then (function (e) {
+      console.log (e);
+    });
+  };
+
+  /*
+  --------------------------------------------------------------------------------
   TESTING
   */
 
   FloodfillingWidget.prototype.test1 = function () {
+    this.floodfill ();
+    return;
     let add_file = function (container, data, file_name) {
       let file = new File (
         [
@@ -302,7 +350,18 @@
   SKELETONS
   */
 
+  FloodfillingWidget.prototype.getSkeleton = function (run_settings) {
+    let self = this;
+    let skid = run_settings['skeleton_id'];
+    CATMAID.fetch (
+      project.id + '/skeletons/' + skid + '/compact-detail'
+    ).then (function (skeleton) {
+      console.log (skeleton);
+    });
+  };
+
   FloodfillingWidget.prototype.sampleSkeleton = function (
+    skeleton,
     resampling_delta,
     smooth_skeleton_sigma
   ) {
@@ -970,6 +1029,11 @@
       return settings[setting];
     };
 
+    /**
+     * Everything to do with connecting the widget to the
+     * compute server goes here.
+     * @param {*} settings 
+     */
     let createServerDefaults = function (settings) {
       let sub_settings = getSubSettings (settings, 'server');
 
@@ -979,7 +1043,7 @@
         label: 'compute_server',
         name: 'Compute server',
         options: [],
-        helptext: 'The server to use for heavy computations',
+        helptext: 'The compute server to use for floodfilling',
         value: undefined,
       });
 
@@ -990,7 +1054,7 @@
         type: 'string',
         label: 'server_diluvian_path',
         name: 'Diluvian path',
-        value: 'code/diluvian',
+        value: 'diluvian',
         helptext: 'The path to the diluvian directory on the compute server',
       });
 
@@ -999,8 +1063,26 @@
         type: 'string',
         label: 'server_env_source',
         name: 'Virtual Environment Source',
-        value: '.virtualenv/cardona-gpu1-py35-tf18/bin/activate',
+        value: '.virtualenv/diluvian/bin/activate',
         helptext: 'The path to activate your desired virtual environment',
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'string',
+        label: 'server_results_dir',
+        name: 'Results directory',
+        value: 'results',
+        helptext: 'A directory in diluvian to store floodfilling job results',
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'string',
+        label: 'model_file',
+        name: 'Trained model',
+        value: 'diluvian_trained.hpf5',
+        helptext: 'The path to the trained model to be used',
       });
     };
 
@@ -1032,6 +1114,11 @@
       });
     };
 
+    /**
+     * These are the settings related to diluvian and its 
+     * execution
+     * @param {*} settings 
+     */
     let createDiluvianModelDefaults = function (settings) {
       let sub_settings = getSubSettings (settings, 'model');
 
@@ -1548,6 +1635,12 @@
       createDiluvianPostprocessingDefaults (sub_settings);
     };
 
+    /**
+     * These settings control everything to do with input
+     * configuration. Choosing the skeleton, strahler index,
+     * etc. etc.
+     * @param {*} settings 
+     */
     let createRunDefaults = function (settings) {
       let sub_settings = getSubSettings (settings, 'run');
     };
