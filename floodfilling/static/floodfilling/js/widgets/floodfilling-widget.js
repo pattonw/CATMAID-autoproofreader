@@ -49,6 +49,34 @@
         // Change content based on currently active tab
         controls.firstChild.onclick = this.refocus.bind (this);
 
+        var fileButton = CATMAID.DOM.createFileButton (
+          undefined,
+          false,
+          function (evt) {
+            self.uploadSettingsToml (evt.target.files, self.settings);
+          }
+        );
+
+        // create validation tab
+        CATMAID.DOM.appendToTab (tabs['Settings'], [
+          ['Floodfill', this.floodfill.bind (this)],
+          [
+            'Download Settings',
+            function () {
+              self.saveToml (
+                self.getSettingValues (self.settings),
+                'ff_widget_settings.toml'
+              );
+            },
+          ],
+          [
+            'Upload Settings',
+            function () {
+              fileButton.click ();
+            },
+          ],
+        ]);
+
         // create validation tab
         CATMAID.DOM.appendToTab (tabs['Validate'], [
           [document.createTextNode ('From')],
@@ -154,6 +182,26 @@
   */
 
   FloodfillingWidget.prototype.floodfill = function () {
+    let self = this;
+    this.gatherFiles ().then (function (files) {
+      self.sendJob (files);
+    });
+  };
+
+  FloodfillingWidget.prototype.gatherFiles = function () {
+    let self = this;
+    let setting_values = self.getSettingValues ();
+    return this.getSkeleton (setting_values.run).then (function (skeleton_csv) {
+      return {
+        skeleton: skeleton_csv,
+        volume: toml.dump (self.getVolumes ()),
+        server: JSON.stringify (setting_values.server),
+        diluvian: toml.dump (setting_values['diluvian']),
+      };
+    });
+  };
+
+  FloodfillingWidget.prototype.sendJob = function (files) {
     let add_file = function (container, data, file_name) {
       let file = new File (
         [
@@ -166,19 +214,10 @@
       container.append (file.name, file, file.name);
     };
     var post_data = new FormData ();
-    let setting_values = this.getSettingValues ();
-    add_file (post_data, toml.dump (setting_values['diluvian']), 'config.toml');
-    add_file (post_data, toml.dump (this.getVolumes ()), 'volume.toml');
-    add_file (
-      post_data,
-      this.getSkeleton ({skeleton_id:'1'}),
-      'skeleton.csv'
-    );
-    return;
-
-    for (let key in setting_values.server) {
-      post_data.append (key, setting_values.server[key]);
-    }
+    add_file (post_data, files.diluvian, 'config.toml');
+    add_file (post_data, files.volume, 'volume.toml');
+    add_file (post_data, files.skeleton, 'skeleton.csv');
+    add_file (post_data, files.server, 'server.json');
 
     CATMAID.fetch (
       project.id + '/flood-fill',
@@ -189,9 +228,13 @@
       undefined,
       undefined,
       {'Content-type': null}
-    ).then (function (e) {
-      console.log (e);
-    });
+    )
+      .then (function (e) {
+        console.log (e);
+      })
+      .catch (function (error) {
+        CATMAID.handleError (error);
+      });
   };
 
   /*
@@ -200,40 +243,8 @@
   */
 
   FloodfillingWidget.prototype.test1 = function () {
-    this.floodfill ();
-    return;
-    let add_file = function (container, data, file_name) {
-      let file = new File (
-        [
-          new Blob ([data], {
-            type: 'text/plain',
-          }),
-        ],
-        file_name
-      );
-      container.append (file.name, file, file.name);
-    };
-    var post_data = new FormData ();
-    let setting_values = this.getSettingValues ();
-    add_file (post_data, toml.dump (setting_values['diluvian']), 'config.toml');
-    add_file (post_data, toml.dump (this.getVolumes ()), 'volume.toml');
-    add_file (post_data, this.sampleSkeleton (), 'skeleton.csv');
-    post_data.append ('job_name', 'default');
-    for (let key in setting_values.server) {
-      post_data.append (key, setting_values.server[key]);
-    }
-
-    CATMAID.fetch (
-      project.id + '/flood-fill',
-      'POST',
-      post_data,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      {'Content-type': null}
-    ).then (function (e) {
-      console.log (e);
+    this.getSkeleton ().then (function (result) {
+      console.log (result);
     });
   };
 
@@ -311,9 +322,7 @@
   };
 
   FloodfillingWidget.prototype.run = function () {
-    console.log (this.settings);
-    return;
-    this.sampleSkeleton (1000);
+    this.floodfill ();
     return;
 
     let tileLayers = project.focusedStackViewer.getLayersOfType (
@@ -350,104 +359,99 @@
   SKELETONS
   */
 
-  FloodfillingWidget.prototype.getSkeleton = function (run_settings) {
+  let getVertices = function (nodes) {
+    return nodes.reduce ((vs, vertex) => {
+      vs[vertex[0]] = new THREE.Vector3 (...vertex.slice (3, 6));
+      return vs;
+    }, {});
+  };
+
+  FloodfillingWidget.prototype.getSkeleton = function () {
     let self = this;
+    let run_settings = self.getSettingValues (self.settings).run;
     let skid = run_settings['skeleton_id'];
-    CATMAID.fetch (
-      project.id + '/skeletons/' + skid + '/compact-detail'
-    ).then (function (skeleton) {
-      console.log (skeleton);
-    });
+    return CATMAID.fetch (project.id + '/skeletons/' + skid + '/compact-detail')
+      .then (function (skeleton_json) {
+        let arborParser = new CATMAID.ArborParser ();
+        let arbor = arborParser.init ('compact-skeleton', skeleton_json).arbor;
+        let nodes = getVertices (skeleton_json[0]);
+        if (run_settings['filter_by_strahler']) {
+          let strahler = arbor.strahlerAnalysis ();
+          if (
+            !Object.values (strahler).filter (
+              index => index >= run_settings.strahler_filter
+            ).length > 0
+          ) {
+            CATMAID.msg (
+              'warn',
+              'The chosen strahler index filter excludes all nodes'
+            );
+            throw 'strahler index too high. Max strahler index in this skeleton is: (' +
+              Object.values (strahler).reduce ((a, b) => Math.max (a, b)) +
+              ')';
+          }
+          [arbor.edges, nodes] = [
+            Object.keys (arbor.edges)
+              .filter (id => strahler[id] >= run_settings.strahler_filter)
+              .reduce (function (a, b) {
+                a[b] = arbor.edges[b];
+                return a;
+              }, {}),
+            Object.keys (nodes)
+              .filter (id => strahler[id] >= run_settings.strahler_filter)
+              .reduce (function (a, b) {
+                a[b] = nodes[b];
+                return a;
+              }, {}),
+          ];
+        }
+        if (run_settings['resample']) {
+          [arbor, nodes] = self.sampleSkeleton (
+            arbor,
+            nodes,
+            run_settings.resampling_delta,
+            run_settings.smoothing_sigma
+          );
+        }
+        return self.skeletonToCSV (arbor, nodes);
+      })
+      .catch (function (error) {
+        CATMAID.handleError (error);
+      });
   };
 
   FloodfillingWidget.prototype.sampleSkeleton = function (
-    skeleton,
+    arbor,
+    nodes,
     resampling_delta,
-    smooth_skeleton_sigma
+    smoothing_sigma
   ) {
     resampling_delta = resampling_delta || 1000;
-    smooth_skeleton_sigma = smooth_skeleton_sigma || resampling_delta / 4;
-    let arbor = this.oTable.row ('.selected').data ()['arbor'];
-    let vs = this.oTable.row ('.selected').data ()['vertices'];
+    smoothing_sigma = smoothing_sigma || resampling_delta / 4;
     let downsampled_skeleton = arbor.resampleSlabs (
-      vs,
-      smooth_skeleton_sigma,
+      nodes,
+      smoothing_sigma,
       resampling_delta
     );
-
-    let csv = '';
-    for (
-      let i = 0;
-      i < Object.keys (downsampled_skeleton.positions).length;
-      i++
-    ) {
-      csv +=
-        i +
-        ',' +
-        (i === downsampled_skeleton.arbor.root
-          ? 'none'
-          : downsampled_skeleton.arbor.edges[i]) +
-        ',' +
-        (downsampled_skeleton.positions[i].z / 50 - 121) +
-        ',' +
-        downsampled_skeleton.positions[i].y / 3.8 +
-        ',' +
-        downsampled_skeleton.positions[i].x / 3.8 +
-        '\n';
-    }
-
-    /*    
-    let skeleton = this.oTable.row ('.selected').data ()['data'][0];
-    console.log (skeleton);
-    // console.log (this.checkDistances (vs, downsampled_skeleton));
-
-    let csv = '';
-    for (let i = 0; i < skeleton.length; i++) {
-      csv +=
-        skeleton[i][0] +
-        ',' +
-        skeleton[i][1] +
-        ',' +
-        (skeleton[i][5] / 50 - 121) +
-        ',' +
-        skeleton[i][4] / 3.8 +
-        ',' +
-        skeleton[i][3] / 3.8 +
-        '\n';
-    }
-    */
-
-    return csv;
-
-    let data = encodeURI (csv);
-
-    let link = document.createElement ('a');
-    link.setAttribute ('href', data);
-    link.setAttribute ('download', 'skeleton.csv');
-    link.click ();
+    return [downsampled_skeleton.arbor, downsampled_skeleton.positions];
   };
 
-  FloodfillingWidget.prototype.getSkeletonCSV = function () {
+  FloodfillingWidget.prototype.skeletonToCSV = function (arbor, nodes) {
     let csv = '';
-    for (
-      let i = 0;
-      i < Object.keys (downsampled_skeleton.positions).length;
-      i++
-    ) {
+    for (let i = 0; i < Object.keys (nodes).length; i++) {
       csv +=
         i +
         ',' +
-        (i === downsampled_skeleton.arbor.root
-          ? 'none'
-          : downsampled_skeleton.arbor.edges[i]) +
+        arbor.edges[i] +
         ',' +
-        (downsampled_skeleton.positions[i].z / 50 - 121) +
+        nodes[i].z +
         ',' +
-        downsampled_skeleton.positions[i].y / 3.8 +
+        nodes[i].y +
         ',' +
-        downsampled_skeleton.positions[i].x / 3.8 +
+        nodes[i].x +
         '\n';
     }
+    return csv;
   };
 
   /*
@@ -511,7 +515,7 @@
   */
 
   FloodfillingWidget.prototype.getServer = function () {
-    let server = this.getSettingValues ({}, this.settings.server);
+    let server = this.getSettingValues (this.settings.server);
     console.log (server);
     return server;
   };
@@ -523,8 +527,8 @@
       e.forEach (function (server) {
         options.push ({name: server.name, id: server.id});
       });
-      self.settings.server.compute_server.options = options;
-      self.settings.server.compute_server.value = options.length > 0
+      self.settings.server.id.options = options;
+      self.settings.server.id.value = options.length > 0
         ? options[0].id
         : undefined;
       self.refreshSettings ();
@@ -874,7 +878,7 @@
           text: false,
         })
         .click (function () {
-          self.saveToml (self.getSettingValues ({}, values), key);
+          self.saveToml (self.getSettingValues (values), key);
         });
       downloadbutton.css ('position', 'absolute');
       downloadbutton.css ('right', depth + 3 + 'em');
@@ -939,8 +943,8 @@
   };
 
   FloodfillingWidget.prototype.getSettingValues = function (
-    setting_values,
-    settings
+    settings,
+    setting_values
   ) {
     setting_values = setting_values || {};
     settings = settings || this.settings;
@@ -952,8 +956,8 @@
             setting_values[key] = settings[key]['value'];
           } else if (Object.keys (settings[key]).length > 0) {
             setting_values[key] = this.getSettingValues (
-              setting_values[key],
-              settings[key]
+              settings[key],
+              setting_values[key]
             );
           }
         }
@@ -982,6 +986,8 @@
         max: args.max,
         step: args.step,
         options: args.options,
+        get_choices: args.get_choices,
+        mode: args.mode,
         change: getChangeFunc (args.type, args.settings, args.label),
       };
       args.settings[args.label] = fields;
@@ -1040,7 +1046,7 @@
       addSettingTemplate ({
         settings: sub_settings,
         type: 'option_dropdown',
-        label: 'compute_server',
+        label: 'id',
         name: 'Compute server',
         options: [],
         helptext: 'The compute server to use for floodfilling',
@@ -1052,7 +1058,7 @@
       addSettingTemplate ({
         settings: sub_settings,
         type: 'string',
-        label: 'server_diluvian_path',
+        label: 'diluvian_path',
         name: 'Diluvian path',
         value: 'diluvian',
         helptext: 'The path to the diluvian directory on the compute server',
@@ -1061,7 +1067,7 @@
       addSettingTemplate ({
         settings: sub_settings,
         type: 'string',
-        label: 'server_env_source',
+        label: 'env_source',
         name: 'Virtual Environment Source',
         value: '.virtualenv/diluvian/bin/activate',
         helptext: 'The path to activate your desired virtual environment',
@@ -1070,7 +1076,7 @@
       addSettingTemplate ({
         settings: sub_settings,
         type: 'string',
-        label: 'server_results_dir',
+        label: 'results_dir',
         name: 'Results directory',
         value: 'results',
         helptext: 'A directory in diluvian to store floodfilling job results',
@@ -1643,6 +1649,61 @@
      */
     let createRunDefaults = function (settings) {
       let sub_settings = getSubSettings (settings, 'run');
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'numeric_spinner_int',
+        label: 'skeleton_id',
+        name: 'Skeleton id',
+        helptext: 'The id of the skeleton to be used for flood filling',
+        value: 1,
+        min: 0,
+        step: 1,
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'checkbox',
+        label: 'resample',
+        name: 'Resample',
+        value: true,
+        helptext: 'Whether or not you want to resample the skeleton at ' +
+          'regular intervals. This is highly recommended for floodfilling.',
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'numeric_spinner_int',
+        label: 'resampling_delta',
+        name: 'Resampling delta',
+        helptext: 'The distance to use when downsampling a skeleton. ' +
+          'Each new neuron will have approximately a distance of delta ' +
+          'nm to its neighbors',
+        value: 1000,
+        min: 0,
+        step: 1,
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'checkbox',
+        label: 'filter_by_strahler',
+        name: 'Filter by strahler index',
+        value: true,
+        helptext: 'Whether or not you want to filter out sections of the skeleton ' +
+          'based on the strahler index.',
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'numeric_spinner_int',
+        label: 'strahler_filter',
+        name: 'Strahler filter',
+        helptext: 'The minimum strahler index to perform flood filling on.',
+        value: 0,
+        min: 0,
+        step: 1,
+      });
     };
 
     let createDefaults = function (settings) {
@@ -1675,3 +1736,104 @@
     creator: FloodfillingWidget,
   });
 }) (CATMAID);
+
+/*
+let initOptionList = function (args, newSelectedChoices) {
+      return args
+        .get_choices (project.id)
+        .then (function (json) {
+          let choices = json
+            .sort (function (a, b) {
+              return CATMAID.tools.compareStrings (a.name, b.name);
+            })
+            .map (function (choice) {
+              return {
+                title: choice['name'],
+                value: choice['id'],
+              };
+            });
+          if (args.mode === 'radio') {
+            let selectedChoices = newSelectedChoices || args.selectedChoices;
+            if (selectedChoices.length > 1) {
+              throw new CATMAID.ValueError (
+                'Radio select only takes one selected option'
+              );
+            }
+            // Create actual element based on the returned data
+            let node = CATMAID.DOM.createRadioSelect (
+              'Choices',
+              choices,
+              selectedChoices[0],
+              true
+            );
+            // Add a selection handler
+            node.onchange = function (e) {
+              let choiceId = parseInt (e.target.value, 10);
+              let selected = true;
+
+              if (CATMAID.tools.isFn (args.select)) {
+                args.select (choiceId, selected, e.target);
+              }
+            };
+            return node;
+          } else {
+            let selectedChoices = newSelectedChoices || args.selectedChoices;
+            // Create actual element based on the returned data
+            let node = CATMAID.DOM.createCheckboxSelect (
+              'Choices',
+              choices,
+              selectedChoices,
+              true,
+              args.rowCallback
+            );
+
+            // Add a selection handler
+            node.onchange = function (e) {
+              let selected = e.target.checked;
+              let choiceId = parseInt (e.target.value, 10);
+
+              if (CATMAID.tools.isFn (args.select)) {
+                args.select (choiceId, selected, e.target);
+              }
+            };
+            return node;
+          }
+        })
+        .catch (function (e) {
+          CATMAID.msg ('warn', 'unknown project id: ' + project.id);
+        });
+    };
+
+    let createAsyncOptionDropdown = function (args) {
+      let optionDropdownWrapper = document.createElement ('span');
+      let optionDropdown;
+      optionDropdown = CATMAID.DOM
+        .createLabeledAsyncPlaceholder (
+          args.label,
+          initOptionList (args),
+          args.name
+        )
+        .get (0);
+      optionDropdownWrapper.appendChild (optionDropdown);
+      optionDropdownWrapper.refresh = function (newSelectedIds) {
+        while (0 !== optionDropdownWrapper.children.length) {
+          optionDropdownWrapper.removeChild (optionDropdownWrapper.children[0]);
+        }
+        let optionDropdown = CATMAID.DOM
+          .createLabeledAsyncPlaceholder (
+            args.label,
+            initOptionList (args, newSelectedIds),
+            args.title
+          )
+          .get (0);
+        optionDropdownWrapper.appendChild (optionDropdown);
+      };
+      return optionDropdownWrapper;
+    };
+
+
+
+
+      } else if (setting.type === 'async_option_dropdown') {
+        container.append (createAsyncOptionDropdown (setting));
+*/
