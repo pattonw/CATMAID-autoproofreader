@@ -33,7 +33,8 @@
   };
 
   FloodfillingWidget.prototype.getWidgetConfiguration = function () {
-    const tableID = this.idPrefix + 'datatable';
+    const jobsTableID = this.idPrefix + 'datatable-jobs';
+    const resultsTableID = this.idPrefix + 'datatable-results';
     let self = this;
     return {
       helpText: 'Floodfilling Widget: ',
@@ -41,9 +42,9 @@
       createControls: function (controls) {
         // Create the tabs
         let tabs = CATMAID.DOM.addTabGroup (controls, this.widgetID, [
-          'Settings',
-          'Validate',
-          'Explore',
+          'Run',
+          'Jobs',
+          'Results',
           'Test',
         ]);
         // Change content based on currently active tab
@@ -58,7 +59,7 @@
         );
 
         // create validation tab
-        CATMAID.DOM.appendToTab (tabs['Settings'], [
+        CATMAID.DOM.appendToTab (tabs['Run'], [
           ['Floodfill', this.floodfill.bind (this)],
           [
             'Download Settings',
@@ -77,32 +78,13 @@
           ],
         ]);
 
-        // create validation tab
-        CATMAID.DOM.appendToTab (tabs['Validate'], [
-          [document.createTextNode ('From')],
-          [CATMAID.skeletonListSources.createSelect (this)],
-          ['Append', this.loadSource.bind (this)],
-          ['Clear', this.clear.bind (this)],
-          ['Run', this.run.bind (this)],
-        ]);
-
-        // create explore tab
-        CATMAID.DOM.appendToTab (tabs['Explore'], [
-          [document.createTextNode ('From')],
-          [CATMAID.skeletonListSources.createSelect (this)],
-          ['Append', this.loadSource.bind (this)],
-          ['Clear', this.clear.bind (this)],
-          ['Run', this.run.bind (this)],
-        ]);
-
-        // create validation tab
         CATMAID.DOM.appendToTab (tabs['Test'], [
           ['test1', this.test1.bind (this)],
           ['test2', this.test2.bind (this)],
           ['test3', this.test3.bind (this)],
           ['test4', this.test4.bind (this)],
           ['test5', this.test5.bind (this)],
-          ['test6', this.test6.bind (this)],
+          ['testOpticalFlow', this.testOpticalFlow.bind (this)],
         ]);
         $ (controls).tabs ();
       },
@@ -110,23 +92,45 @@
       createContent: function (container) {
         container.innerHTML = `
         <div id="content-wrapper">
-          <div class="table">
-            <table cellpadding="0" cellspacing="0" border="0" class="display" id="${tableID}">
+          <div class="jobs">
+            <table cellpadding="0" cellspacing="0" border="0" class="display" id="${jobsTableID}">
               <thead>
                 <tr>
+                  <th>Submission Date
+                    <input type="date" name="submissionDate" id="${this.idPrefix}search-submission-dat"
+                    class="search_init"/>
+                  </th>
                   <th>Skeleton ID
                     <input type="number" name="searchSkeletonId" id="${this.idPrefix}search-skeleton-id"
-                      value="0" class="search_init"/></th>
-                  <th>Skeleton Size
-                    <input type="number" name="searchSkeletonSize" id="${this.idPrefix}search-skeleton-size"
                       value="0" class="search_init"/>
                   </th>
                 </tr>
               </thead>
               <tfoot>
                 <tr>
+                  <th>submission Date</th>
                   <th>skeleton ID</th>
-                  <th>skeleton Size</th>
+                </tr>
+              </tfoot>
+              <tbody>
+              </tbody>
+            </table>
+          </div>
+          <div class="results">
+            <table cellpadding="0" cellspacing="0" border="0" class="display" id="${resultsTableID}">
+              <thead>
+                <tr>
+                  <th>Skeleton ID
+                    <input type="number" name="searchSkeletonId" id="${this.idPrefix}search-skeleton-id"
+                      value="0" class="search_init"/></th>
+                  <th>Nodes Filled (percent)
+                  </th>
+                </tr>
+              </thead>
+              <tfoot>
+                <tr>
+                  <th>skeleton ID</th>
+                  <th>nodes filled</th>
                 </tr>
               </tfoot>
               <tbody>
@@ -145,7 +149,7 @@
    * initialize the widget
    */
   FloodfillingWidget.prototype.init = function () {
-    this.initTable ();
+    this.initTables ();
 
     this.initSettings ();
 
@@ -158,10 +162,10 @@
   FloodfillingWidget.prototype.refocus = function () {
     let content = document.getElementById ('content-wrapper');
     let views = {
-      Test: 'test',
-      Validate: 'table',
-      Explore: 'table',
-      Settings: 'settings',
+      Run: 'settings',
+      Jobs: 'jobs',
+      Results: 'results',
+      Test: 'none',
     };
     let mode = $ ('ul.ui-tabs-nav').children ('.ui-state-active').text ();
     for (let child of content.childNodes) {
@@ -291,67 +295,181 @@
     });
   };
 
-  FloodfillingWidget.prototype.test6 = function () {
-    CATMAID.fetch (project.id + '/create-task', 'POST', {
-      time: 60,
-    }).then (function (e) {
-      console.log (e);
-    });
-  };
-
-  /**
-   * Checks how far downsampled nodes are from the original skeleton nodes
-   * @param {*} vs 
-   * @param {*} downsampled 
-   */
-  FloodfillingWidget.prototype.checkDistances = function (vs, downsampled) {
-    let min_distances = [];
-    for (let i in downsampled.positions) {
-      let min_dist = Infinity;
-      for (let j in vs) {
-        min_dist = Math.min (
-          min_dist,
-          downsampled.positions[i].distanceTo (vs[j])
-        );
-      }
-      min_distances.push (min_dist);
-    }
-    console.log (min_distances.reduce ((a, b) => Math.max (a, b)));
-    console.log (min_distances.reduce ((a, b) => a + b) / min_distances.length);
-    return min_distances;
-  };
-
-  FloodfillingWidget.prototype.run = function () {
-    this.floodfill ();
-    return;
-
+  FloodfillingWidget.prototype.testOpticalFlow = function () {
     let tileLayers = project.focusedStackViewer.getLayersOfType (
       CATMAID.TileLayer
     );
-    for (let l = 0; l < tileLayers.length; ++l) {
-      let tileLayer = tileLayers[l];
-      // Only show visible tile layers
-      if (!tileLayer.visible) {
-        continue;
+    let i = 0;
+    let tileLayer = tileLayers[i];
+    // Only get a visible tile layers
+    while (!tileLayer.visible) {
+      if (i > tileLayers.length) {
+        throw 'no visible layers';
       }
-      let tileSource = tileLayer.stack.createTileSourceForMirror (
-        tileLayer.mirrorIndex
-      );
-      let img = document.createElement ('img');
-      img.onload = function () {
-        let canvas = document.createElement ('canvas');
-        canvas.setAttribute ('height', img.width);
-        canvas.setAttribute ('width', img.height);
-        let ctx = canvas.getContext ('2d');
-        ctx.drawImage (img, 0, 0);
-        $ ('#content-wrapper').append (canvas);
-      };
-      //img.setAttribute("src", tileSource.getTileURL(project.id, tileLayer.stack,[0],0,0,0));
-      img.setAttribute (
-        'src',
-        'https://neurocean.janelia.org/ssd-tiles-no-cache/0111-8/115/0/18_13.jpg'
-      );
+      i = i + 1;
+      tileLayer = tileLayers[i];
     }
+
+    let tileSource = tileLayer.stack.createTileSourceForMirror (
+      tileLayer.mirrorIndex
+    );
+
+    CATMAID.fetch (
+      project.id + '/skeletons/' + 18277211 + '/compact-detail'
+    ).then (function (skeleton) {
+      let nodes = skeleton[0];
+      let current_id = nodes[500][0];
+      let current = get_node (nodes, current_id);
+      optic_flow (nodes, current, 5);
+    });
+
+    /**
+     * This object keeps track of results from optical flow:
+     * {
+     *  [change, expected_change]
+     * }
+     */
+    let node_moves = {};
+
+    let optic_flow = function (nodes, current, i) {
+      if (i === 0) {
+        return;
+      }
+
+      let moves = [];
+      moves.push (current.slice ());
+      moves.push (current.slice ());
+      moves.push (current.slice ());
+      moves[0][5] = moves[0][5] - tileLayer.stack.resolution.z;
+      moves[2][5] = moves[0][5] + tileLayer.stack.resolution.z;
+
+      Promise.all (moves.map (node => get_node_data (node))).then (function (
+        canvases
+      ) {
+        let data = [];
+        for (let canvas of canvases) {
+          data.push (get_data (canvas));
+        }
+        node_moves[current[0]] = get_move (data, current);
+      });
+    };
+
+    let get_move = function (data, node) {
+      if (data.length === 2) {
+        let parent = get_node (node[1]);
+        let expected_change = [parent[3] - node[3], parent[4] - node[4]];
+        return [expected_change];
+      }
+    };
+
+    let get_node = function (nodes, id) {
+      for (let i = 0; i < nodes.length; i++) {
+        if (nodes[i][0] === id) {
+          return nodes[i];
+        }
+      }
+    };
+
+    let get_node_data = function (node) {
+      let z_coord =
+        (node[5] - tileLayer.stack.translation.z) /
+        tileLayer.stack.resolution.z;
+      let y_coord = [
+        (node[4] - tileLayer.stack.translation.y) /
+          tileLayer.stack.resolution.y,
+      ];
+      let x_coord = [
+        (node[3] - tileLayer.stack.translation.x) /
+          tileLayer.stack.resolution.x,
+      ];
+
+      let center_x =
+        x_coord[0] -
+        Math.floor (x_coord[0] / tileSource.tileWidth) * tileSource.tileWidth;
+      let center_y =
+        y_coord[0] -
+        Math.floor (y_coord[0] / tileSource.tileHeight) * tileSource.tileHeight;
+
+      if (center_x < 128) {
+        x_coord.push (x_coord[0] - 512);
+      } else if (512 - center_x < 128) {
+        x_coord.push (x_coord[0] + 512);
+      }
+      if (center_y < 128) {
+        y_coord.push (y_coord[0] - 512);
+      } else if (512 - center_y < 128) {
+        y_coord.push (y_coord[0] + 512);
+      }
+
+      let canvas = document.createElement ('canvas');
+      canvas.setAttribute ('height', 256);
+      canvas.setAttribute ('width', 256);
+
+      let promises = [];
+      for (let i = 0; i < x_coord.length; i++) {
+        for (let j = 0; j < y_coord.length; j++) {
+          promises.push (
+            new Promise (resolve => {
+              let img = document.createElement ('img');
+              img.setAttribute (
+                'src',
+                tileSource.getTileURL (
+                  project.id,
+                  tileLayer.stack,
+                  [z_coord],
+                  Math.floor (x_coord[i] / tileSource.tileWidth),
+                  Math.floor (y_coord[j] / tileSource.tileHeight),
+                  0
+                )
+              );
+              img.crossOrigin = 'Anonymous';
+              img.onload = function () {
+                let ctx = canvas.getContext ('2d');
+                ctx.drawImage (
+                  img,
+                  x_coord[0] -
+                    x_coord[i] -
+                    (x_coord[0] -
+                      Math.floor (x_coord[i] / tileSource.tileWidth) *
+                        tileSource.tileWidth) +
+                    128,
+                  y_coord[0] -
+                    y_coord[i] -
+                    (y_coord[0] -
+                      Math.floor (y_coord[j] / tileSource.tileHeight) *
+                        tileSource.tileHeight) +
+                    128
+                );
+                resolve ();
+              };
+            })
+          );
+        }
+      }
+      console.log (promises);
+      return new Promise (function (resolve) {
+        Promise.all (promises).then (function (e) {
+          console.log (node);
+          resolve (canvas, node);
+        });
+      });
+    };
+
+    let get_data = function (canvas) {
+      let ctx = canvas.getContext ('2d');
+      let width = 256;
+      let height = 256;
+      var image_data = ctx.getImageData (0, 0, width, height);
+
+      var gray_img = new jsfeat.matrix_t (
+        width,
+        height,
+        jsfeat.U8_t | jsfeat.C1_t
+      );
+      var code = jsfeat.COLOR_RGBA2GRAY;
+      jsfeat.imgproc.grayscale (image_data.data, width, height, gray_img, code);
+      return gray_img;
+    };
   };
 
   /*
@@ -442,7 +560,7 @@
       csv +=
         i +
         ',' +
-        arbor.edges[i] +
+        (typeof arbor.edges[i] === 'undefined' ? i : arbor.edges[i]) +
         ',' +
         nodes[i].z +
         ',' +
@@ -482,6 +600,11 @@
         tileLayer.stack.dimension.x,
         tileLayer.stack.dimension.y,
         tileLayer.stack.dimension.z,
+      ];
+      stackInfo['translation'] = [
+        tileLayer.stack.translation.x,
+        tileLayer.stack.translation.y,
+        tileLayer.stack.translation.z,
       ];
       stackInfo['broken_slices'] = tileLayer.stack.broken_slices;
       volumes['ImageStack'].push (stackInfo);
@@ -600,9 +723,91 @@
   --------------------------------------------------------------------------------
   TABLE
   */
-  FloodfillingWidget.prototype.initTable = function () {
+  FloodfillingWidget.prototype.initTables = function () {
+    this.initJobsTable ();
+    this.initResultsTable ();
+  };
+
+  FloodfillingWidget.prototype.initJobsTable = function () {
     const self = this;
-    const tableID = this.idPrefix + 'datatable';
+    const tableID = this.idPrefix + 'datatable-jobs';
+    const $table = $ ('#' + tableID);
+
+    this.oTable = $table.DataTable ({
+      // http://www.datatables.net/usage/options
+      destroy: true,
+      dom: '<"H"lrp>t<"F"ip>',
+      serverSide: false,
+      paging: true,
+      lengthChange: true,
+      autoWidth: false,
+      pageLength: CATMAID.pageLengthOptions[0],
+      lengthMenu: [CATMAID.pageLengthOptions, CATMAID.pageLengthLabels],
+      jQueryUI: true,
+      processing: true,
+      deferRender: true,
+      columns: [
+        {
+          data: 'submissionDate',
+          render: function (data) {
+            DataDay = data.dayOfMonth;
+            DataObj = data.dayOfMonth + '/' + data.monthValue + '/' + data.year;
+            Return (dataDay < 10) ? '0' + dataObj : dataObj;
+          },
+          orderable: true,
+          searchable: true,
+          className: 'submissionDate',
+        },
+        {
+          data: 'skeletonID',
+          render: Math.floor,
+          orderable: true,
+          searchable: true,
+          className: 'skeletonID',
+        },
+      ],
+    });
+
+    $ (`#${tableID} tbody`).on ('click', 'tr', function () {
+      $ (this).toggleClass ('selected');
+    });
+
+    const exactNumSearch = function (event) {
+      if (event.which == 13) {
+        event.stopPropagation ();
+        event.preventDefault ();
+        // Filter with a regular expression
+        const filterValue = event.currentTarget.value;
+        const regex = filterValue === '' ? '' : `^${filterValue}$`;
+
+        self.oTable
+          .column (event.currentTarget.closest ('th'))
+          .search (regex, true, false)
+          .draw ();
+      }
+    };
+
+    $ (`#${self.idPrefix}search-skeleton-id`).keydown (exactNumSearch);
+
+    const $headerInput = $table.find ('thead input');
+
+    // prevent sorting the column when focusing on the search field
+    $headerInput.click (function (event) {
+      event.stopPropagation ();
+    });
+
+    // remove the 'Search' string when first focusing the search box
+    $headerInput.focus (function () {
+      if (this.className === 'search_init') {
+        this.className = '';
+        this.value = '';
+      }
+    });
+  };
+
+  FloodfillingWidget.prototype.initResultsTable = function () {
+    const self = this;
+    const tableID = this.idPrefix + 'datatable-results';
     const $table = $ ('#' + tableID);
 
     this.oTable = $table.DataTable ({
@@ -627,8 +832,7 @@
           className: 'skeletonID',
         },
         {
-          data: 'skeletonSize',
-          render: Math.floor,
+          data: 'nodesFilled',
           orderable: true,
           searchable: true,
           className: 'skeletonSize',
@@ -637,12 +841,7 @@
     });
 
     $ (`#${tableID} tbody`).on ('click', 'tr', function () {
-      if ($ (this).hasClass ('selected')) {
-        $ (this).removeClass ('selected');
-      } else {
-        self.oTable.$ ('tr.selected').removeClass ('selected');
-        $ (this).addClass ('selected');
-      }
+      $ (this).toggleClass ('selected');
     });
 
     const exactNumSearch = function (event) {
@@ -661,7 +860,6 @@
     };
 
     $ (`#${self.idPrefix}search-skeleton-id`).keydown (exactNumSearch);
-    $ (`#${self.idPrefix}search-skeleton-size`).keydown (exactNumSearch);
 
     const $headerInput = $table.find ('thead input');
 
@@ -784,16 +982,7 @@
       );
     };
 
-    let createIntegerListInput = function (args) {
-      return CATMAID.DOM.createInputSetting (
-        args.name,
-        args.value.join (', '),
-        args.helptext,
-        args.change
-      );
-    };
-
-    let createFloatListInput = function (args) {
+    let createNumberListInput = function (args) {
       return CATMAID.DOM.createInputSetting (
         args.name,
         args.value.join (', '),
@@ -827,10 +1016,8 @@
         container.append (createNumericInputSpinner (setting));
       } else if (setting.type === 'numeric_spinner_float') {
         container.append (createNumericInputSpinner (setting));
-      } else if (setting.type === 'integer_list') {
-        container.append (createIntegerListInput (setting));
-      } else if (setting.type === 'float_list') {
-        container.append (createFloatListInput (setting));
+      } else if (setting.type === 'number_list') {
+        container.append (createNumberListInput (setting));
       } else if (setting.type === 'string') {
         container.append (createStringInput (setting));
       } else if (setting.type === 'checkbox') {
@@ -1014,7 +1201,7 @@
           let newValue = this.checked;
           settings[label].value = newValue;
         };
-      } else if (type === 'integer_list' || type === 'float_list') {
+      } else if (type === 'number_list') {
         return function () {
           let newValue = this.value
             .split (',')
@@ -1097,7 +1284,7 @@
 
       addSettingTemplate ({
         settings: sub_settings,
-        type: 'integer_list',
+        type: 'number_list',
         label: 'resolution',
         name: 'Resolution',
         value: [1, 1, 1],
@@ -1130,7 +1317,7 @@
 
       addSettingTemplate ({
         settings: sub_settings,
-        type: 'integer_list',
+        type: 'number_list',
         label: 'input_fov_shape',
         name: 'Input FoV shape',
         value: [17, 33, 33],
@@ -1139,7 +1326,7 @@
 
       addSettingTemplate ({
         settings: sub_settings,
-        type: 'integer_list',
+        type: 'number_list',
         label: 'output_fov_shape',
         name: 'Output FoV shape',
         value: [17, 33, 33],
@@ -1251,7 +1438,7 @@
 
       addSettingTemplate ({
         settings: sub_settings,
-        type: 'integer_list',
+        type: 'number_list',
         label: 'training_subv_shape',
         name: 'Training subvolume shape',
         value: [17, 33, 33],
@@ -1261,7 +1448,7 @@
 
       addSettingTemplate ({
         settings: sub_settings,
-        type: 'integer_list',
+        type: 'number_list',
         label: 'validation_subv_shape',
         name: 'Validation subvolume shape',
         value: [17, 33, 33],
@@ -1334,7 +1521,7 @@
 
       addSettingTemplate ({
         settings: sub_settings,
-        type: 'integer_list',
+        type: 'number_list',
         label: 'convolution_dim',
         name: 'Convolution dimensions',
         helptext: 'Shape of the convolution for each layer.',
@@ -1472,7 +1659,7 @@
 
       addSettingTemplate ({
         settings: sub_settings,
-        type: 'integer_list',
+        type: 'number_list',
         label: 'unet_downsample_rate',
         name: 'Unet downsample rate',
         helptext: 'The frequency in levels to downsample each axis. For example, ' +
@@ -1481,6 +1668,43 @@
           'only be downsampled every other level, this value could be ' +
           '[2, 1, 1]. Axes set to 0 are never downsampled.',
         value: [1, 1, 1],
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'option_dropdown',
+        label: 'unet_downsample_mode',
+        name: 'Downsample mode',
+        helptext: 'The mode used for downsampling. "Fixed rate" will use the ' +
+          'rate specified in "Unet downsample rate", "As needed" will attempt ' +
+          'to downsample in a way that will maximize the isotropic properties ' +
+          'of the volume by downsampling high resolution axes first.',
+        value: 'as_needed',
+        options: [
+          {name: 'As needed', id: 'as_needed'},
+          {name: 'Fixed rate', id: 'fixed_rate'},
+        ],
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'number_list',
+        label: 'resolution',
+        name: 'Volume resolution',
+        helptext: 'This field is necessary for the "as_needed" Downsample mode. ' +
+          'This should be the same as the resolution described in the volume settings.',
+        value: self.settings.diluvian.volume.resolution.value,
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'checkbox',
+        label: 'coord_layer',
+        name: 'Coordinate channels',
+        helptext: 'Whether to include coordinate channels in the input as described ' +
+          'in "An Intriguing Failing of Convolutional Neural Networks and the ' +
+          'CoordConv Solution" (https://arxiv.org/abs/1807.03247)',
+        value: false,
       });
     };
 
@@ -1613,10 +1837,246 @@
           'examples at each epoch are identical.',
         value: false,
       });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'number_list',
+        label: 'fill_factor_bins',
+        name: 'Fill factor bins',
+        helptext: 'Bin boundaries for filling fractions. If provided, sample loss ' +
+          'will be weighted to increase loss contribution from less-frequent bins.',
+        value: [],
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'dict',
+        label: 'partitions',
+        name: 'Partitions',
+        helptext: 'TODO\nDictionary mapping volume name regexes to a sequence of int ' +
+          'indicating number of volume partitions along each axis. Only one axis should ' +
+          'be greater than 1. Each volume should match at most 1 regex.',
+        value: {'.*': [2, 1, 1]},
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'dict',
+        label: 'training_partition',
+        name: 'Training partitions',
+        helptext: 'TODO\nDictionary mapping volume name regexes to a sequence of int ' +
+          'indicating number of volume partitions along each axis. Only one axis should ' +
+          'be greater than 1. Each volume should match at most 1 regex.',
+        value: {'.*': [0, 0, 0]},
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'dict',
+        label: 'validation_partition',
+        name: 'Validation partitions',
+        helptext: 'TODO\nDictionary mapping volume name regexes to a sequence of int ' +
+          'indicating number of volume partitions along each axis. Only one axis should ' +
+          'be greater than 1. Each volume should match at most 1 regex.',
+        value: {'.*': [1, 0, 0]},
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'dict',
+        label: 'validation_metric',
+        name: 'Validation metric',
+        helptext: 'TODO\nModule and function name for a metric function taking a true and ' +
+          "predicted region mask ('metric'). Boolean of whether to threshold the mask " +
+          "for the metric (true) or use the mask and target probabilities ('threshold').\n" +
+          "String 'min' or 'max'for how to choose best validation metric value ('mode').",
+        value: {
+          metric: 'diluvian.util.binary_f_score',
+          threshold: true,
+          mode: 'max',
+          args: {beta: 0.5},
+        },
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'numeric_spinner_int',
+        label: 'patience',
+        name: 'Patience',
+        helptext: 'Number of epochs after the last minimal validation loss to terminate training.',
+        value: 10,
+        min: 0,
+        step: 1,
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'numeric_spinner_int',
+        label: 'early_abort_epoch',
+        name: 'Early abort epoch',
+        helptext: 'If provided, training will check at the end of this epoch whether validation ' +
+          'loss is less than ``Early abort loss``. If not, training will be aborted, and may be ' +
+          'restarted with a new seed depending on CLI options. By default this is disabled.',
+        value: undefined,
+        min: 0,
+        step: 1,
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'numeric_spinner_float',
+        label: 'early_abort_loss',
+        name: 'Early abort loss',
+        helptext: 'The cutoff for validation loss by ``Early abort epoch``',
+        value: undefined,
+        min: 0,
+        step: 0.001,
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'number_list',
+        label: 'label_erosion',
+        name: 'Label erosion',
+        value: [1, 1, 1],
+        helptext: 'Amount to erode label mask for each training subvolume in each dimension, ' +
+          'in pixels. For example, a value of [0,1,1] will result in erosion with a ' +
+          'structuring element of size [1,3,3].',
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'checkbox',
+        label: 'relabel_seed_component',
+        name: 'Relabel seed component',
+        helptext: 'Relabel training subvolumes to only include the seeded connected component.',
+        value: false,
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'checkbox',
+        label: 'augment_validation',
+        name: 'Augment validation',
+        helptext: 'Whether validation data should also be augmented.',
+        value: true,
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'checkbox',
+        label: 'augment_use_both',
+        name: 'Augment use both',
+        helptext: 'To train on both the original data and augmented data for each subvolume.',
+        value: true,
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'number_list',
+        label: 'augment_mirros',
+        name: 'Augment mirrors',
+        value: [0, 1, 2],
+        helptext: 'Axes along which to apply mirror augmentations',
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'number_list',
+        label: 'augment_mirros',
+        name: 'Augment mirrors',
+        value: [0, 1, 2],
+        helptext: 'Axes along which to apply mirror augmentations',
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'list_number_list',
+        label: 'augment_permute_axes',
+        name: 'Augment permute axes',
+        helptext: 'TODO\nAxis permutations to use for data augmentation',
+        value: [[0, 2, 1]],
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'dict_list',
+        label: 'augment_missing_data',
+        name: 'Augment missing data',
+        helptext: 'TODO\nList of dictionaries with ``axis`` and ``prob`` keys, indicating ' +
+          'an axis to perform data blanking along, and the probability to blank' +
+          'each plane in the axis, respectively.',
+        value: [{axis: 0, prob: 0.01}],
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'dict_list',
+        label: 'augment_noise',
+        name: 'Augment noise',
+        helptext: 'TODO\nList of dictionaries with ``axis``, ``mul`` and ``add`` keys, indicating ' +
+          'an axis to perform independent Gaussian noise augmentation on, and the standard deviations ' +
+          'of 1-mean multiplicative and 0-mean additive noise, respectively.',
+        value: [{axis: 0, mul: 0.1, add: 0.1}],
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'dict_list',
+        label: 'augment_contrast',
+        name: 'Augment contrast',
+        helptext: 'TODO\nList of dictionaries with ``axis``, ``prob``, ``scaling_mean``' +
+          '``scaling_std``, ``center_mean`` and ``center_std`` keys. These' +
+          'specify the probability to alter the contrast of a section, the mean' +
+          'and standard deviation to draw from a normal distribution to scale' +
+          'contrast, and the mean and standard deviation to draw from a normal' +
+          'distribution to move the intensity center multiplicatively.',
+        value: [
+          {
+            axis: 0,
+            prob: 0.05,
+            scaling_mean: 0.5,
+            scaling_std: 0.1,
+            center_mean: 1.2,
+            center_std: 0.2,
+          },
+        ],
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'dict_list',
+        label: 'augment_artifacts',
+        name: 'Augment artifacts',
+        helptext: 'TODO\nList of dictionaries with ``axis``, ``prob`` and ``volume_file``' +
+          'keys, indicating an axis to perform data artifacting along, the' +
+          'probability to add artifacts to each plane in the axis, and the' +
+          'volume configuration file from which to draw artifacts, respectively.',
+        value: [],
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'checkbox',
+        label: 'vary_noise',
+        name: 'Vary noise',
+        helptext: 'Randomly vary the intensity of multiplicative and additive by ' +
+          'some factor in (0,1).',
+        value: false,
+      });
     };
 
     let createDiluvianPostprocessingDefaults = function (settings) {
       let sub_settings = getSubSettings (settings, 'postprocessing');
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'number_list',
+        label: 'closing_shape',
+        name: 'Closing shape',
+        helptext: 'Shape of the structuring element for morphological closing, in voxels',
+        value: [],
+      });
     };
 
     let createDiluvianDefaults = function (settings) {
