@@ -314,15 +314,6 @@
       tileLayer.mirrorIndex
     );
 
-    CATMAID.fetch (
-      project.id + '/skeletons/' + 18277211 + '/compact-detail'
-    ).then (function (skeleton) {
-      let nodes = skeleton[0];
-      let current_id = nodes[500][0];
-      let current = get_node (nodes, current_id);
-      optic_flow (nodes, current, 5);
-    });
-
     /**
      * This object keeps track of results from optical flow:
      * {
@@ -331,35 +322,174 @@
      */
     let node_moves = {};
 
-    let optic_flow = function (nodes, current, i) {
-      if (i === 0) {
-        return;
-      }
+    CATMAID.fetch (
+      project.id + '/skeletons/' + 18277211 + '/compact-detail'
+    ).then (function (skeleton) {
+      let nodes = skeleton[0];
+      let nodes100 = nodes.slice (100, 200);
+      Promise.all (
+        nodes100.map (node => optic_flow (nodes, node))
+      ).then (function (moves) {
+        let move_metrics = moves.map (function (result) {
+          if (result) {
+            let theta_a = Math.atan2 (result[0][0], result[0][1]);
+            let mag_a = Math.sqrt (
+              Math.pow (result[0][0], 2) + Math.pow (result[0][1], 2)
+            );
+            let theta_b = Math.atan2 (result[1][0], result[1][1]);
+            let mag_b = Math.sqrt (
+              Math.pow (result[1][0], 2) + Math.pow (result[1][1], 2)
+            );
+            return [
+              Math.min (theta_b - theta_a, 2 * Math.PI - (theta_b - theta_a)),
+              Math.abs ((mag_b - mag_a) / mag_a),
+            ];
+          }
+        });
+        let totals = move_metrics.reduce (
+          function (acc, cur) {
+            if (typeof cur !== 'undefined') {
+              acc[0] = acc[0] + Math.abs (cur[0]);
+              acc[1] = acc[1] + Math.abs (cur[1]);
+            }
+            return acc;
+          },
+          [0, 0]
+        );
+        console.log (move_metrics);
+        console.log (totals);
+      });
+    });
 
+    let optic_flow = function (nodes, current) {
       let moves = [];
       moves.push (current.slice ());
-      moves.push (current.slice ());
-      moves.push (current.slice ());
-      moves[0][5] = moves[0][5] - tileLayer.stack.resolution.z;
-      moves[2][5] = moves[0][5] + tileLayer.stack.resolution.z;
+      if (current[5] < get_node (nodes, current[1])[5]) {
+        let next_frame = current.slice ();
+        next_frame[5] = next_frame[5] + tileLayer.stack.resolution.z;
+        moves.push (next_frame);
+      } else if (current[5] > get_node (nodes, current[1])[5]) {
+        let next_frame = current.slice ();
+        next_frame[5] = next_frame[5] - tileLayer.stack.resolution.z;
+        moves.push (next_frame);
+      }
 
-      Promise.all (moves.map (node => get_node_data (node))).then (function (
-        canvases
-      ) {
-        let data = [];
-        for (let canvas of canvases) {
-          data.push (get_data (canvas));
-        }
-        node_moves[current[0]] = get_move (data, current);
-      });
+      if (moves.length > 1) {
+        return Promise.all (
+          moves.map (node => get_node_data (node))
+        ).then (function (canvases) {
+          let data = [];
+          for (let canvas of canvases) {
+            data.push (get_data (canvas));
+          }
+          return get_move (data, nodes, current);
+          //plot_change (canvases, node_moves[current[0]]);
+        });
+      }
     };
 
-    let get_move = function (data, node) {
-      if (data.length === 2) {
-        let parent = get_node (node[1]);
-        let expected_change = [parent[3] - node[3], parent[4] - node[4]];
-        return [expected_change];
+    let plot_change = function (canvases, node_moves) {
+      let ctx0 = canvases[0].getContext ('2d');
+      let ctx1 = canvases[1].getContext ('2d');
+      for (let i = 0; i < node_moves[1].length / 2; i++) {
+        ctx0.beginPath ();
+        ctx0.arc (
+          node_moves[1][i * 2],
+          node_moves[1][i * 2 + 1],
+          3,
+          0,
+          2 * Math.PI
+        );
+        ctx0.fillStyle = 'red';
+        ctx0.fill ();
+        ctx1.beginPath ();
+        ctx1.arc (
+          node_moves[2][i * 2],
+          node_moves[2][i * 2 + 1],
+          3,
+          0,
+          2 * Math.PI
+        );
+        ctx1.fillStyle = 'red';
+        ctx1.fill ();
       }
+    };
+
+    let get_move = function (data, nodes, node) {
+      if (data.length === 2) {
+        let parent = get_node (nodes, node[1]);
+        let expected_change = [parent[3] - node[3], parent[4] - node[4]];
+
+        let levels = 3,
+          start_width = 256,
+          start_height = 256,
+          data_type = jsfeat.U8_t | jsfeat.C1_t;
+        let prev_pyr = new jsfeat.pyramid_t (levels);
+
+        // this will populate data property with matrix_t instances
+        prev_pyr.allocate (start_width, start_height, data_type);
+        prev_pyr.build (data[0]);
+
+        let curr_pyr = new jsfeat.pyramid_t (levels);
+
+        // this will populate data property with matrix_t instances
+        curr_pyr.allocate (start_width, start_height, data_type);
+        curr_pyr.build (data[1]);
+
+        let prev_xy = new Float32Array (100 * 2),
+          curr_xy = new Float32Array (100 * 2),
+          count = 0,
+          win_size = 10,
+          max_iter = 30,
+          status = new Uint8Array (100),
+          eps = 0.01,
+          min_eigen_threshold = 0.0001;
+
+        for (let i = 0; i < 5; i++) {
+          for (let j = 0; j < 5; j++) {
+            count = add_point (
+              prev_xy,
+              128 + 10 * (i - 2),
+              128 + 10 * (j - 2),
+              count
+            );
+          }
+        }
+
+        jsfeat.optical_flow_lk.track (
+          prev_pyr,
+          curr_pyr,
+          prev_xy,
+          curr_xy,
+          count,
+          win_size,
+          max_iter,
+          status,
+          eps,
+          min_eigen_threshold
+        );
+
+        let total_change = [0, 0];
+        for (let i = 0; i < count; i++) {
+          let a_x = prev_xy[2 * i], a_y = prev_xy[2 * i + 1];
+          let b_x = curr_xy[2 * i], b_y = curr_xy[2 * i + 1];
+          total_change[0] = total_change[0] + b_x - a_x;
+          total_change[1] = total_change[1] + b_y - a_y;
+        }
+        let change = total_change.map (total => total / count);
+        return [
+          expected_change,
+          change,
+          //prev_xy.slice (0, count * 2),
+          //curr_xy.slice (0, count * 2),
+        ];
+      }
+    };
+
+    let add_point = function (xy, x, y, count) {
+      xy[count << 1] = x;
+      xy[(count << 1) + 1] = y;
+      return count + 1;
     };
 
     let get_node = function (nodes, id) {
@@ -411,6 +541,7 @@
           promises.push (
             new Promise (resolve => {
               let img = document.createElement ('img');
+              img.crossOrigin = 'Anonymous';
               img.setAttribute (
                 'src',
                 tileSource.getTileURL (
@@ -422,21 +553,20 @@
                   0
                 )
               );
-              img.crossOrigin = 'Anonymous';
               img.onload = function () {
                 let ctx = canvas.getContext ('2d');
                 ctx.drawImage (
                   img,
-                  x_coord[0] -
-                    x_coord[i] -
+                  x_coord[i] -
+                    x_coord[0] -
                     (x_coord[0] -
-                      Math.floor (x_coord[i] / tileSource.tileWidth) *
+                      Math.floor (x_coord[0] / tileSource.tileWidth) *
                         tileSource.tileWidth) +
                     128,
-                  y_coord[0] -
-                    y_coord[i] -
+                  y_coord[j] -
+                    y_coord[0] -
                     (y_coord[0] -
-                      Math.floor (y_coord[j] / tileSource.tileHeight) *
+                      Math.floor (y_coord[0] / tileSource.tileHeight) *
                         tileSource.tileHeight) +
                     128
                 );
@@ -446,16 +576,15 @@
           );
         }
       }
-      console.log (promises);
       return new Promise (function (resolve) {
         Promise.all (promises).then (function (e) {
-          console.log (node);
           resolve (canvas, node);
         });
       });
     };
 
     let get_data = function (canvas) {
+      $ ('#content-wrapper').append (canvas);
       let ctx = canvas.getContext ('2d');
       let width = 256;
       let height = 256;
