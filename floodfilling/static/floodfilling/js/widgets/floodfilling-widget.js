@@ -17,7 +17,7 @@
     this.settings = {};
     this.volumes = {ImageStack: [], HDF5: []};
 
-    this.skeletons = [];
+    this.supported_fields = [];
   };
 
   FloodfillingWidget.prototype = Object.create (
@@ -290,9 +290,7 @@
   };
 
   FloodfillingWidget.prototype.test5 = function () {
-    CATMAID.fetch (project.id + '/tasks', 'GET').then (function (e) {
-      console.log (e);
-    });
+    console.log (this.settings);
   };
 
   FloodfillingWidget.prototype.testOpticalFlow = function () {
@@ -314,19 +312,12 @@
       tileLayer.mirrorIndex
     );
 
-    /**
-     * This object keeps track of results from optical flow:
-     * {
-     *  [change, expected_change]
-     * }
-     */
-    let node_moves = {};
-
     CATMAID.fetch (
       project.id + '/skeletons/' + 18277211 + '/compact-detail'
     ).then (function (skeleton) {
       let nodes = skeleton[0];
       let nodes100 = nodes.slice (100, 200);
+
       Promise.all (
         nodes100.map (node => optic_flow (nodes, node))
       ).then (function (moves) {
@@ -342,7 +333,7 @@
             );
             return [
               Math.min (theta_b - theta_a, 2 * Math.PI - (theta_b - theta_a)),
-              Math.abs ((mag_b - mag_a) / mag_a),
+              Math.abs ((mag_b - mag_a) / mag_b),
             ];
           }
         });
@@ -382,8 +373,9 @@
           for (let canvas of canvases) {
             data.push (get_data (canvas));
           }
-          return get_move (data, nodes, current);
-          //plot_change (canvases, node_moves[current[0]]);
+          let move = get_move (data, nodes, current);
+          plot_change (canvases, [move[2], move[3]]);
+          return [move[0], move[1]];
         });
       }
     };
@@ -394,8 +386,8 @@
       for (let i = 0; i < node_moves[1].length / 2; i++) {
         ctx0.beginPath ();
         ctx0.arc (
-          node_moves[1][i * 2],
-          node_moves[1][i * 2 + 1],
+          node_moves[0][i * 2],
+          node_moves[0][i * 2 + 1],
           3,
           0,
           2 * Math.PI
@@ -404,8 +396,8 @@
         ctx0.fill ();
         ctx1.beginPath ();
         ctx1.arc (
-          node_moves[2][i * 2],
-          node_moves[2][i * 2 + 1],
+          node_moves[1][i * 2],
+          node_moves[1][i * 2 + 1],
           3,
           0,
           2 * Math.PI
@@ -480,8 +472,8 @@
         return [
           expected_change,
           change,
-          //prev_xy.slice (0, count * 2),
-          //curr_xy.slice (0, count * 2),
+          prev_xy.slice (0, count * 2),
+          curr_xy.slice (0, count * 2),
         ];
       }
     };
@@ -825,7 +817,7 @@
           if (key in old_settings) {
             // if the key is part of the old settings, check if it
             // is a field that can have its value overwritten
-            if ('value' in old_settings[key]) {
+            if ('type' in old_settings[key]) {
               old_settings[key]['value'] = new_settings[key];
             } else {
               // key must be an overarching catagory that contains fields.
@@ -1268,8 +1260,13 @@
     if (keys.length > 0) {
       for (let key of keys) {
         if (key) {
-          if ('value' in settings[key]) {
-            setting_values[key] = settings[key]['value'];
+          if ('type' in settings[key]) {
+            if (
+              this.supported_fields.includes (settings[key]['type']) &&
+              'value' in settings[key]
+            ) {
+              setting_values[key] = settings[key]['value'];
+            }
           } else if (Object.keys (settings[key]).length > 0) {
             setting_values[key] = this.getSettingValues (
               settings[key],
@@ -1311,26 +1308,31 @@
 
     let getChangeFunc = function (type, settings, label) {
       if (type === 'numeric_spinner_float') {
+        self.supported_fields.push ('numeric_spinner_float');
         return function () {
           let newValue = parseFloat (this.value);
           settings[label].value = newValue;
         };
       } else if (type === 'numeric_spinner_int') {
+        self.supported_fields.push ('numeric_spinner_int');
         return function () {
           let newValue = parseFloat (this.value, 10);
           settings[label].value = newValue;
         };
       } else if (type === 'option_dropdown') {
+        self.supported_fields.push ('option_dropdown');
         return function () {
           let newValue = this.value;
           settings[label].value = newValue;
         };
       } else if (type === 'checkbox') {
+        self.supported_fields.push ('checkbox');
         return function () {
           let newValue = this.checked;
           settings[label].value = newValue;
         };
       } else if (type === 'number_list') {
+        self.supported_fields.push ('number_list');
         return function () {
           let newValue = this.value
             .split (',')
@@ -1339,6 +1341,7 @@
           settings[label].value = newValue;
         };
       } else if (type === 'string') {
+        self.supported_fields.push ('string');
         return function () {
           let newValue = this.value;
           settings[label].value = newValue;
@@ -1974,7 +1977,7 @@
         name: 'Fill factor bins',
         helptext: 'Bin boundaries for filling fractions. If provided, sample loss ' +
           'will be weighted to increase loss contribution from less-frequent bins.',
-        value: [],
+          value: [],
       });
 
       addSettingTemplate ({
@@ -1985,7 +1988,7 @@
         helptext: 'TODO\nDictionary mapping volume name regexes to a sequence of int ' +
           'indicating number of volume partitions along each axis. Only one axis should ' +
           'be greater than 1. Each volume should match at most 1 regex.',
-        value: {'.*': [2, 1, 1]},
+        value: {'".*"': [2, 1, 1]},
       });
 
       addSettingTemplate ({
@@ -1996,7 +1999,7 @@
         helptext: 'TODO\nDictionary mapping volume name regexes to a sequence of int ' +
           'indicating number of volume partitions along each axis. Only one axis should ' +
           'be greater than 1. Each volume should match at most 1 regex.',
-        value: {'.*': [0, 0, 0]},
+        value: {'".*"': [0, 0, 0]},
       });
 
       addSettingTemplate ({
@@ -2007,7 +2010,7 @@
         helptext: 'TODO\nDictionary mapping volume name regexes to a sequence of int ' +
           'indicating number of volume partitions along each axis. Only one axis should ' +
           'be greater than 1. Each volume should match at most 1 regex.',
-        value: {'.*': [1, 0, 0]},
+        value: {'".*"': [1, 0, 0]},
       });
 
       addSettingTemplate ({
@@ -2046,7 +2049,6 @@
         helptext: 'If provided, training will check at the end of this epoch whether validation ' +
           'loss is less than ``Early abort loss``. If not, training will be aborted, and may be ' +
           'restarted with a new seed depending on CLI options. By default this is disabled.',
-        value: undefined,
         min: 0,
         step: 1,
       });
@@ -2057,7 +2059,6 @@
         label: 'early_abort_loss',
         name: 'Early abort loss',
         helptext: 'The cutoff for validation loss by ``Early abort epoch``',
-        value: undefined,
         min: 0,
         step: 0.001,
       });

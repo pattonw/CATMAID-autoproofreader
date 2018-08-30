@@ -411,6 +411,7 @@ let toml = (function () {
   };
 
   let dump = function (value, context, aot, all_int) {
+    console.log(value);
     switch (typeof value) {
       case 'string':
         return '"' + escapeString (value) + '"';
@@ -426,6 +427,8 @@ let toml = (function () {
         return value ? 'true' : 'false';
       case 'object':
         return dumpObject (value, context, aot);
+      case 'undefined':
+        return '';
     }
   };
 
