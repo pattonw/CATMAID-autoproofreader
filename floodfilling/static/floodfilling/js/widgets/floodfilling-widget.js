@@ -224,7 +224,7 @@
     add_file (post_data, files.server, 'server.json');
 
     CATMAID.fetch (
-      project.id + '/flood-fill',
+      'ext/floodfilling/' + project.id + '/flood-fill',
       'POST',
       post_data,
       undefined,
@@ -259,7 +259,7 @@
       address: 'cardona-gpu1.int.janelia.org',
     };
     CATMAID.fetch (
-      project.id + '/add-compute-server',
+      'ext/floodfilling/' + project.id + '/add-compute-server',
       'POST',
       params
     ).then (function (e) {
@@ -269,17 +269,26 @@
   };
 
   FloodfillingWidget.prototype.test3 = function () {
-    CATMAID.fetch (project.id + '/compute-servers', 'GET').then (function (e) {
+    CATMAID.fetch (
+      'ext/floodfilling/' + project.id + '/compute-servers',
+      'GET'
+    ).then (function (e) {
       console.log (e);
     });
   };
 
   FloodfillingWidget.prototype.test4 = function () {
     let self = this;
-    CATMAID.fetch (project.id + '/compute-servers', 'GET').then (function (e) {
+    CATMAID.fetch (
+      'ext/floodfilling/' + project.id + '/compute-servers',
+      'GET'
+    ).then (function (e) {
       e.forEach (function (server) {
         CATMAID.fetch (
-          project.id + '/remove-compute-server/' + server.id,
+          'ext/floodfilling/' +
+            project.id +
+            '/remove-compute-server/' +
+            server.id,
           'DELETE'
         ).then (function (e) {
           console.log (e);
@@ -766,7 +775,10 @@
 
   FloodfillingWidget.prototype.refreshServers = function () {
     let self = this;
-    CATMAID.fetch (project.id + '/compute-servers', 'GET').then (function (e) {
+    CATMAID.fetch (
+      'ext/floodfilling/' + project.id + '/compute-servers',
+      'GET'
+    ).then (function (e) {
       let options = [];
       e.forEach (function (server) {
         options.push ({name: server.name, id: server.id});
@@ -775,7 +787,7 @@
       self.settings.server.id.value = options.length > 0
         ? options[0].id
         : undefined;
-      self.refreshSettings ();
+      self.refreshSettings (self.settings.server);
     });
   };
 
@@ -835,7 +847,7 @@
         });
       };
       update_settings (settings, uploaded_settings);
-      self.refreshSettings ();
+      self.refreshSettings (settings);
     };
     reader.readAsText (files[0]);
   };
@@ -1063,10 +1075,28 @@
   FloodfillingWidget.prototype.initSettings = function () {
     this.createDefaultSettings ();
 
-    this.refreshSettings ();
+    this.createSettings ();
   };
 
-  FloodfillingWidget.prototype.refreshSettings = function () {
+  FloodfillingWidget.prototype.refreshSettings = function (settings) {
+    // TODO: change the refresh function to only change the values of each setting
+    // This will allow for values to be set more naturally without closing
+    // all settings tabs. Also probably quite a bit faster
+    refreshSetting (settings);
+
+    function refreshSetting (setting) {
+      if ('change' in setting) {
+        setting.change ();
+      } else {
+        let keys = Object.keys (setting);
+        for (let key of keys) {
+          refreshSetting (setting[key]);
+        }
+      }
+    }
+  };
+
+  FloodfillingWidget.prototype.createSettings = function () {
     let self = this;
 
     let createNumericInputSpinner = function (args) {
@@ -1131,21 +1161,23 @@
     };
 
     let renderSetting = function (container, setting) {
+      let newOption;
       if (setting.type === 'option_dropdown') {
-        container.append (createOptionDropdown (setting));
+        newOption = createOptionDropdown (setting);
       } else if (setting.type === 'numeric_spinner_int') {
-        container.append (createNumericInputSpinner (setting));
+        newOption = createNumericInputSpinner (setting);
       } else if (setting.type === 'numeric_spinner_float') {
-        container.append (createNumericInputSpinner (setting));
+        newOption = createNumericInputSpinner (setting);
       } else if (setting.type === 'number_list') {
-        container.append (createNumberListInput (setting));
+        newOption = createNumberListInput (setting);
       } else if (setting.type === 'string') {
-        container.append (createStringInput (setting));
+        newOption = createStringInput (setting);
       } else if (setting.type === 'checkbox') {
-        container.append (createCheckbox (setting));
+        newOption = createCheckbox (setting);
       } else {
         CATMAID.msg ('warn', 'unknown setting type ' + setting.type);
       }
+      container.append (newOption);
     };
 
     let createSection = function (container, key, values, collapsed) {
@@ -1154,6 +1186,7 @@
         key + ' settings',
         collapsed
       );
+      section.id = key;
       let depth = section.parents ('div.settings-container').length;
 
       var fileButton = CATMAID.DOM.createFileButton (
@@ -1293,6 +1326,7 @@
       let fields = {
         type: args.type,
         name: args.name,
+        label: args.label,
         helptext: args.helptext,
         value: args.value,
         min: args.min,
@@ -1977,7 +2011,7 @@
         name: 'Fill factor bins',
         helptext: 'Bin boundaries for filling fractions. If provided, sample loss ' +
           'will be weighted to increase loss contribution from less-frequent bins.',
-          value: [],
+        value: undefined,
       });
 
       addSettingTemplate ({
@@ -2209,6 +2243,30 @@
       });
     };
 
+    let createDiluvianServerDefaults = function (settings) {
+      let sub_settings = getSubSettings (settings, 'server');
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'number_list',
+        label: 'gpus',
+        name: 'GPU ids',
+        helptext: 'GPU ids to use for data-parallelism.',
+        value: [],
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'numeric_spinner_int',
+        label: 'num_workers',
+        name: 'Number of workers',
+        helptext: 'Number of worker queues to use for generating training data.',
+        value: 4,
+        min: 0,
+        step: 1,
+      });
+    };
+
     let createDiluvianDefaults = function (settings) {
       let sub_settings = getSubSettings (settings, 'diluvian');
 
@@ -2227,8 +2285,15 @@
       createDiluvianModelDefaults (sub_settings);
       createDiluvianNetworkDefaults (sub_settings);
       createDiluvianOptimizerDefaults (sub_settings);
-      createDiluvianTrainingDefaults (sub_settings);
+      /**
+       * Diluvian Training settings partially implemented. Not yet support
+       * due to the fact that the widget probably shouldn't be used for
+       * training models, rather the widgets main purpose is for the easy
+       * application of production ready models.
+       */
+      // createDiluvianTrainingDefaults (sub_settings);
       createDiluvianPostprocessingDefaults (sub_settings);
+      createDiluvianServerDefaults (sub_settings);
     };
 
     /**
