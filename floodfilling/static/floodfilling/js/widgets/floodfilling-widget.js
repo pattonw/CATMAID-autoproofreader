@@ -45,7 +45,9 @@
           'Run',
           'Jobs',
           'Results',
-          'Test',
+          'floodfilling_test',
+          'celery_test',
+          'optic_flow_test',
         ]);
         // Change content based on currently active tab
         controls.firstChild.onclick = this.refocus.bind (this);
@@ -78,12 +80,15 @@
           ],
         ]);
 
-        CATMAID.DOM.appendToTab (tabs['Test'], [
-          ['test1', this.test1.bind (this)],
-          ['test2', this.test2.bind (this)],
-          ['test3', this.test3.bind (this)],
-          ['test4', this.test4.bind (this)],
-          ['test5', this.test5.bind (this)],
+        CATMAID.DOM.appendToTab (tabs['floodfilling_test'], []);
+
+        CATMAID.DOM.appendToTab (tabs['celery_test'], [
+          ['get', this.test_celery_get.bind (this)],
+          ['put', this.test_celery_put.bind (this)],
+          ['del', this.test_celery_del.bind (this)],
+        ]);
+
+        CATMAID.DOM.appendToTab (tabs['optic_flow_test'], [
           ['testOpticalFlow', this.testOpticalFlow.bind (this)],
         ]);
         $ (controls).tabs ();
@@ -246,21 +251,15 @@
   TESTING
   */
 
-  FloodfillingWidget.prototype.test1 = function () {
-    this.getSkeleton ().then (function (result) {
-      console.log (result);
-    });
-  };
-
-  FloodfillingWidget.prototype.test2 = function () {
+  // CELERY
+  FloodfillingWidget.prototype.test_celery_get = function () {
     let self = this;
     let params = {
-      name: 'cardona-gpu1 - diluvian',
-      address: 'cardona-gpu1.int.janelia.org',
+      server_id: 1,
     };
     CATMAID.fetch (
-      'ext/floodfilling/' + project.id + '/add-compute-server',
-      'POST',
+      'ext/floodfilling/' + project.id + '/compute-servers',
+      'GET',
       params
     ).then (function (e) {
       console.log (e);
@@ -268,40 +267,20 @@
     });
   };
 
-  FloodfillingWidget.prototype.test3 = function () {
-    CATMAID.fetch (
-      'ext/floodfilling/' + project.id + '/compute-servers',
-      'GET'
-    ).then (function (e) {
-      console.log (e);
+  FloodfillingWidget.prototype.test_celery_put = function () {
+    this.getSkeleton ().then (function (result) {
+      console.log (result);
     });
   };
 
-  FloodfillingWidget.prototype.test4 = function () {
-    let self = this;
-    CATMAID.fetch (
-      'ext/floodfilling/' + project.id + '/compute-servers',
-      'GET'
-    ).then (function (e) {
-      e.forEach (function (server) {
-        CATMAID.fetch (
-          'ext/floodfilling/' +
-            project.id +
-            '/remove-compute-server/' +
-            server.id,
-          'DELETE'
-        ).then (function (e) {
-          console.log (e);
-        });
-      });
-      self.refreshServers ();
+  FloodfillingWidget.prototype.test_celery_del = function () {
+    this.getSkeleton ().then (function (result) {
+      console.log (result);
     });
   };
 
-  FloodfillingWidget.prototype.test5 = function () {
-    console.log (this.settings);
-  };
-
+  
+  // OPTIC FLOW
   FloodfillingWidget.prototype.testOpticalFlow = function () {
     let tileLayers = project.focusedStackViewer.getLayersOfType (
       CATMAID.TileLayer
@@ -2282,16 +2261,16 @@
       });
 
       createDiluvianVolumeDefaults (sub_settings);
-      createDiluvianModelDefaults (sub_settings);
-      createDiluvianNetworkDefaults (sub_settings);
-      createDiluvianOptimizerDefaults (sub_settings);
       /**
-       * Diluvian Training settings partially implemented. Not yet support
+       * Full set of Diluvian settings partially implemented. Not yet support
        * due to the fact that the widget probably shouldn't be used for
        * training models, rather the widgets main purpose is for the easy
        * application of production ready models.
        */
-      // createDiluvianTrainingDefaults (sub_settings);
+      //createDiluvianModelDefaults (sub_settings);
+      //createDiluvianNetworkDefaults (sub_settings);
+      //createDiluvianOptimizerDefaults (sub_settings);
+      //createDiluvianTrainingDefaults (sub_settings);
       createDiluvianPostprocessingDefaults (sub_settings);
       createDiluvianServerDefaults (sub_settings);
     };
@@ -2363,9 +2342,8 @@
 
     let createDefaults = function (settings) {
       // Add all settings
-      createServerDefaults (settings);
-      createDiluvianDefaults (settings);
       createRunDefaults (settings);
+      createDiluvianDefaults (settings);
     };
 
     createDefaults (this.settings);
@@ -2391,104 +2369,3 @@
     creator: FloodfillingWidget,
   });
 }) (CATMAID);
-
-/*
-let initOptionList = function (args, newSelectedChoices) {
-      return args
-        .get_choices (project.id)
-        .then (function (json) {
-          let choices = json
-            .sort (function (a, b) {
-              return CATMAID.tools.compareStrings (a.name, b.name);
-            })
-            .map (function (choice) {
-              return {
-                title: choice['name'],
-                value: choice['id'],
-              };
-            });
-          if (args.mode === 'radio') {
-            let selectedChoices = newSelectedChoices || args.selectedChoices;
-            if (selectedChoices.length > 1) {
-              throw new CATMAID.ValueError (
-                'Radio select only takes one selected option'
-              );
-            }
-            // Create actual element based on the returned data
-            let node = CATMAID.DOM.createRadioSelect (
-              'Choices',
-              choices,
-              selectedChoices[0],
-              true
-            );
-            // Add a selection handler
-            node.onchange = function (e) {
-              let choiceId = parseInt (e.target.value, 10);
-              let selected = true;
-
-              if (CATMAID.tools.isFn (args.select)) {
-                args.select (choiceId, selected, e.target);
-              }
-            };
-            return node;
-          } else {
-            let selectedChoices = newSelectedChoices || args.selectedChoices;
-            // Create actual element based on the returned data
-            let node = CATMAID.DOM.createCheckboxSelect (
-              'Choices',
-              choices,
-              selectedChoices,
-              true,
-              args.rowCallback
-            );
-
-            // Add a selection handler
-            node.onchange = function (e) {
-              let selected = e.target.checked;
-              let choiceId = parseInt (e.target.value, 10);
-
-              if (CATMAID.tools.isFn (args.select)) {
-                args.select (choiceId, selected, e.target);
-              }
-            };
-            return node;
-          }
-        })
-        .catch (function (e) {
-          CATMAID.msg ('warn', 'unknown project id: ' + project.id);
-        });
-    };
-
-    let createAsyncOptionDropdown = function (args) {
-      let optionDropdownWrapper = document.createElement ('span');
-      let optionDropdown;
-      optionDropdown = CATMAID.DOM
-        .createLabeledAsyncPlaceholder (
-          args.label,
-          initOptionList (args),
-          args.name
-        )
-        .get (0);
-      optionDropdownWrapper.appendChild (optionDropdown);
-      optionDropdownWrapper.refresh = function (newSelectedIds) {
-        while (0 !== optionDropdownWrapper.children.length) {
-          optionDropdownWrapper.removeChild (optionDropdownWrapper.children[0]);
-        }
-        let optionDropdown = CATMAID.DOM
-          .createLabeledAsyncPlaceholder (
-            args.label,
-            initOptionList (args, newSelectedIds),
-            args.title
-          )
-          .get (0);
-        optionDropdownWrapper.appendChild (optionDropdown);
-      };
-      return optionDropdownWrapper;
-    };
-
-
-
-
-      } else if (setting.type === 'async_option_dropdown') {
-        container.append (createAsyncOptionDropdown (setting));
-*/
