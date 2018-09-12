@@ -13,23 +13,14 @@ class FloodfillModelAPI(APIView):
     @method_decorator(requires_user_role(UserRole.QueueComputeTask))
     def put(self, request, project_id):
 
+        for i in range(10):
+            print()
         name = request.POST.get("name", None)
         server_id = request.POST.get("server_id", None)
-        environment_source_path = request.POST.get("environment_source_path", None)
-        diluvian_path = request.POST.get("diluvian_path", None)
-        results_directory = request.POST.get("results_directory", None)
         model_source_path = request.POST.get("model_source_path", None)
         config = request.POST.get("config", None)
 
-        params = [
-            name,
-            server_id,
-            environment_source_path,
-            diluvian_path,
-            results_directory,
-            model_source_path,
-            config,
-        ]
+        params = [name, server_id, model_source_path, config]
 
         if any([x is None for x in params]):
             return JsonResponse({"success": False, "results": request.POST})
@@ -41,11 +32,8 @@ class FloodfillModelAPI(APIView):
         model = FloodfillModel(
             name=name,
             server_id=server_id,
-            environment_source_path=environment_source_path,
-            diluvian_path=diluvian_path,
-            results_directory=results_directory,
             model_source_path=model_source_path,
-            config=config,  # TODO: This should take a config id like other foreign key fields
+            config_id=config.id,
             user_id=request.user.id,
             project_id=project_id,
         )
@@ -72,7 +60,7 @@ class FloodfillModelAPI(APIView):
             defaultValue: false
         """
         model_id = request.query_params.get("model_id", None)
-        result = get_models(model_id)
+        result = self.get_models(model_id)
 
         return JsonResponse(
             result, safe=False, json_dumps_params={"sort_keys": True, "indent": 4}
@@ -88,25 +76,21 @@ class FloodfillModelAPI(APIView):
 
         return JsonResponse({"success": True})
 
-
-def get_models(model_id=None):
-    cursor = connection.cursor()
-    if model_id is not None:
-        cursor.execute(
-            """
-            SELECT * FROM floodfill_model
-            WHERE id = {}
-            """.format(
-                model_id
+    def get_models(self, model_id=None):
+        cursor = connection.cursor()
+        if model_id is not None:
+            cursor.execute(
+                """
+                SELECT * FROM floodfill_model
+                WHERE id = {}
+                """.format(
+                    model_id
+                )
             )
-        )
-    else:
-        cursor.execute(
-            """
-            SELECT * FROM floodfill_model
-            """
-        )
-    models = []
-    for row in cursor.fetchall():
-        models.append({"id": row[0], "name": row[5]})
-    return models
+        else:
+            cursor.execute(
+                """
+                SELECT * FROM floodfill_model
+                """
+            )
+        return cursor.fetchall()

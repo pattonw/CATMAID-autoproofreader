@@ -17,8 +17,18 @@ class ComputeServerAPI(APIView):
             name = request.POST.get("name")
         else:
             name = address.split(".")[0]
+        environment_source_path = request.POST.get("environment_source_path", None)
+        diluvian_path = request.POST.get("diluvian_path", None)
+        results_directory = request.POST.get("results_directory", None)
 
-        server = ComputeServer(name=name, address=address, editor=request.user)
+        server = ComputeServer(
+            name=name,
+            address=address,
+            editor=request.user,
+            environment_source_path=environment_source_path,
+            diluvian_path=diluvian_path,
+            results_directory=results_directory,
+        )
         server.save()
 
         return JsonResponse({"success": True})
@@ -42,7 +52,7 @@ class ComputeServerAPI(APIView):
             defaultValue: false
         """
         server_id = request.query_params.get("server_id", None)
-        result = get_servers(server_id)
+        result = self.get_servers(server_id)
 
         return JsonResponse(
             result, safe=False, json_dumps_params={"sort_keys": True, "indent": 4}
@@ -58,25 +68,21 @@ class ComputeServerAPI(APIView):
 
         return JsonResponse({"success": True})
 
-
-def get_servers(server_id=None):
-    cursor = connection.cursor()
-    if server_id is not None:
-        cursor.execute(
-            """
-            SELECT * FROM compute_server
-            WHERE id = {}
-            """.format(
-                server_id
+    def get_servers(self, server_id=None):
+        cursor = connection.cursor()
+        if server_id is not None:
+            cursor.execute(
+                """
+                SELECT * FROM compute_server
+                WHERE id = {}
+                """.format(
+                    server_id
+                )
             )
-        )
-    else:
-        cursor.execute(
-            """
-            SELECT * FROM compute_server
-            """
-        )
-    servers = []
-    for row in cursor.fetchall():
-        servers.append({"id": row[0], "name": row[1]})
-    return servers
+        else:
+            cursor.execute(
+                """
+                SELECT * FROM compute_server
+                """
+            )
+        return cursor.fetchall()

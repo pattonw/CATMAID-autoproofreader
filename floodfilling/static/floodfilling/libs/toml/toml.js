@@ -427,7 +427,6 @@ let toml = (function () {
   };
 
   let dump = function (value, context, aot, all_int) {
-    console.log(value);
     switch (typeof value) {
       case 'string':
         return '"' + escapeString (value) + '"';

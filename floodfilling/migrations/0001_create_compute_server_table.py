@@ -12,7 +12,10 @@ forward_create_tables = """
         name text NOT NULL,
         address text NOT NULL,
         editor_id integer NOT NULL,
-        edition_time timestamp with time zone DEFAULT now() NOT NULL
+        edition_time timestamp with time zone DEFAULT now() NOT NULL,
+        environment_source_path text,
+        diluvian_path text,
+        results_directory text
     );
 
     -- Create history tables
@@ -64,6 +67,9 @@ class Migration(migrations.Migration):
                                 to=settings.AUTH_USER_MODEL,
                             ),
                         ),
+                        ("diluvian_path", models.TextField()),
+                        ("results_directory", models.TextField()),
+                        ("model_source_path", models.TextField()),
                     ],
                     options={"db_table": "compute_server"},
                 )

@@ -10,6 +10,9 @@ class ComputeServer(models.Model):
     name = models.TextField()
     address = models.TextField()
     edition_time = models.DateTimeField(default=timezone.now)
+    diluvian_path = models.TextField()
+    results_directory = models.TextField()
+    environment_source_path = models.TextField(null=True)
     editor = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -42,9 +45,6 @@ class FloodfillModel(UserFocusedModel):
 
     name = models.TextField()
     server = models.ForeignKey(ComputeServer, on_delete=models.DO_NOTHING)
-    environment_source_path = models.TextField(null=True)
-    diluvian_path = models.TextField()
-    results_directory = models.TextField()
     model_source_path = models.TextField()
     config = models.ForeignKey(FloodfillConfig, on_delete=models.DO_NOTHING)
 

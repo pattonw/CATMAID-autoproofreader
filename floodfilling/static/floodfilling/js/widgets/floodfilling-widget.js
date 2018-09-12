@@ -80,7 +80,9 @@
           ],
         ]);
 
-        CATMAID.DOM.appendToTab (tabs['floodfilling_test'], []);
+        CATMAID.DOM.appendToTab (tabs['floodfilling_test'], [
+          ['test_settings', this.test_floodfilling_settings.bind (this)],
+        ]);
 
         CATMAID.DOM.appendToTab (tabs['celery_test'], [
           ['get', this.test_celery_get.bind (this)],
@@ -192,20 +194,39 @@
 
   FloodfillingWidget.prototype.floodfill = function () {
     let self = this;
-    this.gatherFiles ().then (function (files) {
-      self.sendJob (files);
-    });
+    this.gatherFiles ()
+      .then (function (files) {
+        self.sendJob (files);
+      })
+      .catch (CATMAID.handleError);
   };
 
   FloodfillingWidget.prototype.gatherFiles = function () {
     let self = this;
     let setting_values = self.getSettingValues ();
     return this.getSkeleton (setting_values.run).then (function (skeleton_csv) {
+      if (
+        setting_values.run.server_id === undefined ||
+        setting_values.run.model_id === undefined
+      ) {
+        let s = setting_values.run.server_id === undefined;
+        let m = setting_values.run.model_id === undefined;
+        let message;
+        if (s && m) {
+          message = 'Both server and model not yet selected!';
+        } else if (s) {
+          message = 'Server not yet selected!';
+        } else {
+          message = 'Model not yet selected!';
+        }
+        throw new Error (message);
+      }
+
       return {
         skeleton: skeleton_csv,
         volume: toml.dump (self.getVolumes ()),
-        server: JSON.stringify (setting_values.server),
-        diluvian: toml.dump (setting_values['diluvian']),
+        job_config: JSON.stringify (setting_values.run),
+        diluvian_config: toml.dump (setting_values['diluvian']),
       };
     });
   };
@@ -223,14 +244,14 @@
       container.append (file.name, file, file.name);
     };
     var post_data = new FormData ();
-    add_file (post_data, files.diluvian, 'config.toml');
+    add_file (post_data, files.diluvian_config, 'diluvian_config.toml');
     add_file (post_data, files.volume, 'volume.toml');
     add_file (post_data, files.skeleton, 'skeleton.csv');
-    add_file (post_data, files.server, 'server.json');
+    add_file (post_data, files.job_config, 'job_config.json');
 
     CATMAID.fetch (
       'ext/floodfilling/' + project.id + '/flood-fill',
-      'POST',
+      'PUT',
       post_data,
       undefined,
       undefined,
@@ -279,7 +300,12 @@
     });
   };
 
-  
+  // FLOODFILLING
+  FloodfillingWidget.prototype.test_floodfilling_settings = function () {
+    console.log (this.settings);
+    console.log (this.getSettingValues ());
+  };
+
   // OPTIC FLOW
   FloodfillingWidget.prototype.testOpticalFlow = function () {
     let tileLayers = project.focusedStackViewer.getLayersOfType (
@@ -747,7 +773,7 @@
   */
 
   FloodfillingWidget.prototype.getServer = function () {
-    let server = this.getSettingValues (this.settings.server);
+    let server = this.getSettingValues (this.settings.run.server_id);
     console.log (server);
     return server;
   };
@@ -766,7 +792,7 @@
       self.settings.server.id.value = options.length > 0
         ? options[0].id
         : undefined;
-      self.refreshSettings (self.settings.server);
+      self.createSettings (self.settings.server);
     });
   };
 
@@ -826,7 +852,7 @@
         });
       };
       update_settings (settings, uploaded_settings);
-      self.refreshSettings (settings);
+      self.createSettings (settings);
     };
     reader.readAsText (files[0]);
   };
@@ -1057,24 +1083,6 @@
     this.createSettings ();
   };
 
-  FloodfillingWidget.prototype.refreshSettings = function (settings) {
-    // TODO: change the refresh function to only change the values of each setting
-    // This will allow for values to be set more naturally without closing
-    // all settings tabs. Also probably quite a bit faster
-    refreshSetting (settings);
-
-    function refreshSetting (setting) {
-      if ('change' in setting) {
-        setting.change ();
-      } else {
-        let keys = Object.keys (setting);
-        for (let key of keys) {
-          refreshSetting (setting[key]);
-        }
-      }
-    }
-  };
-
   FloodfillingWidget.prototype.createSettings = function () {
     let self = this;
 
@@ -1112,6 +1120,55 @@
       );
     };
 
+    let createAsyncOptionDropdown = function (args) {
+      var async_placeholder = CATMAID.DOM.createLabeledAsyncPlaceholder (
+        args.name,
+        args.async_func,
+        args.helptext
+      );
+
+      let addbutton = $ ('<button class="add" />')
+        .button ({
+          icons: {
+            primary: 'ui-icon-plus',
+          },
+          text: false,
+        })
+        .click (function () {
+          args.async_add ();
+        });
+
+      let removebutton = $ ('<button class="remove" />')
+        .button ({
+          icons: {
+            primary: 'ui-icon-minus',
+          },
+          text: false,
+        })
+        .click (function () {
+          args.async_remove ();
+        });
+
+      async_placeholder.find ('div.help').before (addbutton);
+      async_placeholder.find ('div.help').before (removebutton);
+
+      /**
+       * This function is necessary for refreshing the list when
+       * adding or removing servers. 
+       * 
+       * async_func:
+       * This parameter must be re-passed since it is a promise
+       * and the original one has already resolved and thus will
+       * not provide the refreshed results.
+       */
+      async_placeholder[0].rebuild = function (async_func) {
+        args.async_func = async_func;
+        return createAsyncOptionDropdown (args);
+      };
+
+      return async_placeholder;
+    };
+
     let createNumberListInput = function (args) {
       return CATMAID.DOM.createInputSetting (
         args.name,
@@ -1140,23 +1197,28 @@
     };
 
     let renderSetting = function (container, setting) {
-      let newOption;
+      let newOption = [];
       if (setting.type === 'option_dropdown') {
-        newOption = createOptionDropdown (setting);
+        newOption.push (createOptionDropdown (setting));
+      } else if (setting.type === 'async_option_dropdown') {
+        newOption.push (createAsyncOptionDropdown (setting));
       } else if (setting.type === 'numeric_spinner_int') {
-        newOption = createNumericInputSpinner (setting);
+        newOption.push (createNumericInputSpinner (setting));
       } else if (setting.type === 'numeric_spinner_float') {
-        newOption = createNumericInputSpinner (setting);
+        newOption.push (createNumericInputSpinner (setting));
       } else if (setting.type === 'number_list') {
-        newOption = createNumberListInput (setting);
+        newOption.push (createNumberListInput (setting));
       } else if (setting.type === 'string') {
-        newOption = createStringInput (setting);
+        newOption.push (createStringInput (setting));
       } else if (setting.type === 'checkbox') {
-        newOption = createCheckbox (setting);
+        newOption.push (createCheckbox (setting));
       } else {
         CATMAID.msg ('warn', 'unknown setting type ' + setting.type);
       }
-      container.append (newOption);
+      newOption.forEach (function (item) {
+        item[0].id = setting.label;
+        container.append (item);
+      });
     };
 
     let createSection = function (container, key, values, collapsed) {
@@ -1223,7 +1285,7 @@
       }
     };
 
-    let refresh = function (settings) {
+    let refresh = function () {
       // get the settings page and clear it
       let space = $ ('#content-wrapper > #settings');
       space.width ('100%');
@@ -1259,7 +1321,7 @@
       });
     }.bind (this);
 
-    refresh (this.settings);
+    refresh ();
   };
 
   FloodfillingWidget.prototype.getSettingValues = function (
@@ -1312,6 +1374,9 @@
         max: args.max,
         step: args.step,
         options: args.options,
+        async_func: args.async_func,
+        async_add: args.async_add,
+        async_remove: args.async_remove,
         get_choices: args.get_choices,
         mode: args.mode,
         change: getChangeFunc (args.type, args.settings, args.label),
@@ -1338,6 +1403,9 @@
           let newValue = this.value;
           settings[label].value = newValue;
         };
+      } else if (type === 'async_option_dropdown') {
+        self.supported_fields.push ('async_option_dropdown');
+        return function () {};
       } else if (type === 'checkbox') {
         self.supported_fields.push ('checkbox');
         return function () {
@@ -1367,885 +1435,6 @@
       return settings[setting];
     };
 
-    /**
-     * Everything to do with connecting the widget to the
-     * compute server goes here.
-     * @param {*} settings 
-     */
-    let createServerDefaults = function (settings) {
-      let sub_settings = getSubSettings (settings, 'server');
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'option_dropdown',
-        label: 'id',
-        name: 'Compute server',
-        options: [],
-        helptext: 'The compute server to use for floodfilling',
-        value: undefined,
-      });
-
-      self.refreshServers ();
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'string',
-        label: 'diluvian_path',
-        name: 'Diluvian path',
-        value: 'diluvian',
-        helptext: 'The path to the diluvian directory on the compute server',
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'string',
-        label: 'env_source',
-        name: 'Virtual Environment Source',
-        value: '.virtualenv/diluvian/bin/activate',
-        helptext: 'The path to activate your desired virtual environment',
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'string',
-        label: 'results_dir',
-        name: 'Results directory',
-        value: 'results',
-        helptext: 'A directory in diluvian to store floodfilling job results',
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'string',
-        label: 'model_file',
-        name: 'Trained model',
-        value: 'diluvian_trained.hpf5',
-        helptext: 'The path to the trained model to be used',
-      });
-    };
-
-    let createDiluvianVolumeDefaults = function (settings) {
-      let sub_settings = getSubSettings (settings, 'volume');
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'number_list',
-        label: 'resolution',
-        name: 'Resolution',
-        value: [1, 1, 1],
-        helptext: 'A list of numbers, representing the resolution of the input ' +
-          'for the flood filling network. Note current downsampling images ' +
-          'algorithm only supports downsampling resolution by powers of two',
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'option_dropdown',
-        label: 'label_downsampling',
-        name: 'Label downsampling',
-        helptext: 'Method for downsampling label masks.',
-        options: [
-          {name: 'majority', id: 'majority'},
-          {name: 'conjunction', id: 'conjunction'},
-        ],
-        value: 'majority',
-      });
-    };
-
-    /**
-     * These are the settings related to diluvian and its 
-     * execution
-     * @param {*} settings 
-     */
-    let createDiluvianModelDefaults = function (settings) {
-      let sub_settings = getSubSettings (settings, 'model');
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'number_list',
-        label: 'input_fov_shape',
-        name: 'Input FoV shape',
-        value: [17, 33, 33],
-        helptext: 'A list of numbers, representing the input field of view shape.',
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'number_list',
-        label: 'output_fov_shape',
-        name: 'Output FoV shape',
-        value: [17, 33, 33],
-        helptext: 'A list of numbers, representing the output field of view shape.',
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_int',
-        label: 'output_fov_move_fraction',
-        name: 'Output FoV move fraction',
-        value: 4,
-        helptext: 'Move size as a fraction of the output field of view shape.',
-        min: 0,
-        step: 1,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_float',
-        label: 'v_true',
-        name: 'Target True',
-        value: 0.95,
-        helptext: 'Soft target value for in-object mask voxels.',
-        min: 0,
-        max: 1,
-        step: 0.001,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_float',
-        label: 'v_false',
-        name: 'Target False',
-        value: 0.05,
-        helptext: 'Soft target value for out-of-object mask voxels.',
-        min: 0,
-        max: 1,
-        step: 0.001,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_float',
-        label: 't_move',
-        name: 'Target move',
-        value: 0.9,
-        helptext: 'Threshold mask probability in the move check plane ' +
-          'to queue a move to that position.',
-        min: 0,
-        max: 1,
-        step: 0.001,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_float',
-        label: 't_final',
-        name: 'Target final',
-        value: 0.9,
-        helptext: 'Threshold mask probability to produce the final ' +
-          'segmentation. Defaults to ``t_move``',
-        min: 0,
-        max: 1,
-        step: 0.001,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_int',
-        label: 'move_check_thickness',
-        name: 'Move check plane thickness',
-        value: 1,
-        helptext: 'Thickness of move check plane in voxels. Setting ' +
-          'this greater than 1 is useful to make moves more robust even ' +
-          'if the move grid aligns with missing sections or image artifacts.',
-        min: 0,
-        step: 1,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'option_dropdown',
-        label: 'move_priority',
-        name: 'Move priority',
-        options: [
-          {name: 'descending', id: 'descending'},
-          {name: 'proximity', id: 'proximity'},
-          {name: 'random', id: 'random'},
-        ],
-        helptext: "How to prioritize the move queue. Either 'descending' " +
-          'to order by descending mask probability in the move check plane ' +
-          "(default), 'proximity' to prioritize moves minimizing L1 path " +
-          "distance from the seed, or 'random'.",
-        value: 'descending',
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'checkbox',
-        label: 'move_recheck',
-        name: 'Move recheck',
-        value: true,
-        helptext: 'If true, when moves are retrieved from the queue a cube in the ' +
-          'probability mask will be checked around the move location. If no ' +
-          'voxels in this cube are greater than the move threshold, the move ' +
-          'will be skipped. The cube size is one move step in each direction.',
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'number_list',
-        label: 'training_subv_shape',
-        name: 'Training subvolume shape',
-        value: [17, 33, 33],
-        helptext: 'An optional list of numbers, representing the shape of the ' +
-          'subvolumes used during training.',
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'number_list',
-        label: 'validation_subv_shape',
-        name: 'Validation subvolume shape',
-        value: [17, 33, 33],
-        helptext: 'An optional list of numbers, representing the shape of the ' +
-          'subvolumes used during training validation.',
-      });
-    };
-
-    let createDiluvianNetworkDefaults = function (settings) {
-      let sub_settings = getSubSettings (settings, 'network');
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'string',
-        label: 'factory',
-        name: 'Network Factory',
-        value: 'diluvian.network.make_flood_fill_unet',
-        helptext: 'Module and function name for a factory method for creating the ' +
-          'flood filling network. This allows a custom architecture to be ' +
-          'provided without needing to modify diluvian.',
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'checkbox',
-        label: 'transpose',
-        name: 'Transpose',
-        value: false,
-        helptext: 'If true, any loaded networks will reverse the order of axes for ' +
-          'both inputs and outputs. Data is assumed to be ZYX row-major, ' +
-          'but old versions of diluvian used XYZ, so this is necessary' +
-          'to load old networks.',
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'checkbox',
-        label: 'rescale_image',
-        name: 'Rescale image',
-        value: false,
-        helptext: 'If true, rescale the input image intensity from [0, 1) to [-1, 1)',
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_int',
-        label: 'num_modules',
-        name: 'Number of Modules',
-        value: 8,
-        helptext: 'Number of convolution modules to use, each module ' +
-          'consisting of a skip link in parallel with ``num_layers_per_module`` ' +
-          'convolution layers.',
-        min: 0,
-        step: 1,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_int',
-        label: 'num_layers_per_module',
-        name: 'Number layers per module',
-        value: 2,
-        helptext: 'Number of layers to use in each organizational module, ' +
-          'e.g., the number of convolution layers in each convolution module ' +
-          'or the number of convolution layers before and after each down- ' +
-          'and up-sampling respectively in a U-Net level.',
-        min: 0,
-        step: 1,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'number_list',
-        label: 'convolution_dim',
-        name: 'Convolution dimensions',
-        helptext: 'Shape of the convolution for each layer.',
-        value: [3, 3, 3],
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_int',
-        label: 'convolution_filters',
-        name: 'Convolution filters',
-        helptext: 'Number of convolution filters for each layer.',
-        value: 32,
-        min: 0,
-        step: 1,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'option_dropdown',
-        label: 'convolution_activation',
-        name: 'Convolution activation',
-        helptext: 'Name of the Keras activation function to apply ' +
-          'after convolution layers.',
-        value: 'relu',
-        options: [
-          {name: 'Softmax', id: 'softmax'},
-          {name: 'Exponential linear unit', id: 'elu'},
-          {name: 'Scaled Exponential Linear Unit', id: 'selu'},
-          {name: 'Softplus activation function', id: 'softplus'},
-          {name: 'Softsign activation function', id: 'softsign'},
-          {name: 'Rectified Linear Unit', id: 'relu'},
-          {name: 'Hyperbolic tangent activation function', id: 'tanh'},
-          {name: 'Sigmoid', id: 'sigmoid'},
-          {name: 'Hard sigmoid', id: 'hard_sigmoid'},
-          {name: 'Linear', id: 'linear'},
-        ],
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'option_dropdown',
-        label: 'convolution_padding',
-        name: 'Convolution padding',
-        helptext: 'Name of the padding mode for convolutions, either ' +
-          "'same' (default) or 'valid'",
-        value: 'same',
-        options: [{name: 'Same', id: 'same'}, {name: 'Valid', id: 'valid'}],
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'option_dropdown',
-        label: 'initialization',
-        name: 'Weight initialization',
-        helptext: 'Name of the Keras initialization function to use for weight ' +
-          'initialization of all layers',
-        value: 'glorot_uniform',
-        options: [
-          {name: 'Zeros', id: 'zeros'},
-          {name: 'Ones', id: 'ones'},
-          {name: 'Constant', id: 'constant'},
-          {name: 'Random normal', id: 'random_normal'},
-          {name: 'Random uniform', id: 'random_uniform'},
-          {name: 'Truncated normal', id: 'truncated_normal'},
-          {name: 'letiance scaling', id: 'letianceScaling'},
-          {name: 'Orthogonal', id: 'orthogonal'},
-          {name: 'Lecun normal', id: 'lecun_normal'},
-          {name: 'Lecun uniform', id: 'lecun_uniform'},
-          {name: 'Glorot normal', id: 'glorot_normal'},
-          {name: 'Glorot uniform', id: 'glorot_uniform'},
-          {name: 'He normal', id: 'he_normal'},
-          {name: 'He uniform', id: 'he_uniform'},
-          {name: 'Identity', id: 'identity'},
-        ],
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'option_dropdown',
-        label: 'output_activation',
-        name: 'Output activation',
-        helptext: 'Name of the Keras activation function to use ' +
-          'for final network output.',
-        value: 'sigmoid',
-        options: [
-          {name: 'Softmax', id: 'softmax'},
-          {name: 'Exponential linear unit', id: 'elu'},
-          {name: 'Scaled Exponential Linear Unit', id: 'selu'},
-          {name: 'Softplus activation function', id: 'softplus'},
-          {name: 'Softsign activation function', id: 'softsign'},
-          {name: 'Rectified Linear Unit', id: 'relu'},
-          {name: 'Hyperbolic tangent activation function', id: 'tanh'},
-          {name: 'Sigmoid', id: 'sigmoid'},
-          {name: 'Hard sigmoid', id: 'hard_sigmoid'},
-          {name: 'Linear', id: 'linear'},
-        ],
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_int',
-        label: 'dropout_probability',
-        name: 'Dropout probability',
-        helptext: 'Probability for dropout layers. If zero, no dropout ' +
-          'layers will be included.',
-        value: 0,
-        min: 0,
-        max: 1,
-        step: 0.001,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'checkbox',
-        label: 'batch_normalization',
-        name: 'Batch normalization',
-        helptext: 'Whether to apply batch normalization. Note that in included networks ' +
-          'normalization is applied after activation, rather than before ' +
-          'as in the original paper, because this is now more common practice.',
-        value: true,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_int',
-        label: 'unet_depth',
-        name: 'Unet depth',
-        helptext: 'For U-Net models, the total number of downsampled ' +
-          'levels in the network.',
-        value: 4,
-        min: 0,
-        step: 1,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'number_list',
-        label: 'unet_downsample_rate',
-        name: 'Unet downsample rate',
-        helptext: 'The frequency in levels to downsample each axis. For example, ' +
-          'a standard U-Net downsamples all axes at each level, so this ' +
-          'value would be all ones. If data is anisotropic and Z should ' +
-          'only be downsampled every other level, this value could be ' +
-          '[2, 1, 1]. Axes set to 0 are never downsampled.',
-        value: [1, 1, 1],
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'option_dropdown',
-        label: 'unet_downsample_mode',
-        name: 'Downsample mode',
-        helptext: 'The mode used for downsampling. "Fixed rate" will use the ' +
-          'rate specified in "Unet downsample rate", "As needed" will attempt ' +
-          'to downsample in a way that will maximize the isotropic properties ' +
-          'of the volume by downsampling high resolution axes first.',
-        value: 'as_needed',
-        options: [
-          {name: 'As needed', id: 'as_needed'},
-          {name: 'Fixed rate', id: 'fixed_rate'},
-        ],
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'number_list',
-        label: 'resolution',
-        name: 'Volume resolution',
-        helptext: 'This field is necessary for the "as_needed" Downsample mode. ' +
-          'This should be the same as the resolution described in the volume settings.',
-        value: self.settings.diluvian.volume.resolution.value,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'checkbox',
-        label: 'coord_layer',
-        name: 'Coordinate channels',
-        helptext: 'Whether to include coordinate channels in the input as described ' +
-          'in "An Intriguing Failing of Convolutional Neural Networks and the ' +
-          'CoordConv Solution" (https://arxiv.org/abs/1807.03247)',
-        value: false,
-      });
-    };
-
-    let createDiluvianOptimizerDefaults = function (settings) {
-      let sub_settings = getSubSettings (settings, 'optimizer');
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'option_dropdown',
-        label: 'klass',
-        name: 'Optimizer',
-        helptext: 'The optimization function to use.',
-        value: 'sgd',
-        options: [
-          {name: 'Stochastic gradient descent', id: 'sgd'},
-          {name: 'RMSProp', id: 'rmsprop'},
-          {name: 'Adagrad', id: 'adagrad'},
-          {name: 'Adadelta', id: 'adadelta'},
-          {name: 'Adam', id: 'adam'},
-          {name: 'Adamax', id: 'adamax'},
-          {name: 'Nadam', id: 'nadam'},
-        ],
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'option_dropdown',
-        label: 'loss',
-        name: 'Loss function',
-        helptext: 'The loss function to use.',
-        value: 'binary_crossentropy',
-        options: [
-          {name: 'Mean squared error', id: 'mse'},
-          {name: 'Mean absolute error', id: 'mae'},
-          {name: 'Mean absolute percentage error', id: 'mape'},
-          {name: 'Mean squared logarithmic error', id: 'msle'},
-          {name: 'Squared hinge', id: 'squared_hinge'},
-          {name: 'Hinge', id: 'hinge'},
-          {name: 'Categorical hinge', id: 'categorical_hinge'},
-          {name: 'Log cosh', id: 'logcosh'},
-          {name: 'Categorical crossentropy', id: 'categorical_crossentropy'},
-          {
-            name: 'Sparse categorical crossentropy',
-            id: 'sparse_categorical_crossentropy',
-          },
-          {name: 'Binary crossentropy', id: 'binary_crossentropy'},
-          {name: 'Kullback leibler divergence', id: 'kld'},
-          {name: 'Poisson', id: 'poisson'},
-          {name: 'Cosine proximity', id: 'cosine'},
-        ],
-      });
-    };
-
-    let createDiluvianTrainingDefaults = function (settings) {
-      let sub_settings = getSubSettings (settings, 'training');
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_int',
-        label: 'num_gpus',
-        name: 'Number of GPUs',
-        helptext: 'Number of GPUs to use for data-parallelism.',
-        value: 1,
-        min: 0,
-        step: 1,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_int',
-        label: 'num_workers',
-        name: 'Number of workers',
-        helptext: 'Number of worker queues to use for generating training data.',
-        value: 4,
-        min: 0,
-        step: 1,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_int',
-        label: 'gpu_batch_size',
-        name: 'GPU batch size',
-        helptext: 'Per-GPU batch size. The effective batch size will be ' +
-          'this times ``num_gpus``.',
-        value: 8,
-        min: 0,
-        step: 1,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_int',
-        label: 'training_size',
-        name: 'Training sample size',
-        helptext: 'Number of samples to use for training **from each volume**.',
-        value: 256,
-        min: 0,
-        step: 1,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_int',
-        label: 'validation_size',
-        name: 'Validation sample size',
-        helptext: 'Number of samples to use for validation **from each volume**.',
-        value: 256,
-        min: 0,
-        step: 1,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_int',
-        label: 'total_epochs',
-        name: 'Total epochs',
-        helptext: 'Maximum number of training epochs.',
-        value: 100,
-        min: 0,
-        step: 1,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'checkbox',
-        label: 'reset_generators',
-        name: 'Reset generators',
-        helptext: 'Reset training generators after each epoch, so that the training ' +
-          'examples at each epoch are identical.',
-        value: false,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'number_list',
-        label: 'fill_factor_bins',
-        name: 'Fill factor bins',
-        helptext: 'Bin boundaries for filling fractions. If provided, sample loss ' +
-          'will be weighted to increase loss contribution from less-frequent bins.',
-        value: undefined,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'dict',
-        label: 'partitions',
-        name: 'Partitions',
-        helptext: 'TODO\nDictionary mapping volume name regexes to a sequence of int ' +
-          'indicating number of volume partitions along each axis. Only one axis should ' +
-          'be greater than 1. Each volume should match at most 1 regex.',
-        value: {'".*"': [2, 1, 1]},
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'dict',
-        label: 'training_partition',
-        name: 'Training partitions',
-        helptext: 'TODO\nDictionary mapping volume name regexes to a sequence of int ' +
-          'indicating number of volume partitions along each axis. Only one axis should ' +
-          'be greater than 1. Each volume should match at most 1 regex.',
-        value: {'".*"': [0, 0, 0]},
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'dict',
-        label: 'validation_partition',
-        name: 'Validation partitions',
-        helptext: 'TODO\nDictionary mapping volume name regexes to a sequence of int ' +
-          'indicating number of volume partitions along each axis. Only one axis should ' +
-          'be greater than 1. Each volume should match at most 1 regex.',
-        value: {'".*"': [1, 0, 0]},
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'dict',
-        label: 'validation_metric',
-        name: 'Validation metric',
-        helptext: 'TODO\nModule and function name for a metric function taking a true and ' +
-          "predicted region mask ('metric'). Boolean of whether to threshold the mask " +
-          "for the metric (true) or use the mask and target probabilities ('threshold').\n" +
-          "String 'min' or 'max'for how to choose best validation metric value ('mode').",
-        value: {
-          metric: 'diluvian.util.binary_f_score',
-          threshold: true,
-          mode: 'max',
-          args: {beta: 0.5},
-        },
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_int',
-        label: 'patience',
-        name: 'Patience',
-        helptext: 'Number of epochs after the last minimal validation loss to terminate training.',
-        value: 10,
-        min: 0,
-        step: 1,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_int',
-        label: 'early_abort_epoch',
-        name: 'Early abort epoch',
-        helptext: 'If provided, training will check at the end of this epoch whether validation ' +
-          'loss is less than ``Early abort loss``. If not, training will be aborted, and may be ' +
-          'restarted with a new seed depending on CLI options. By default this is disabled.',
-        min: 0,
-        step: 1,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_float',
-        label: 'early_abort_loss',
-        name: 'Early abort loss',
-        helptext: 'The cutoff for validation loss by ``Early abort epoch``',
-        min: 0,
-        step: 0.001,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'number_list',
-        label: 'label_erosion',
-        name: 'Label erosion',
-        value: [1, 1, 1],
-        helptext: 'Amount to erode label mask for each training subvolume in each dimension, ' +
-          'in pixels. For example, a value of [0,1,1] will result in erosion with a ' +
-          'structuring element of size [1,3,3].',
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'checkbox',
-        label: 'relabel_seed_component',
-        name: 'Relabel seed component',
-        helptext: 'Relabel training subvolumes to only include the seeded connected component.',
-        value: false,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'checkbox',
-        label: 'augment_validation',
-        name: 'Augment validation',
-        helptext: 'Whether validation data should also be augmented.',
-        value: true,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'checkbox',
-        label: 'augment_use_both',
-        name: 'Augment use both',
-        helptext: 'To train on both the original data and augmented data for each subvolume.',
-        value: true,
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'number_list',
-        label: 'augment_mirros',
-        name: 'Augment mirrors',
-        value: [0, 1, 2],
-        helptext: 'Axes along which to apply mirror augmentations',
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'number_list',
-        label: 'augment_mirros',
-        name: 'Augment mirrors',
-        value: [0, 1, 2],
-        helptext: 'Axes along which to apply mirror augmentations',
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'list_number_list',
-        label: 'augment_permute_axes',
-        name: 'Augment permute axes',
-        helptext: 'TODO\nAxis permutations to use for data augmentation',
-        value: [[0, 2, 1]],
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'dict_list',
-        label: 'augment_missing_data',
-        name: 'Augment missing data',
-        helptext: 'TODO\nList of dictionaries with ``axis`` and ``prob`` keys, indicating ' +
-          'an axis to perform data blanking along, and the probability to blank' +
-          'each plane in the axis, respectively.',
-        value: [{axis: 0, prob: 0.01}],
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'dict_list',
-        label: 'augment_noise',
-        name: 'Augment noise',
-        helptext: 'TODO\nList of dictionaries with ``axis``, ``mul`` and ``add`` keys, indicating ' +
-          'an axis to perform independent Gaussian noise augmentation on, and the standard deviations ' +
-          'of 1-mean multiplicative and 0-mean additive noise, respectively.',
-        value: [{axis: 0, mul: 0.1, add: 0.1}],
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'dict_list',
-        label: 'augment_contrast',
-        name: 'Augment contrast',
-        helptext: 'TODO\nList of dictionaries with ``axis``, ``prob``, ``scaling_mean``' +
-          '``scaling_std``, ``center_mean`` and ``center_std`` keys. These' +
-          'specify the probability to alter the contrast of a section, the mean' +
-          'and standard deviation to draw from a normal distribution to scale' +
-          'contrast, and the mean and standard deviation to draw from a normal' +
-          'distribution to move the intensity center multiplicatively.',
-        value: [
-          {
-            axis: 0,
-            prob: 0.05,
-            scaling_mean: 0.5,
-            scaling_std: 0.1,
-            center_mean: 1.2,
-            center_std: 0.2,
-          },
-        ],
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'dict_list',
-        label: 'augment_artifacts',
-        name: 'Augment artifacts',
-        helptext: 'TODO\nList of dictionaries with ``axis``, ``prob`` and ``volume_file``' +
-          'keys, indicating an axis to perform data artifacting along, the' +
-          'probability to add artifacts to each plane in the axis, and the' +
-          'volume configuration file from which to draw artifacts, respectively.',
-        value: [],
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'checkbox',
-        label: 'vary_noise',
-        name: 'Vary noise',
-        helptext: 'Randomly vary the intensity of multiplicative and additive by ' +
-          'some factor in (0,1).',
-        value: false,
-      });
-    };
-
-    let createDiluvianPostprocessingDefaults = function (settings) {
-      let sub_settings = getSubSettings (settings, 'postprocessing');
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'number_list',
-        label: 'closing_shape',
-        name: 'Closing shape',
-        helptext: 'Shape of the structuring element for morphological closing, in voxels',
-        value: [],
-      });
-    };
-
-    let createDiluvianServerDefaults = function (settings) {
-      let sub_settings = getSubSettings (settings, 'server');
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'number_list',
-        label: 'gpus',
-        name: 'GPU ids',
-        helptext: 'GPU ids to use for data-parallelism.',
-        value: [],
-      });
-
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_int',
-        label: 'num_workers',
-        name: 'Number of workers',
-        helptext: 'Number of worker queues to use for generating training data.',
-        value: 4,
-        min: 0,
-        step: 1,
-      });
-    };
-
     let createDiluvianDefaults = function (settings) {
       let sub_settings = getSubSettings (settings, 'diluvian');
 
@@ -2259,21 +1448,332 @@
         min: 0,
         step: 1,
       });
-
-      createDiluvianVolumeDefaults (sub_settings);
-      /**
-       * Full set of Diluvian settings partially implemented. Not yet support
-       * due to the fact that the widget probably shouldn't be used for
-       * training models, rather the widgets main purpose is for the easy
-       * application of production ready models.
-       */
-      //createDiluvianModelDefaults (sub_settings);
-      //createDiluvianNetworkDefaults (sub_settings);
-      //createDiluvianOptimizerDefaults (sub_settings);
-      //createDiluvianTrainingDefaults (sub_settings);
-      createDiluvianPostprocessingDefaults (sub_settings);
-      createDiluvianServerDefaults (sub_settings);
     };
+
+    let change_server = function (server_id) {
+      self.settings.run.server_id.value = server_id;
+      let model_id = self.settings.run.model_id.value;
+      if (model_id !== undefined) {
+        CATMAID.fetch (
+          'ext/floodfilling/' + project.id + '/floodfill-models',
+          'GET',
+          {model_id: model_id}
+        ).then (function (result) {
+          let model = result[0];
+          if (model.server_id !== server_id) {
+            CATMAID.msg (
+              'warn',
+              'Server does not match the server the selected ' +
+                'Model was trained on. Make sure the server specific ' +
+                'parameters on the model are correct.'
+            );
+          }
+        });
+      }
+    };
+
+    let initServerList = function (change_func) {
+      return CATMAID.fetch (
+        'ext/floodfilling/' + project.id + '/compute-servers',
+        'GET'
+      ).then (function (json) {
+        var servers = json
+          .sort (function (a, b) {
+            return CATMAID.tools.compareStrings (a.name, b.name);
+          })
+          .map (function (server) {
+            return {
+              title: server.name + ' (#' + server.id + ')',
+              value: server.id,
+            };
+          });
+        var selectedServerId = self.settings.run.server_id.value;
+        // Create actual element based on the returned data
+        var node = CATMAID.DOM.createRadioSelect (
+          'Servers',
+          servers,
+          selectedServerId,
+          true
+        );
+        // Add a selection handler
+        node.onchange = function (e) {
+          let serverId = null;
+          if (e.srcElement.value !== 'none') {
+            serverId = parseInt (e.srcElement.value, 10);
+          }
+          change_func (serverId);
+        };
+
+        return node;
+      });
+    };
+
+    let change_model = function (model_id) {
+      self.settings.run.model_id.value = model_id;
+      let server_id = self.settings.run.server_id.value;
+      CATMAID.fetch (
+        'ext/floodfilling/' + project.id + '/floodfill-models',
+        'GET',
+        {model_id: model_id}
+      ).then (function (result) {
+        let model = result[0];
+
+        if (server_id !== undefined) {
+          if (model.server_id !== server_id) {
+            CATMAID.msg (
+              'warn',
+              'Server does not match the server the selected ' +
+                'Model was trained on. Make sure the server specific ' +
+                'parameters on the model are correct.'
+            );
+          }
+        } else {
+          self.settings.run.server_id.value = model.server_id;
+          // refresh the server list
+          let replacement = $ ('#server_id')[0].rebuild (
+            initServerList (change_server)
+          );
+          $ ('#server_id').empty ();
+          $ ('#server_id').append (replacement);
+        }
+      });
+    };
+
+    let initModelList = function (change_func) {
+      return CATMAID.fetch (
+        'ext/floodfilling/' + project.id + '/floodfill-models',
+        'GET'
+      ).then (function (json) {
+        var models = json
+          .sort (function (a, b) {
+            return CATMAID.tools.compareStrings (a.name, b.name);
+          })
+          .map (function (model) {
+            return {
+              title: model.name + ' (#' + model.id + ')',
+              value: model.id,
+            };
+          });
+        var selectedModelId = self.settings.run.model_id.value;
+        // Create actual element based on the returned data
+        var node = CATMAID.DOM.createRadioSelect (
+          'Models',
+          models,
+          selectedModelId,
+          true
+        );
+        // Add a selection handler
+        node.onchange = function (e) {
+          let modelId = null;
+          if (e.srcElement.value !== 'none') {
+            modelId = parseInt (e.srcElement.value, 10);
+          }
+          change_func (modelId);
+        };
+
+        return node;
+      });
+    };
+
+    function add_server () {
+      // Add skeleton source message and controls
+      let dialog = new CATMAID.OptionsDialog ('Add Server');
+
+      dialog.appendMessage ('Please provide the necessary information:');
+      let server_name = dialog.appendField ('Server name: ', 'server_name', '');
+      let server_address = dialog.appendField (
+        'Server address: ',
+        'server_address',
+        'janelia.int.org'
+      );
+
+      // Add handler for creating the server
+      dialog.onOK = function () {
+        return CATMAID.fetch (
+          'ext/floodfilling/' + project.id + '/compute-servers',
+          'PUT',
+          {name: server_name.value, address: server_address.value}
+        )
+          .then (function (e) {
+            // refresh the server list
+            let replacement = $ ('#server_id')[0].rebuild (
+              initServerList (change_server)
+            );
+            $ ('#server_id').empty ();
+            $ ('#server_id').append (replacement);
+          })
+          .catch (CATMAID.handleError);
+      };
+
+      dialog.show (500, 'auto', true);
+    }
+
+    function add_model () {
+      // Add skeleton source message and controls
+      let dialog = new CATMAID.OptionsDialog ('WIP');
+      dialog.appendMessage ('Please provide the necessary information:');
+      let model_name = dialog.appendField ('Model name: ', 'model_name', '');
+      let server;
+      let change_func = function (server_id) {
+        server = server_id;
+      };
+      dialog.appendChild (
+        CATMAID.DOM.createLabeledAsyncPlaceholder (
+          'Compute server',
+          initServerList (change_func),
+          'The server to remove.'
+        )[0]
+      );
+
+      let environment_source_path = dialog.appendField (
+        'Source path for floodfilling environment (optional but recommended): ',
+        'env_source_path',
+        ''
+      );
+      let diluvian_path = dialog.appendField (
+        'Path to the diluvian directory: ',
+        'diluvian_path',
+        '~/diluvian'
+      );
+      let results_directory = dialog.appendField (
+        'Path to the results directory in diluvian: ',
+        'results_directory',
+        'results'
+      );
+      let model_source_path = dialog.appendField (
+        'Path to the models weights: ',
+        'model_path',
+        'trained_models/model.hdf5'
+      );
+      let config;
+      var fileButton = CATMAID.DOM.createFileButton (
+        undefined,
+        false,
+        function (evt) {
+          let reader = new FileReader ();
+          reader.onload = function (e) {
+            config = reader.result;
+          };
+          reader.readAsText (evt.target.files[0]);
+        }
+      );
+      let configbutton = $ ('<button class="uploadSettingsFile" />')
+        .button ({
+          icons: {
+            primary: 'ui-icon-arrowthick-1-n',
+          },
+          text: false,
+        })
+        .click (function () {
+          fileButton.click ();
+        });
+      dialog.appendChild (configbutton[0]);
+
+      // Add handler for creating the model
+      dialog.onOK = function () {
+        return false;
+        CATMAID.fetch (
+          'ext/floodfilling/' + project.id + '/floodfill-models',
+          'PUT',
+          {
+            name: model_name.value,
+            server_id: server,
+            environment_source_path: environment_source_path.value,
+            diluvian_path: diluvian_path.value,
+            results_directory: results_directory.value,
+            model_source_path: model_source_path.value,
+            config: config,
+          }
+        )
+          .then (function (e) {
+            // refresh the server list
+            let replacement = $ ('#model_id')[0].rebuild (
+              initModelList (change_model)
+            );
+            $ ('#model_id').empty ();
+            $ ('#model_id').append (replacement);
+          })
+          .catch (CATMAID.handleError);
+      };
+
+      dialog.show (500, 'auto', true);
+    }
+
+    function remove_server () {
+      // Add skeleton source message and controls
+      let dialog = new CATMAID.OptionsDialog ('Remove Server');
+
+      dialog.appendMessage ('Please select a server:');
+      let server;
+      let change_func = function (server_id) {
+        server = server_id;
+      };
+      dialog.appendChild (
+        CATMAID.DOM.createLabeledAsyncPlaceholder (
+          'Compute server',
+          initServerList (change_func),
+          'The server to remove.'
+        )[0]
+      );
+
+      // Add handler for creating the server
+      dialog.onOK = function () {
+        CATMAID.fetch (
+          'ext/floodfilling/' + project.id + '/compute-servers',
+          'DELETE',
+          {server_id: server}
+        )
+          .then (function (e) {
+            // refresh the server list
+            let replacement = $ ('#server_id')[0].rebuild (
+              initServerList (change_server)
+            );
+            $ ('#server_id').empty ();
+            $ ('#server_id').append (replacement);
+          })
+          .catch (CATMAID.handleError);
+      };
+
+      dialog.show (500, 'auto', true);
+    }
+
+    function remove_model () {
+      // Remove a model
+      let dialog = new CATMAID.OptionsDialog ('Remove Model');
+
+      dialog.appendMessage ('Please select a model:');
+      let model;
+      let change_func = function (model_id) {
+        model = model_id;
+      };
+      dialog.appendChild (
+        CATMAID.DOM.createLabeledAsyncPlaceholder (
+          'Floodfill Model',
+          initModelList (change_func),
+          'The model to remove.'
+        )[0]
+      );
+
+      // Add handler for removing the model
+      dialog.onOK = function () {
+        CATMAID.fetch (
+          'ext/floodfilling/' + project.id + '/floodfill-models',
+          'DELETE',
+          {model_id: model}
+        )
+          .then (function (e) {
+            // refresh the server list
+            let replacement = $ ('#model_id')[0].rebuild (
+              initModelList (change_model)
+            );
+            $ ('#model_id').empty ();
+            $ ('#model_id').append (replacement);
+          })
+          .catch (CATMAID.handleError);
+      };
+
+      dialog.show (500, 'auto', true);
+    }
 
     /**
      * These settings control everything to do with input
@@ -2283,6 +1783,28 @@
      */
     let createRunDefaults = function (settings) {
       let sub_settings = getSubSettings (settings, 'run');
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'async_option_dropdown',
+        label: 'server_id',
+        name: 'Compute server',
+        async_func: initServerList (change_server),
+        async_add: add_server,
+        async_remove: remove_server,
+        helptext: 'The compute server to use for floodfilling',
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'async_option_dropdown',
+        label: 'model_id',
+        name: 'Floodfilling model',
+        async_func: initModelList (change_model),
+        async_add: add_model,
+        async_remove: remove_model,
+        helptext: 'The pretrained model to use for floodfilling',
+      });
 
       addSettingTemplate ({
         settings: sub_settings,

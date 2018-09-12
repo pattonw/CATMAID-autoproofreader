@@ -3,7 +3,6 @@
 
 from django.conf import settings
 from django.db import migrations, models
-from django.contrib.postgres.fields import ArrayField
 import django.db.models.deletion
 import django.utils.timezone
 
@@ -25,9 +24,6 @@ forward_create_tables = """
         edition_time timestamptz NOT NULL DEFAULT now(),
         name text,
         server_id int REFERENCES compute_server(id) ON DELETE CASCADE NOT NULL,
-        environment_source_path text,
-        diluvian_path text,
-        results_directory text,
         model_source_path text,
         config_id int REFERENCES floodfill_config(id) ON DELETE CASCADE NOT NULL
     );
@@ -42,9 +38,9 @@ forward_create_tables = """
         name text,
         data text,
         status text CHECK (status IN ('queued', 'computing', 'complete', 'error')),
-        config int REFERENCES floodfill_config(id),
-        model int REFERENCES floodfill_model(id),
-        volume int REFERENCES catmaid_volume(id),
+        config_id int REFERENCES floodfill_config(id),
+        model_id int REFERENCES floodfill_model(id),
+        volume_id int REFERENCES catmaid_volume(id),
         skeleton_id int,
         skeleton_csv text
     );
@@ -151,9 +147,6 @@ class Migration(migrations.Migration):
                         ("name", models.TextField()),
                         ("skeleton_csv", models.TextField()),
                         ("environment_source_path", models.TextField()),
-                        ("diluvian_path", models.TextField()),
-                        ("results_directory", models.TextField()),
-                        ("model_source_path", models.TextField()),
                         (
                             "skeleton",
                             models.ForeignKey(
