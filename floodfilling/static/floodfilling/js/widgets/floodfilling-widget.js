@@ -621,7 +621,7 @@
 
   FloodfillingWidget.prototype.getSkeleton = function () {
     let self = this;
-    let run_settings = self.getSettingValues (self.settings).run;
+    let run_settings = self.getSettingValues (self.settings.run);
     let skid = run_settings['skeleton_id'];
     return CATMAID.fetch (project.id + '/skeletons/' + skid + '/compact-detail')
       .then (function (skeleton_json) {
@@ -632,7 +632,9 @@
           let strahler = arbor.strahlerAnalysis ();
           if (
             !Object.values (strahler).filter (
-              index => index >= run_settings.strahler_filter
+              index =>
+                index >= run_settings.strahler_filter_min &&
+                index <= run_settings.strahler_filter_max
             ).length > 0
           ) {
             CATMAID.msg (
@@ -645,13 +647,21 @@
           }
           [arbor.edges, nodes] = [
             Object.keys (arbor.edges)
-              .filter (id => strahler[id] >= run_settings.strahler_filter)
+              .filter (
+                id =>
+                  strahler[id] >= run_settings.strahler_filter_min &&
+                  strahler[id] <= run_settings.strahler_filter_max
+              )
               .reduce (function (a, b) {
                 a[b] = arbor.edges[b];
                 return a;
               }, {}),
             Object.keys (nodes)
-              .filter (id => strahler[id] >= run_settings.strahler_filter)
+              .filter (
+                id =>
+                  strahler[id] >= run_settings.strahler_filter_min &&
+                  strahler[id] <= run_settings.strahler_filter_max
+              )
               .reduce (function (a, b) {
                 a[b] = nodes[b];
                 return a;
@@ -786,7 +796,7 @@
     ).then (function (e) {
       let options = [];
       e.forEach (function (server) {
-        options.push ({name: server.name, id: server.id});
+        options.push ({name: server[1], id: server[0]});
       });
       self.settings.server.id.options = options;
       self.settings.server.id.value = options.length > 0
@@ -1460,7 +1470,7 @@
           {model_id: model_id}
         ).then (function (result) {
           let model = result[0];
-          if (model.server_id !== server_id) {
+          if (model[6] !== server_id) {
             CATMAID.msg (
               'warn',
               'Server does not match the server the selected ' +
@@ -1479,12 +1489,12 @@
       ).then (function (json) {
         var servers = json
           .sort (function (a, b) {
-            return CATMAID.tools.compareStrings (a.name, b.name);
+            return CATMAID.tools.compareStrings (a[1], b[1]);
           })
           .map (function (server) {
             return {
-              title: server.name + ' (#' + server.id + ')',
-              value: server.id,
+              title: server[1] + ' (#' + server[0] + ')',
+              value: server[0],
             };
           });
         var selectedServerId = self.settings.run.server_id.value;
@@ -1519,7 +1529,7 @@
         let model = result[0];
 
         if (server_id !== undefined) {
-          if (model.server_id !== server_id) {
+          if (model[6] !== server_id) {
             CATMAID.msg (
               'warn',
               'Server does not match the server the selected ' +
@@ -1528,7 +1538,7 @@
             );
           }
         } else {
-          self.settings.run.server_id.value = model.server_id;
+          self.settings.run.server_id.value = model[6];
           // refresh the server list
           let replacement = $ ('#server_id')[0].rebuild (
             initServerList (change_server)
@@ -1546,12 +1556,12 @@
       ).then (function (json) {
         var models = json
           .sort (function (a, b) {
-            return CATMAID.tools.compareStrings (a.name, b.name);
+            return CATMAID.tools.compareStrings (a[5], b[5]);
           })
           .map (function (model) {
             return {
-              title: model.name + ' (#' + model.id + ')',
-              value: model.id,
+              title: model[5] + ' (#' + model[0] + ')',
+              value: model[0],
             };
           });
         var selectedModelId = self.settings.run.model_id.value;
@@ -1587,12 +1597,34 @@
         'janelia.int.org'
       );
 
+      let environment_source_path = dialog.appendField (
+        'Source path for floodfilling environment (optional but recommended): ',
+        'env_source_path',
+        ''
+      );
+      let diluvian_path = dialog.appendField (
+        'Path to the diluvian directory: ',
+        'diluvian_path',
+        '~/diluvian'
+      );
+      let results_directory = dialog.appendField (
+        'Path to the results directory in diluvian: ',
+        'results_directory',
+        'results'
+      );
+
       // Add handler for creating the server
       dialog.onOK = function () {
         return CATMAID.fetch (
           'ext/floodfilling/' + project.id + '/compute-servers',
           'PUT',
-          {name: server_name.value, address: server_address.value}
+          {
+            name: server_name.value,
+            address: server_address.value,
+            environment_source_path: environment_source_path.value,
+            diluvian_path: diluvian_path.value,
+            results_directory: results_directory.value,
+          }
         )
           .then (function (e) {
             // refresh the server list
@@ -1623,22 +1655,6 @@
           initServerList (change_func),
           'The server to remove.'
         )[0]
-      );
-
-      let environment_source_path = dialog.appendField (
-        'Source path for floodfilling environment (optional but recommended): ',
-        'env_source_path',
-        ''
-      );
-      let diluvian_path = dialog.appendField (
-        'Path to the diluvian directory: ',
-        'diluvian_path',
-        '~/diluvian'
-      );
-      let results_directory = dialog.appendField (
-        'Path to the results directory in diluvian: ',
-        'results_directory',
-        'results'
       );
       let model_source_path = dialog.appendField (
         'Path to the models weights: ',
@@ -1671,16 +1687,12 @@
 
       // Add handler for creating the model
       dialog.onOK = function () {
-        return false;
         CATMAID.fetch (
           'ext/floodfilling/' + project.id + '/floodfill-models',
           'PUT',
           {
             name: model_name.value,
             server_id: server,
-            environment_source_path: environment_source_path.value,
-            diluvian_path: diluvian_path.value,
-            results_directory: results_directory.value,
             model_source_path: model_source_path.value,
             config: config,
           }
@@ -1853,10 +1865,21 @@
       addSettingTemplate ({
         settings: sub_settings,
         type: 'numeric_spinner_int',
-        label: 'strahler_filter',
-        name: 'Strahler filter',
+        label: 'strahler_filter_min',
+        name: 'Strahler filter minimum',
         helptext: 'The minimum strahler index to perform flood filling on.',
         value: 0,
+        min: 0,
+        step: 1,
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'numeric_spinner_int',
+        label: 'strahler_filter_max',
+        name: 'Strahler filter maximum',
+        helptext: 'The maximum strahler index to perform flood filling on.',
+        value: 10,
         min: 0,
         step: 1,
       });
@@ -1889,5 +1912,10 @@
     description: 'Widget associated with the floodfilling app',
     key: 'floodfilling-widget',
     creator: FloodfillingWidget,
+    websocketHandlers: {
+      'floodfilling-result-update': function (client, payload) {
+        CATMAID.msg ('warn', 'got a message');
+      },
+    },
   });
 }) (CATMAID);

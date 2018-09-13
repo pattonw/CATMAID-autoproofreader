@@ -58,6 +58,18 @@ class FloodfillModelAPI(APIView):
             paramType: form
             required: false
             defaultValue: false
+        returns: List of lists of the form:
+            [
+                id,
+                user_id,
+                project_id,
+                creation_time,
+                edition_time,
+                name,
+                server_id,
+                model_source_path,
+                config_id,
+            ]
         """
         model_id = request.query_params.get("model_id", None)
         result = self.get_models(model_id)

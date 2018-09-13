@@ -50,6 +50,17 @@ class ComputeServerAPI(APIView):
             paramType: form
             required: false
             defaultValue: false
+        returns: List of lists of the form:
+            [
+                id,
+                name,
+                address,
+                editor_id,
+                edition_time,
+                environment_source_path,
+                diluvian_path,
+                results_directory,
+            ]
         """
         server_id = request.query_params.get("server_id", None)
         result = self.get_servers(server_id)
