@@ -12,34 +12,42 @@ from rest_framework.views import APIView
 class FloodfillModelAPI(APIView):
     @method_decorator(requires_user_role(UserRole.QueueComputeTask))
     def put(self, request, project_id):
+        warnings = []
 
-        for i in range(10):
-            print()
         name = request.POST.get("name", None)
         server_id = request.POST.get("server_id", None)
         model_source_path = request.POST.get("model_source_path", None)
         config = request.POST.get("config", None)
 
-        params = [name, server_id, model_source_path, config]
+        params = [name, server_id, model_source_path]
 
         if any([x is None for x in params]):
             return JsonResponse({"success": False, "results": request.POST})
 
-        config = FloodfillConfig(
-            user_id=request.user.id, project_id=project_id, config=config
-        )
-        config.save()
+        if config is not None:
+            model_config = FloodfillConfig(
+                user_id=request.user.id, project_id=project_id, config=config
+            )
+            model_config.save()
+            config_id = model_config.id
+        else:
+            warnings.append(
+                "Model created with no configuration files. This "
+                + "will make it much harder to reproduce your "
+                + "results later."
+            )
+            config_id = None
         model = FloodfillModel(
             name=name,
             server_id=server_id,
             model_source_path=model_source_path,
-            config_id=config.id,
+            config_id=config_id,
             user_id=request.user.id,
             project_id=project_id,
         )
         model.save()
 
-        return JsonResponse({"success": True})
+        return JsonResponse({"success": True, "warnings": warnings})
 
     @method_decorator(requires_user_role(UserRole.Browse))
     def get(self, request, project_id):

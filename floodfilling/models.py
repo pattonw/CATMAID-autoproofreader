@@ -69,4 +69,4 @@ class FloodfillResults(UserFocusedModel):
     status = models.TextField()
 
     class Meta:
-        db_table = "floodfill_results"
+        db_table = "floodfill_result"

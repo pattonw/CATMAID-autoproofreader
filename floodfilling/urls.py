@@ -16,7 +16,7 @@ urlpatterns = [url(r"^is-installed$", is_installed)]
 
 # Skeleton flood filling
 urlpatterns += [
-    url(r"^(?P<project_id>\d+)/flood-fill$", floodfilling.FloodfillingTaskAPI.as_view())
+    url(r"^(?P<project_id>\d+)/flood-fill$", floodfilling.FloodfillTaskAPI.as_view())
 ]
 
 # Compute Servers
@@ -32,6 +32,14 @@ urlpatterns += [
     url(
         r"^(?P<project_id>\d+)/floodfill-models$",
         floodfill_model.FloodfillModelAPI.as_view(),
+    )
+]
+
+# Floodfilling Results
+urlpatterns += [
+    url(
+        r"^(?P<project_id>\d+)/floodfill-results$",
+        floodfilling.FloodfillResultsAPI.as_view(),
     )
 ]
 

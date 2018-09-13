@@ -12,7 +12,8 @@
     this.widgetID = this.registerInstance ();
     this.idPrefix = `floodfilling-widget${this.widgetID}-`;
 
-    this.oTable = null;
+    this.ongoingTable = null;
+    this.finishedTable = null;
     this.configJsons = {};
     this.settings = {};
     this.volumes = {ImageStack: [], HDF5: []};
@@ -103,9 +104,7 @@
             <table cellpadding="0" cellspacing="0" border="0" class="display" id="${jobsTableID}">
               <thead>
                 <tr>
-                  <th>Submission Date
-                    <input type="date" name="submissionDate" id="${this.idPrefix}search-submission-dat"
-                    class="search_init"/>
+                  <th>Run Time (hours)
                   </th>
                   <th>Skeleton ID
                     <input type="number" name="searchSkeletonId" id="${this.idPrefix}search-skeleton-id"
@@ -115,7 +114,7 @@
               </thead>
               <tfoot>
                 <tr>
-                  <th>submission Date</th>
+                  <th>run time</th>
                   <th>skeleton ID</th>
                 </tr>
               </tfoot>
@@ -881,7 +880,7 @@
     const tableID = this.idPrefix + 'datatable-jobs';
     const $table = $ ('#' + tableID);
 
-    this.oTable = $table.DataTable ({
+    this.ongoingTable = $table.DataTable ({
       // http://www.datatables.net/usage/options
       destroy: true,
       dom: '<"H"lrp>t<"F"ip>',
@@ -896,18 +895,18 @@
       deferRender: true,
       columns: [
         {
-          data: 'submissionDate',
-          render: function (data) {
-            DataDay = data.dayOfMonth;
-            DataObj = data.dayOfMonth + '/' + data.monthValue + '/' + data.year;
-            Return (dataDay < 10) ? '0' + dataObj : dataObj;
+          data: 'creation_time',
+          render: function (time_string) {
+            let start = new Date (time_string);
+            let now = new Date ();
+            return Math.floor ((now - start) / (10 * 60 * 60)) / 100;
           },
           orderable: true,
           searchable: true,
-          className: 'submissionDate',
+          className: 'run_time',
         },
         {
-          data: 'skeletonID',
+          data: 'skeleton_id',
           render: Math.floor,
           orderable: true,
           searchable: true,
@@ -928,7 +927,7 @@
         const filterValue = event.currentTarget.value;
         const regex = filterValue === '' ? '' : `^${filterValue}$`;
 
-        self.oTable
+        self.ongoingTable
           .column (event.currentTarget.closest ('th'))
           .search (regex, true, false)
           .draw ();
@@ -958,7 +957,7 @@
     const tableID = this.idPrefix + 'datatable-results';
     const $table = $ ('#' + tableID);
 
-    this.oTable = $table.DataTable ({
+    this.finishedTable = $table.DataTable ({
       // http://www.datatables.net/usage/options
       destroy: true,
       dom: '<"H"lrp>t<"F"ip>',
@@ -1000,7 +999,7 @@
         const filterValue = event.currentTarget.value;
         const regex = filterValue === '' ? '' : `^${filterValue}$`;
 
-        self.oTable
+        self.finishedTable
           .column (event.currentTarget.closest ('th'))
           .search (regex, true, false)
           .draw ();
@@ -1023,53 +1022,53 @@
         this.value = '';
       }
     });
+
+    this.getJobs ();
   };
 
-  FloodfillingWidget.prototype.append = function (models) {
-    let skids = Object.keys (models);
-    this.appendOrdered (skids, models);
+  FloodfillingWidget.prototype.getJobs = function () {
+    let self = this;
+    CATMAID.fetch (
+      'ext/floodfilling/' + project.id + '/floodfill-results',
+      'GET'
+    )
+      .then (function (results) {
+        results.forEach (function (result) {
+          self.appendOne (result);
+        });
+      })
+      .catch (CATMAID.handleError);
   };
 
-  FloodfillingWidget.prototype.appendOrdered = function (skids, models) {
-    CATMAID.NeuronNameService.getInstance ().registerAll (
-      this,
-      models,
-      function () {
-        fetchSkeletons (
-          skids,
-          function (skid) {
-            return CATMAID.makeURL (
-              project.id + '/skeletons/' + skid + '/compact-detail'
-            );
-          },
-          function (skid) {
-            return {};
-          },
-          this.appendOne.bind (this),
-          function (skid) {
-            CATMAID.msg ('ERROR', 'Failed to load skeleton #' + skid);
-          },
-          this.update.bind (this),
-          'GET'
-        );
-      }.bind (this)
-    );
-  };
-
-  FloodfillingWidget.prototype.appendOne = function (skid, json) {
-    let arborParser = new CATMAID.ArborParser ();
-
-    let row = {
-      skeletonID: skid,
-      skeletonSize: json[0].length,
-      data: json,
-      vertices: json[0].reduce ((vs, vertex) => {
-        vs[vertex[0]] = new THREE.Vector3 (...vertex.slice (3, 6));
-        return vs;
-      }, {}),
-      arbor: arborParser.init ('compact-skeleton', json).arbor,
-    };
-    this.oTable.rows.add ([row]);
+  FloodfillingWidget.prototype.appendOne = function (job) {
+    console.log (job);
+    if (job.status === 'complete') {
+      let row = {
+        job_id: job.id,
+        creation_time: job.creation_time,
+        completion_time: job.completion_time,
+        name: job.name,
+        data: job.data,
+        config_id: job.config_id,
+        model_id: job.model_id,
+        volume_id: job.volume_id,
+        skeleton_id: job.skeleton_id,
+      };
+      this.finishedTable.rows.add ([row]);
+    } else {
+      let row = {
+        job_id: job.id,
+        creation_time: job.creation_time,
+        name: job.name,
+        status: job.status,
+        config_id: job.config_id,
+        model_id: job.model_id,
+        skeleton_id: job.skeleton_id,
+      };
+      this.ongoingTable.rows.add ([row]);
+    }
+    this.finishedTable.draw ();
+    this.ongoingTable.draw ();
   };
 
   FloodfillingWidget.prototype.clear = function () {
@@ -1645,7 +1644,7 @@
       let dialog = new CATMAID.OptionsDialog ('WIP');
       dialog.appendMessage ('Please provide the necessary information:');
       let model_name = dialog.appendField ('Model name: ', 'model_name', '');
-      let server;
+      let server = self.settings.run.server_id.value;
       let change_func = function (server_id) {
         server = server_id;
       };
@@ -1698,6 +1697,7 @@
           }
         )
           .then (function (e) {
+            console.log (e);
             // refresh the server list
             let replacement = $ ('#model_id')[0].rebuild (
               initModelList (change_model)
@@ -1716,7 +1716,7 @@
       let dialog = new CATMAID.OptionsDialog ('Remove Server');
 
       dialog.appendMessage ('Please select a server:');
-      let server;
+      let server = self.settings.run.server_id.value;
       let change_func = function (server_id) {
         server = server_id;
       };
@@ -1754,7 +1754,7 @@
       let dialog = new CATMAID.OptionsDialog ('Remove Model');
 
       dialog.appendMessage ('Please select a model:');
-      let model;
+      let model = self.settings.run.model_id.value;
       let change_func = function (model_id) {
         model = model_id;
       };

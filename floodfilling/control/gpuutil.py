@@ -108,33 +108,17 @@ def getGPUs():
     GPUs = []
     for g in range(numDevices):
         line = lines[g]
-        # print(line)
         vals = line.split(", ")
-        # print(vals)
-        for i in range(11):
-            # print(vals[i])
-            if i == 0:
-                deviceIds[g] = int(vals[i])
-            elif i == 1:
-                uuid = vals[i]
-            elif i == 2:
-                gpuUtil[g] = safeFloatCast(vals[i]) / 100
-            elif i == 3:
-                memTotal[g] = safeFloatCast(vals[i])
-            elif i == 4:
-                memUsed[g] = safeFloatCast(vals[i])
-            elif i == 5:
-                memFree[g] = safeFloatCast(vals[i])
-            elif i == 6:
-                driver = vals[i]
-            elif i == 7:
-                gpu_name = vals[i]
-            elif i == 8:
-                serial = vals[i]
-            elif i == 9:
-                display_active = vals[i]
-            elif i == 10:
-                display_mode = vals[i]
+        deviceIds[g] = int(vals[0])
+        uuid = vals[1]
+        gpuUtil[g] = safeFloatCast(vals[2]) / 100
+        memTotal[g] = safeFloatCast(vals[3])
+        memUsed[g] = safeFloatCast(vals[4])
+        memFree[g] = safeFloatCast(vals[5])
+        gpu_name = vals[7]
+        serial = vals[8]
+        display_active = vals[9]
+        display_mode = vals[10]
         GPUs.append(
             GPU(
                 deviceIds[g],
