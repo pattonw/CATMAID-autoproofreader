@@ -16,7 +16,6 @@
     this.finishedTable = null;
     this.configJsons = {};
     this.settings = {};
-    this.volumes = {ImageStack: [], HDF5: []};
 
     this.supported_fields = [];
   };
@@ -79,6 +78,16 @@
               fileButton.click ();
             },
           ],
+        ]);
+
+        CATMAID.DOM.appendToTab (tabs['Jobs'], [
+          ['refresh', this.test_results_refresh.bind (this)],
+          ['clear', this.test_results_clear.bind (this)],
+        ]);
+
+        CATMAID.DOM.appendToTab (tabs['Results'], [
+          ['refresh', this.test_results_refresh.bind (this)],
+          ['clear', this.test_results_clear.bind (this)],
         ]);
 
         CATMAID.DOM.appendToTab (tabs['floodfilling_test'], [
@@ -220,10 +229,9 @@
         }
         throw new Error (message);
       }
-
       return {
         skeleton: skeleton_csv,
-        volume: toml.dump (self.getVolumes ()),
+        volume: toml.dump (self.getVolume ()),
         job_config: JSON.stringify (setting_values.run),
         diluvian_config: toml.dump (setting_values['diluvian']),
       };
@@ -270,6 +278,32 @@
   --------------------------------------------------------------------------------
   TESTING
   */
+
+  // RESULTS
+  FloodfillingWidget.prototype.test_results_clear = function () {
+    CATMAID.fetch (
+      'ext/floodfilling/' + project.id + '/floodfill-results',
+      'GET'
+    )
+      .then (function (results) {
+        results.forEach (function (result) {
+          CATMAID.fetch (
+            'ext/floodfilling/' + project.id + '/floodfill-results',
+            'DELETE',
+            {result_id: result.id}
+          )
+            .then (function (delete_reply) {
+              console.log (delete_reply);
+            })
+            .catch (CATMAID.handleError);
+        });
+      })
+      .catch (CATMAID.handleError);
+  };
+
+  FloodfillingWidget.prototype.test_results_refresh = function () {
+    this.getJobs ();
+  };
 
   // CELERY
   FloodfillingWidget.prototype.test_celery_get = function () {
@@ -722,11 +756,10 @@
   This section deals with the volume toml
   */
 
-  FloodfillingWidget.prototype.addCurrentImageStackVolumes = function () {
+  FloodfillingWidget.prototype.getImageStackVolume = function () {
     let tileLayers = project.focusedStackViewer.getLayersOfType (
       CATMAID.TileLayer
     );
-    let volumes = this.volumes;
     for (let l = 0; l < tileLayers.length; ++l) {
       let tileLayer = tileLayers[l];
       let stackInfo = Object.assign (
@@ -751,29 +784,22 @@
         tileLayer.stack.translation.z,
       ];
       stackInfo['broken_slices'] = tileLayer.stack.broken_slices;
-      volumes['ImageStack'].push (stackInfo);
+      return stackInfo;
     }
   };
 
   /**
    * Gather the information for the volume toml
    */
-  FloodfillingWidget.prototype.getVolumes = function () {
-    if (
-      this.volumes['ImageStack'].length === 0 &&
-      this.volumes['HDF5'].length === 0
-    ) {
-      this.addCurrentImageStackVolumes ();
-    }
-    return this.volumes;
+  FloodfillingWidget.prototype.getVolume = function () {
+    return {ImageStack: [this.getImageStackVolume ()]};
   };
 
   /**
    * Save the volume data in a toml
    */
   FloodfillingWidget.prototype.saveVolumes = function () {
-    if (!('volumes' in this.configJsons)) this.getVolumes ();
-    this.saveToml (this.getVolumes (), 'volumes');
+    this.saveToml (this.getVolume (), 'volumes');
   };
 
   /*
@@ -972,17 +998,17 @@
       deferRender: true,
       columns: [
         {
-          data: 'skeletonID',
+          data: 'skeleton_id',
           render: Math.floor,
           orderable: true,
           searchable: true,
           className: 'skeletonID',
         },
         {
-          data: 'nodesFilled',
+          data: 'name',
           orderable: true,
           searchable: true,
-          className: 'skeletonSize',
+          className: 'name',
         },
       ],
     });
@@ -1027,6 +1053,8 @@
   };
 
   FloodfillingWidget.prototype.getJobs = function () {
+    this.ongoingTable.clear ();
+    this.finishedTable.clear ();
     let self = this;
     CATMAID.fetch (
       'ext/floodfilling/' + project.id + '/floodfill-results',
@@ -1036,6 +1064,8 @@
         results.forEach (function (result) {
           self.appendOne (result);
         });
+        self.ongoingTable.draw ();
+        self.finishedTable.draw ();
       })
       .catch (CATMAID.handleError);
   };
@@ -1457,6 +1487,24 @@
         min: 0,
         step: 1,
       });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'number_list',
+        label: 'input_resolution',
+        name: 'Input resolution',
+        helptext: 'The resolution of the floodfilling network input. ' +
+          'The highest possible resolution is the resolution of the ' +
+          'image stack since upsampling is not supported. You may downsample ' +
+          'by an arbitrary number of factors of 2 on each axis.',
+        value: [
+          self.getImageStackVolume ().resolution[2],
+          self.getImageStackVolume ().resolution[1],
+          self.getImageStackVolume ().resolution[0],
+        ],
+        min: 0,
+        step: 1,
+      });
     };
 
     let change_server = function (server_id) {
@@ -1795,6 +1843,17 @@
      */
     let createRunDefaults = function (settings) {
       let sub_settings = getSubSettings (settings, 'run');
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'string',
+        label: 'job_name',
+        name: 'Job name',
+        value: '',
+        helptext: 'A name for the job so that it can bse easily found ' +
+          'later. If left blank the default will be a ' +
+          'combination of the skeleton id and the date.',
+      });
 
       addSettingTemplate ({
         settings: sub_settings,

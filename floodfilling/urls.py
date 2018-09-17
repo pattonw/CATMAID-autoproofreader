@@ -39,7 +39,7 @@ urlpatterns += [
 urlpatterns += [
     url(
         r"^(?P<project_id>\d+)/floodfill-results$",
-        floodfilling.FloodfillResultsAPI.as_view(),
+        floodfilling.FloodfillResultAPI.as_view(),
     )
 ]
 

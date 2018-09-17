@@ -52,7 +52,7 @@ class FloodfillModel(UserFocusedModel):
         db_table = "floodfill_model"
 
 
-class FloodfillResults(UserFocusedModel):
+class FloodfillResult(UserFocusedModel):
     """
     A model to represent the results of a floodfilling task.
     """

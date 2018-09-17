@@ -44,18 +44,9 @@ forward_create_tables = """
         skeleton_id int,
         skeleton_csv text
     );
-
-    -- Create history tables
-    SELECT create_history_table('floodfill_config'::regclass, 'edition_time', 'txid');
-    SELECT create_history_table('floodfill_model'::regclass, 'edition_time', 'txid');
-    SELECT create_history_table('floodfill_result'::regclass, 'edition_time', 'txid');
 """
 
 backward_create_tables = """
-    SELECT drop_history_table('floodfill_config'::regclass);
-    SELECT drop_history_table('floodfill_model'::regclass);
-    SELECT drop_history_table('floodfill_result'::regclass);
-
     DROP TABLE floodfill_config CASCADE;
     DROP TABLE floodfill_model CASCADE;
     DROP TABLE floodfill_result CASCADE;
@@ -125,7 +116,7 @@ class Migration(migrations.Migration):
                     options={"db_table": "floodfill_model"},
                 ),
                 migrations.CreateModel(
-                    name="FloodfillResults",
+                    name="FloodfillResult",
                     fields=[
                         (
                             "id",
