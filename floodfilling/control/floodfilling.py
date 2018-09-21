@@ -52,7 +52,7 @@ class FloodfillTaskAPI(APIView):
             "diluvian_config.toml",
             "skeleton.csv",
         ]:
-            if x not in files.keys:
+            if x not in files.keys():
                 Exception(x + " is missing!")
         # pop the job_config since that is needed here, the rest of the files
         # will get passed through to diluvian
@@ -82,7 +82,7 @@ class FloodfillTaskAPI(APIView):
         # create a floodfill config object if necessary and pass
         # it to the floodfill results object
         diluvian_config = self._get_diluvian_config(
-            self, request.user.id, project_id, files["diluvian_config.toml"]
+            request.user.id, project_id, files["diluvian_config.toml"]
         )
         diluvian_config.save()
 
@@ -125,7 +125,7 @@ class FloodfillTaskAPI(APIView):
         msg_user(request.user.id, "floodfilling-result-update", {"status": "queued"})
 
         # Flood filling async function
-        x = self.flood_fill_async.delay(
+        x = flood_fill_async.delay(
             result,
             project_id,
             request.user.id,
@@ -136,7 +136,15 @@ class FloodfillTaskAPI(APIView):
         )
 
         # Send a response to let the user know the async funcion has started
+        for i in range(10):
+            print("HOW")
         return JsonResponse({"task_id": x.task_id, "status": "queued"})
+
+    def get(self, request, project_id):
+
+        msg_user(request.user.id, "floodfilling-result-update", {"status": "queued"})
+
+        return JsonResponse({"stop": "testing"})
 
     def _get_job_name(self, config):
         """
@@ -145,7 +153,7 @@ class FloodfillTaskAPI(APIView):
         """
         name = config.get("job_name", "")
         if len(name) == 0:
-            skid = config.get("skeleton_id", None)
+            skid = str(config.get("skeleton_id", None))
             date = str(datetime.datetime.now().date())
             if skid is None:
                 Exception("missing skeleton id!")
@@ -160,138 +168,131 @@ class FloodfillTaskAPI(APIView):
         there are only a couple options and will probably be very similar if not identical
         through many different runs.
         """
-        FloodfillConfig(user_id=user_id, project_id=project_id, config=config)
+        return FloodfillConfig(user_id=user_id, project_id=project_id, config=config)
 
-    @task()
-    def flood_fill_async(
-        self,
-        result,
-        project_id,
-        user_id,
-        ssh_key_path,
-        local_temp_dir,
-        server,
-        job_name,
-    ):
 
-        # copy temp files from django local temp media storage to server temp storage
-        setup = "scp -i {ssh_key_path} -pr {local_dir} {server_address}:{server_diluvian_dir}/{server_results_dir}/{job_dir}".format(
-            **{
-                "local_dir": local_temp_dir,
-                "server_address": server["address"],
-                "server_diluvian_dir": server["diluvian_path"],
-                "server_results_dir": server["results_dir"],
-                "job_dir": job_name,
-                "ssh_key_path": ssh_key_path,
-            }
-        )
-        files = {}
-        for f in local_temp_dir.iterdir():
-            files[f.name.split(".")[0]] = Path(
-                "~/", server["diluvian_path"], server["results_dir"], job_name, f.name
-            )
+def importFloodFilledVolume(project_id, user_id, ff_output_file):
+    x = np.load(ff_output_file)
+    verts = x[0]
+    faces = x[1]
+    verts = [[v[i] for i in range(len(v))] for v in verts]
+    faces = [list(f) for f in faces]
 
-        # connect to the server and run the floodfilling algorithm on the provided skeleton
-        flood_fill = """
-        ssh -i {ssh_key_path} {server}
-        source {server_ff_env_path}
-        cd  {server_diluvian_dir}
-        python -m diluvian skeleton-fill-parallel {skeleton_file} -s {output_file} -m {model_file} -c {model_config_file} -c {job_config_file} -v {volume_file} --no-in-memory -l WARNING --max-moves 3
-        """.format(
-            **{
-                "ssh_key_path": ssh_key_path,
-                "server": server["address"],
-                "server_ff_env_path": server["env_source"],
-                "server_diluvian_dir": server["diluvian_path"],
-                "model_file": server["model_file"],
-                "output_file": Path(
-                    server["results_dir"], job_name, job_name + "_output"
-                ),
-                "skeleton_file": files["skeleton"],
-                "job_config_file": files["diluvian_config"],
-                "model_config_file": files["model_config"],
-                "volume_file": files["volume"],
-            }
+    x = [verts, faces]
+
+    options = {"type": "trimesh", "mesh": x, "title": "skeleton_test"}
+    volume = get_volume_instance(project_id, user_id, options)
+    volume.save()
+
+    return JsonResponse({"success": True})
+
+
+@task()
+def flood_fill_async(
+    result, project_id, user_id, ssh_key_path, local_temp_dir, server, job_name
+):
+
+    # copy temp files from django local temp media storage to server temp storage
+    setup = "scp -i {ssh_key_path} -pr {local_dir} {server_address}:{server_diluvian_dir}/{server_results_dir}/{job_dir}".format(
+        **{
+            "local_dir": local_temp_dir,
+            "server_address": server["address"],
+            "server_diluvian_dir": server["diluvian_path"],
+            "server_results_dir": server["results_dir"],
+            "job_dir": job_name,
+            "ssh_key_path": ssh_key_path,
+        }
+    )
+    files = {}
+    for f in local_temp_dir.iterdir():
+        files[f.name.split(".")[0]] = Path(
+            "~/", server["diluvian_path"], server["results_dir"], job_name, f.name
         )
 
-        # Copy the numpy file containing the volume mesh and the csv containing the node connections
-        # predicted by the floodfilling run.
-        cleanup = """
-        scp -i {ssh_key_path} {server}:{server_diluvian_dir}/{server_results_dir}/{server_job_dir}/{output_file_name}.npy {local_temp_dir}
-        scp -i {ssh_key_path} {server}:{server_diluvian_dir}/{server_results_dir}/{server_job_dir}/{output_file_name}.csv {local_temp_dir}
-        ssh -i {ssh_key_path} {server}
-        rm -r {server_diluvian_dir}/{server_results_dir}/{server_job_dir}
-        """.format(
-            **{
-                "ssh_key_path": ssh_key_path,
-                "server": server["address"],
-                "server_diluvian_dir": server["diluvian_path"],
-                "server_results_dir": server["results_dir"],
-                "server_job_dir": job_name,
-                "output_file_name": job_name + "_output",
-                "local_temp_dir": local_temp_dir,
-            }
+    # connect to the server and run the floodfilling algorithm on the provided skeleton
+    flood_fill = """
+    ssh -i {ssh_key_path} {server}
+    source {server_ff_env_path}
+    cd  {server_diluvian_dir}
+    python -m diluvian skeleton-fill-parallel {skeleton_file} -s {output_file} -m {model_file} -c {model_config_file} -c {job_config_file} -v {volume_file} --no-in-memory -l WARNING --max-moves 3
+    """.format(
+        **{
+            "ssh_key_path": ssh_key_path,
+            "server": server["address"],
+            "server_ff_env_path": server["env_source"],
+            "server_diluvian_dir": server["diluvian_path"],
+            "model_file": server["model_file"],
+            "output_file": Path(server["results_dir"], job_name, job_name + "_output"),
+            "skeleton_file": files["skeleton"],
+            "job_config_file": files["diluvian_config"],
+            "model_config_file": files["model_config"],
+            "volume_file": files["volume"],
+        }
+    )
+
+    # Copy the numpy file containing the volume mesh and the csv containing the node connections
+    # predicted by the floodfilling run.
+    cleanup = """
+    scp -i {ssh_key_path} {server}:{server_diluvian_dir}/{server_results_dir}/{server_job_dir}/{output_file_name}.npy {local_temp_dir}
+    scp -i {ssh_key_path} {server}:{server_diluvian_dir}/{server_results_dir}/{server_job_dir}/{output_file_name}.csv {local_temp_dir}
+    ssh -i {ssh_key_path} {server}
+    rm -r {server_diluvian_dir}/{server_results_dir}/{server_job_dir}
+    """.format(
+        **{
+            "ssh_key_path": ssh_key_path,
+            "server": server["address"],
+            "server_diluvian_dir": server["diluvian_path"],
+            "server_results_dir": server["results_dir"],
+            "server_job_dir": job_name,
+            "output_file_name": job_name + "_output",
+            "local_temp_dir": local_temp_dir,
+        }
+    )
+
+    process = subprocess.Popen(
+        "/bin/bash", stdin=subprocess.PIPE, stdout=subprocess.PIPE, encoding="utf8"
+    )
+    out, err = process.communicate(setup)
+    print(out)
+
+    process = subprocess.Popen(
+        "/bin/bash", stdin=subprocess.PIPE, stdout=subprocess.PIPE, encoding="utf8"
+    )
+    out, err = process.communicate(flood_fill)
+    print(out)
+
+    process = subprocess.Popen(
+        "/bin/bash", stdin=subprocess.PIPE, stdout=subprocess.PIPE, encoding="utf8"
+    )
+    out, err = process.communicate(cleanup)
+    print(out)
+
+    # actually import the volume into the database
+    if False:
+        importFloodFilledVolume(
+            project_id,
+            user_id,
+            "{}/{}.npy".format(local_temp_dir, job_name + "_output"),
         )
 
-        process = subprocess.Popen(
-            "/bin/bash", stdin=subprocess.PIPE, stdout=subprocess.PIPE, encoding="utf8"
-        )
-        out, err = process.communicate(setup)
-        print(out)
+    if False:
+        msg = Message()
+        msg.user = User.objects.get(pk=int(user_id))
+        msg.read = False
 
-        process = subprocess.Popen(
-            "/bin/bash", stdin=subprocess.PIPE, stdout=subprocess.PIPE, encoding="utf8"
-        )
-        out, err = process.communicate(flood_fill)
-        print(out)
+        msg.title = "ASYNC JOB MESSAGE HERE"
+        msg.text = "IM DOING SOME STUFF, CHECK IT OUT"
+        msg.action = "localhost:8000"
 
-        process = subprocess.Popen(
-            "/bin/bash", stdin=subprocess.PIPE, stdout=subprocess.PIPE, encoding="utf8"
-        )
-        out, err = process.communicate(cleanup)
-        print(out)
+        notify_user(user_id, msg.id, msg.title)
 
-        # actually import the volume into the database
-        if False:
-            importFloodFilledVolume(
-                project_id,
-                user_id,
-                "{}/{}.npy".format(local_temp_dir, job_name + "_output"),
-            )
+    result.completion_time = datetime.datetime.now()
+    with open("{}/{}.csv".format(local_temp_dir, job_name + "_output")) as f:
+        result.data = f.read()
+    result.status = "complete"
+    result.save()
 
-        if False:
-            msg = Message()
-            msg.user = User.objects.get(pk=int(user_id))
-            msg.read = False
-
-            msg.title = "ASYNC JOB MESSAGE HERE"
-            msg.text = "IM DOING SOME STUFF, CHECK IT OUT"
-            msg.action = "localhost:8000"
-
-            notify_user(user_id, msg.id, msg.title)
-
-        result.completion_time = datetime.datetime.now()
-        with open("{}/{}.csv".format(local_temp_dir, job_name + "_output")) as f:
-            result.data = f.read()
-        result.status = "complete"
-        result.save()
-
-        return "complete"
-
-    def importFloodFilledVolume(self, project_id, user_id, ff_output_file):
-        x = np.load(ff_output_file)
-        verts = x[0]
-        faces = x[1]
-        verts = [[v[i] for i in range(len(v))] for v in verts]
-        faces = [list(f) for f in faces]
-
-        x = [verts, faces]
-
-        options = {"type": "trimesh", "mesh": x, "title": "skeleton_test"}
-        volume = get_volume_instance(project_id, user_id, options)
-        volume.save()
-
-        return JsonResponse({"success": True})
+    return "complete"
 
 
 class FloodfillResultAPI(APIView):
@@ -355,4 +356,56 @@ def dictfetchall(cursor):
     "Returns all rows from a cursor as a dict"
     desc = cursor.description
     return [dict(zip([col[0] for col in desc], row)) for row in cursor.fetchall()]
+
+
+# HELPER FUNCTIONS
+def _DTW(seq_a, seq_b):
+    """
+    Dynamic Time Warping:
+    Common algorithm for comparing the similarity of two time series
+    while allowing for some compression/stretching along the time axis.
+
+    In this case it might make sense for comparing two traces of a neuron
+    since changes in the frequency of node placement should not have a
+    large effect on the similarity of the skeleton as a whole.
+
+    assume seq_a and seq_b are of equal length
+        (interpolate values before passing to this function)
+    """
+    Exception("not yet implemented")
+    assert len(seq_a) == len(seq_b)
+    empty = np.zeros([len(seq_a), len(seq_b)])
+    # TODO
+    return empty
+
+
+def _center_of_mass(nodes, data):
+    """
+    I think we could use center of mass of the floodfilling output segmentations
+    to detect missing branches. Assuming floodfilling would detect a large number
+    of voxels at the base of a missing branch, this should throw off the center
+    of mass of a sliding window following the neurons skeleton. Assuming the
+    base of the branch is relatively small, sudden spikes and subsequent drops
+    back to the original pattern should indicate the presence of a missing branch
+    without the need to excessively expore large regions around the skeleton.
+
+    inputs:
+        - sequence of nodes (id, pid, x, y, z)
+        - query-able binary volume
+    output:
+        - sequence of nodes (id, theta, tau)
+        - theta is measured on the plane (alpha) perpendicular to the skeleton
+        - 0 degrees is the line generated from the intersection of alpha and the xy
+            plane or (1,0) centered at the node.
+        - tau is the magnitude of the vector from the node to the localized center of mass
+    """
+    Exception("not yet implemented")
+
+    for node in nodes:
+        arc_tangent_center, arc_tangent_slope = _get_tangent(node, nodes)
+        volume = _get_data_around_tangent(arc_tangent_center, arc_tangent_slope)
+        center_of_mass_vector = _calculate_center(
+            volume, arc_tangent_center, arc_tangent_slope
+        )
+        return (node, center_of_mass_vector)
 

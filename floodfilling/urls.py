@@ -24,7 +24,8 @@ urlpatterns += [
     url(
         r"^(?P<project_id>\d+)/compute-servers$",
         compute_server.ComputeServerAPI.as_view(),
-    )
+    ),
+    url(r"^(?P<project_id>\d+)/gpu-util$", compute_server.GPUUtilAPI.as_view()),
 ]
 
 # Floodfilling Models

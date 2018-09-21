@@ -91,7 +91,8 @@
         ]);
 
         CATMAID.DOM.appendToTab (tabs['floodfilling_test'], [
-          ['test_settings', this.test_floodfilling_settings.bind (this)],
+          ['test_gpuutil', this.test_gpuutil.bind (this)],
+          ['test_websockets', this.test_websockets.bind (this)],
         ]);
 
         CATMAID.DOM.appendToTab (tabs['celery_test'], [
@@ -334,9 +335,26 @@
   };
 
   // FLOODFILLING
-  FloodfillingWidget.prototype.test_floodfilling_settings = function () {
-    console.log (this.settings);
-    console.log (this.getSettingValues ());
+  FloodfillingWidget.prototype.test_gpuutil = function () {
+    let self = this;
+    CATMAID.fetch ('ext/floodfilling/' + project.id + '/gpu-util', 'GET', {
+      server_id: self.getServer (),
+    })
+      .then (function (response) {
+        console.log (response);
+      })
+      .catch (CATMAID.handleError);
+  };
+
+  FloodfillingWidget.prototype.test_websockets = function () {
+    let self = this;
+    CATMAID.fetch ('ext/floodfilling/' + project.id + '/flood-fill', 'GET', {
+      server_id: self.getServer (),
+    })
+      .then (function (response) {
+        console.log (response);
+      })
+      .catch (CATMAID.handleError);
   };
 
   // OPTIC FLOW
@@ -809,7 +827,6 @@
 
   FloodfillingWidget.prototype.getServer = function () {
     let server = this.getSettingValues (this.settings.run.server_id);
-    console.log (server);
     return server;
   };
 
@@ -1071,7 +1088,6 @@
   };
 
   FloodfillingWidget.prototype.appendOne = function (job) {
-    console.log (job);
     if (job.status === 'complete') {
       let row = {
         job_id: job.id,
@@ -1370,6 +1386,9 @@
     setting_values = setting_values || {};
     settings = settings || this.settings;
     let keys = Object.keys (settings);
+    if ('value' in settings) {
+      return settings.value;
+    }
     if (keys.length > 0) {
       for (let key of keys) {
         if (key) {
@@ -1973,6 +1992,7 @@
     creator: FloodfillingWidget,
     websocketHandlers: {
       'floodfilling-result-update': function (client, payload) {
+        alert ('message');
         CATMAID.msg ('warn', 'got a message');
       },
     },
