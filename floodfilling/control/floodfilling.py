@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 import json
 import numpy as np
+import time
 
 from django.conf import settings
 from django.http import JsonResponse
@@ -27,6 +28,7 @@ from floodfilling.models import (
     ComputeServer,
     FloodfillModel,
 )
+from floodfilling.control.compute_server import GPUUtilAPI
 
 
 # The path were server side exported files get stored in
@@ -86,20 +88,6 @@ class FloodfillTaskAPI(APIView):
         )
         diluvian_config.save()
 
-        # store a job in the database now so that information about
-        # ongoing jobs can be retrieved.
-        result = FloodfillResult(
-            user_id=request.user.id,
-            project_id=project_id,
-            config_id=diluvian_config.id,
-            skeleton_id=job_config["skeleton_id"],
-            skeleton_csv=files["skeleton.csv"],
-            model_id=job_config["model_id"],
-            name=job_name,
-            status="queued",
-        )
-        result.save()
-
         # retrieve necessary paths from the chosen server and model
         server = ComputeServer.objects.get(id=job_config["server_id"])
         model = FloodfillModel.objects.get(id=job_config["model_id"])
@@ -110,6 +98,25 @@ class FloodfillTaskAPI(APIView):
             "env_source": server.environment_source_path,
             "model_file": model.model_source_path,
         }
+
+        # store a job in the database now so that information about
+        # ongoing jobs can be retrieved.
+        gpus = self._get_gpus(job_config)
+        print(gpus)
+        if self._check_gpu_conflict(gpus):
+            raise Exception("Not enough compute resources for this job")
+        result = FloodfillResult(
+            user_id=request.user.id,
+            project_id=project_id,
+            config_id=diluvian_config.id,
+            skeleton_id=job_config["skeleton_id"],
+            skeleton_csv=files["skeleton.csv"],
+            model_id=job_config["model_id"],
+            name=job_name,
+            status="queued",
+            gpus=gpus,
+        )
+        result.save()
 
         # retrieve the configurations used during the chosen models training.
         # this is used as the base configuration when running since most
@@ -124,6 +131,8 @@ class FloodfillTaskAPI(APIView):
 
         msg_user(request.user.id, "floodfilling-result-update", {"status": "queued"})
 
+        if self._check_gpu_conflict():
+            raise Exception("Not enough compute resources for this job")
         # Flood filling async function
         x = flood_fill_async.delay(
             result,
@@ -136,8 +145,6 @@ class FloodfillTaskAPI(APIView):
         )
 
         # Send a response to let the user know the async funcion has started
-        for i in range(10):
-            print("HOW")
         return JsonResponse({"task_id": x.task_id, "status": "queued"})
 
     def get(self, request, project_id):
@@ -160,6 +167,30 @@ class FloodfillTaskAPI(APIView):
             return skid + "_" + date
 
         return name
+
+    def _get_gpus(self, config):
+        gpus = GPUUtilAPI._query_server(config["server_id"])
+        config_gpus = config.get("gpus", [])
+        if len(config_gpus) == 0:
+            config_gpus = list(range(len(gpus)))
+        usage = [True if (i in config_gpus) else False for i in range(len(gpus))]
+        return usage
+
+    def _check_gpu_conflict(self, gpus=None):
+        # returns True if there is a conflict
+        ongoing_jobs = FloodfillResult.objects.filter(status="queued")
+        if len(ongoing_jobs) == 0:
+            # jobs will not have taken compute resources if there
+            # are no other jobs. We should probably still check gpu
+            # usage stats to see if the gpus are unavailable for some
+            # reason other than flood filling jobs.
+            return False
+        gpu_utils = [job.gpus for job in ongoing_jobs]
+        if gpus is not None:
+            gpu_utils.append(gpus)
+        return (
+            len(list(filter(lambda x: x > 1, map(lambda *x: sum(x), *gpu_utils)))) > 1
+        )
 
     def _get_diluvian_config(self, user_id, project_id, config):
         """
@@ -191,7 +222,7 @@ def importFloodFilledVolume(project_id, user_id, ff_output_file):
 def flood_fill_async(
     result, project_id, user_id, ssh_key_path, local_temp_dir, server, job_name
 ):
-
+    return time.sleep(60)
     # copy temp files from django local temp media storage to server temp storage
     setup = "scp -i {ssh_key_path} -pr {local_dir} {server_address}:{server_diluvian_dir}/{server_results_dir}/{job_dir}".format(
         **{

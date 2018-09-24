@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 from django.db import models
 from django.utils import timezone
 from catmaid.models import User, Volume, UserFocusedModel, ClassInstance
+from django.contrib.postgres.fields import ArrayField
 
 
 class ComputeServer(models.Model):
@@ -67,6 +68,7 @@ class FloodfillResult(UserFocusedModel):
     data = models.TextField()
     name = models.TextField()
     status = models.TextField()
+    gpus = ArrayField(base_field=models.BooleanField(), size=None)
 
     class Meta:
         db_table = "floodfill_result"

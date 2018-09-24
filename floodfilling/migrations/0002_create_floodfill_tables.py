@@ -42,7 +42,8 @@ forward_create_tables = """
         model_id int REFERENCES floodfill_model(id),
         volume_id int REFERENCES catmaid_volume(id),
         skeleton_id int,
-        skeleton_csv text
+        skeleton_csv text,
+        gpus boolean[]
     );
 """
 
@@ -142,6 +143,12 @@ class Migration(migrations.Migration):
                             "skeleton",
                             models.ForeignKey(
                                 to="catmaid.ClassInstance", on_delete=models.CASCADE
+                            ),
+                        ),
+                        (
+                            "gpus",
+                            django.contrib.postgres.fields.ArrayField(
+                                base_field=models.BooleanField(), size=None
                             ),
                         ),
                     ],

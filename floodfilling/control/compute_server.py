@@ -124,35 +124,56 @@ class GPUUtilAPI(APIView):
             required: true
             defaultValue: false
         """
-        server_id = request.query_params.get("server_id", None)
+
+        out = GPUUtilAPI._query_server(request.query_params.get("server_id", None))
+
+        return JsonResponse(
+            out, safe=False, json_dumps_params={"sort_keys": True, "indent": 4}
+        )
+
+    def _query_server(server_id):
+        fields = [
+            ("index", int),
+            ("uuid", str),
+            ("utilization.gpu", float),
+            ("memory.total", int),
+            ("memory.used", int),
+            ("memory.free", int),
+            ("driver_version", str),
+            ("name", str),
+            ("gpu_serial", str),
+        ]
+
         server = ComputeServerAPI.get_servers(server_id)[0]
 
-        fields = (
-            (
-                "index,uuid,utilization.gpu,memory.total,memory.used,memory.free,"
-                + "driver_version,name,gpu_serial,display_active,display_mode"
-            )
-            .strip()
-            .split(",")
-        )
         bash_script = (
             "ssh -i {} {}\n".format(settings.SSH_KEY_PATH, server[2])
             + "nvidia-smi "
-            + "--query-gpu={}".format(",".join(fields))
-            + " --format=csv,noheader,nounits"
+            + "--query-gpu={} ".format(",".join([x[0] for x in fields]))
+            + "--format=csv,noheader,nounits"
         )
 
         process = subprocess.Popen(
             "/bin/bash", stdin=subprocess.PIPE, stdout=subprocess.PIPE, encoding="utf8"
         )
         out, err = process.communicate(bash_script)
+        return GPUUtilAPI._parse_query(out, fields)
+
+    def _parse_query(out, fields):
         out = out.strip()
         out = out.split("\n")
         out = list(map(lambda x: x.split(", "), out))
-        out = filter(lambda x: len(x) == 11, out)
+        out = filter(lambda x: len(x) == len(fields), out)
+
+        def is_valid(x, x_type):
+            try:
+                x_type(x)
+                return True
+            except ValueError:
+                return False
+
+        out = filter(lambda x: all(list(map(is_valid, x, [f[1] for f in fields]))), out)
         out = {
             x[0]: {fields[i + 1]: x[i + 1] for i in range(len(fields) - 1)} for x in out
         }
-        return JsonResponse(
-            out, safe=False, json_dumps_params={"sort_keys": True, "indent": 4}
-        )
+        return out

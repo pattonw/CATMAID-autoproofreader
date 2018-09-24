@@ -1178,7 +1178,7 @@
     let createAsyncOptionDropdown = function (args) {
       var async_placeholder = CATMAID.DOM.createLabeledAsyncPlaceholder (
         args.name,
-        args.async_func,
+        args.async_func (args.async_func_change),
         args.helptext
       );
 
@@ -1216,8 +1216,7 @@
        * and the original one has already resolved and thus will
        * not provide the refreshed results.
        */
-      async_placeholder[0].rebuild = function (async_func) {
-        args.async_func = async_func;
+      async_placeholder[0].rebuild = function () {
         return createAsyncOptionDropdown (args);
       };
 
@@ -1606,9 +1605,7 @@
         } else {
           self.settings.run.server_id.value = model[6];
           // refresh the server list
-          let replacement = $ ('#server_id')[0].rebuild (
-            initServerList (change_server)
-          );
+          let replacement = $ ('#server_id')[0].rebuild ();
           $ ('#server_id').empty ();
           $ ('#server_id').append (replacement);
         }
@@ -1694,9 +1691,7 @@
         )
           .then (function (e) {
             // refresh the server list
-            let replacement = $ ('#server_id')[0].rebuild (
-              initServerList (change_server)
-            );
+            let replacement = $ ('#server_id')[0].rebuild ();
             $ ('#server_id').empty ();
             $ ('#server_id').append (replacement);
           })
@@ -1766,9 +1761,7 @@
           .then (function (e) {
             console.log (e);
             // refresh the server list
-            let replacement = $ ('#model_id')[0].rebuild (
-              initModelList (change_model)
-            );
+            let replacement = $ ('#model_id')[0].rebuild ();
             $ ('#model_id').empty ();
             $ ('#model_id').append (replacement);
           })
@@ -1804,9 +1797,7 @@
         )
           .then (function (e) {
             // refresh the server list
-            let replacement = $ ('#server_id')[0].rebuild (
-              initServerList (change_server)
-            );
+            let replacement = $ ('#server_id')[0].rebuild ();
             $ ('#server_id').empty ();
             $ ('#server_id').append (replacement);
           })
@@ -1842,9 +1833,7 @@
         )
           .then (function (e) {
             // refresh the server list
-            let replacement = $ ('#model_id')[0].rebuild (
-              initModelList (change_model)
-            );
+            let replacement = $ ('#model_id')[0].rebuild ();
             $ ('#model_id').empty ();
             $ ('#model_id').append (replacement);
           })
@@ -1877,9 +1866,22 @@
       addSettingTemplate ({
         settings: sub_settings,
         type: 'async_option_dropdown',
+        label: 'model_id',
+        name: 'Floodfilling model',
+        async_func: initModelList,
+        async_func_change: change_model,
+        async_add: add_model,
+        async_remove: remove_model,
+        helptext: 'The pretrained model to use for floodfilling',
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'async_option_dropdown',
         label: 'server_id',
         name: 'Compute server',
-        async_func: initServerList (change_server),
+        async_func: initServerList,
+        async_change_func: change_server,
         async_add: add_server,
         async_remove: remove_server,
         helptext: 'The compute server to use for floodfilling',
@@ -1887,13 +1889,14 @@
 
       addSettingTemplate ({
         settings: sub_settings,
-        type: 'async_option_dropdown',
-        label: 'model_id',
-        name: 'Floodfilling model',
-        async_func: initModelList (change_model),
-        async_add: add_model,
-        async_remove: remove_model,
-        helptext: 'The pretrained model to use for floodfilling',
+        type: 'number_list',
+        label: 'gpus',
+        name: 'GPUs',
+        helptext: 'Which gpus to use for floodfilling. ' +
+          'Leave blank to use all available gpus.' +
+          'If you want to run multiple jobs simultaneously, ' +
+          'you will have to choose which gpus to use for each job.',
+        value: [],
       });
 
       addSettingTemplate ({
