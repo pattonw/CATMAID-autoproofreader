@@ -116,15 +116,28 @@
                 <tr>
                   <th>Run Time (hours)
                   </th>
+                  <th>Name
+                    <input type="text" name="searchJobName" id="${jobsTableID}-search-job-name"
+                      value="" class="search_init"/>
+                  </th>
+                  <th>Status
+                    <input type="text" name="searchJobStatus" id="${jobsTableID}-search-job-status"
+                      value="" class="search_init"/>
+                  </th>
+                  <th>Model
+                    <input type="text" name="searchModelName" id="${jobsTableID}-search-model-name"
+                      value="" class="search_init"/>
+                  </th>
                   <th>Skeleton ID
-                    <input type="number" name="searchSkeletonId" id="${this.idPrefix}search-skeleton-id"
-                      value="0" class="search_init"/>
                   </th>
                 </tr>
               </thead>
               <tfoot>
                 <tr>
                   <th>run time</th>
+                  <th>name</th>
+                  <th>status</th>
+                  <th>model</th>
                   <th>skeleton ID</th>
                 </tr>
               </tfoot>
@@ -136,17 +149,31 @@
             <table cellpadding="0" cellspacing="0" border="0" class="display" id="${resultsTableID}">
               <thead>
                 <tr>
+                  <th>Run Time (hours)
+                  </th>
+                  <th>Name
+                    <input type="text" name="searchJobName" id="${resultsTableID}-search-job-name"
+                      value="" class="search_init"/>
+                  </th>
+                  <th>Status
+                    <input type="text" name="searchJobStatus" id="${resultsTableID}-search-job-status"
+                      value="" class="search_init"/>
+                  </th>
+                  <th>Model
+                    <input type="text" name="searchModelName" id="${resultsTableID}-search-model-name"
+                      value="" class="search_init"/>
+                  </th>
                   <th>Skeleton ID
-                    <input type="number" name="searchSkeletonId" id="${this.idPrefix}search-skeleton-id"
-                      value="0" class="search_init"/></th>
-                  <th>Nodes Filled (percent)
                   </th>
                 </tr>
               </thead>
               <tfoot>
                 <tr>
+                  <th>run time</th>
+                  <th>name</th>
+                  <th>status</th>
+                  <th>model</th>
                   <th>skeleton ID</th>
-                  <th>nodes filled</th>
                 </tr>
               </tfoot>
               <tbody>
@@ -303,7 +330,7 @@
   };
 
   FloodfillingWidget.prototype.test_results_refresh = function () {
-    this.getJobs ();
+    this.get_jobs ();
   };
 
   // CELERY
@@ -911,6 +938,15 @@
 
   /*
   --------------------------------------------------------------------------------
+  DATA VIS
+  */
+  FloodfillingWidget.prototype.display_results_data = function (data) {
+    let display = new CATMAID.ResultsWindow ('RESULTS');
+    display.show (500, 'auto', true);
+  };
+
+  /*
+  --------------------------------------------------------------------------------
   TABLE
   */
   FloodfillingWidget.prototype.initTables = function () {
@@ -949,6 +985,24 @@
           className: 'run_time',
         },
         {
+          data: 'name',
+          orderable: true,
+          searchable: true,
+          className: 'name',
+        },
+        {
+          data: 'status',
+          orderable: true,
+          searchable: true,
+          className: 'status',
+        },
+        {
+          data: 'model_name',
+          orderable: true,
+          searchable: true,
+          className: 'model_name',
+        },
+        {
           data: 'skeleton_id',
           render: Math.floor,
           orderable: true,
@@ -962,7 +1016,7 @@
       $ (this).toggleClass ('selected');
     });
 
-    const exactNumSearch = function (event) {
+    let exactNumSearch = function (event) {
       if (event.which == 13) {
         event.stopPropagation ();
         event.preventDefault ();
@@ -977,9 +1031,26 @@
       }
     };
 
-    $ (`#${self.idPrefix}search-skeleton-id`).keydown (exactNumSearch);
+    let stringSearch = function (event) {
+      if (event.which == 13) {
+        event.stopPropagation ();
+        event.preventDefault ();
+      }
+      // Filter with a regular expression
+      let filterValue = event.currentTarget.value;
+      let regex = filterValue === '' ? '' : `.*${filterValue}.*`;
 
-    const $headerInput = $table.find ('thead input');
+      self.ongoingTable
+        .column (event.currentTarget.closest ('th'))
+        .search (regex, true, false)
+        .draw ();
+    };
+
+    $ (`#${tableID}-search-job-name`).keyup (stringSearch);
+    $ (`#${tableID}-search-job-status`).keyup (stringSearch);
+    $ (`#${tableID}-search-model-name`).keyup (stringSearch);
+
+    let $headerInput = $table.find ('thead input');
 
     // prevent sorting the column when focusing on the search field
     $headerInput.click (function (event) {
@@ -1015,11 +1086,15 @@
       deferRender: true,
       columns: [
         {
-          data: 'skeleton_id',
-          render: Math.floor,
+          data: 'creation_time',
+          render: function (time_string) {
+            let start = new Date (time_string);
+            let now = new Date ();
+            return Math.floor ((now - start) / (10 * 60 * 60)) / 100;
+          },
           orderable: true,
           searchable: true,
-          className: 'skeletonID',
+          className: 'run_time',
         },
         {
           data: 'name',
@@ -1027,14 +1102,33 @@
           searchable: true,
           className: 'name',
         },
+        {
+          data: 'status',
+          orderable: true,
+          searchable: true,
+          className: 'status',
+        },
+        {
+          data: 'model_name',
+          orderable: true,
+          searchable: true,
+          className: 'model_name',
+        },
+        {
+          data: 'skeleton_id',
+          render: Math.floor,
+          orderable: true,
+          searchable: true,
+          className: 'skeletonID',
+        },
       ],
     });
 
     $ (`#${tableID} tbody`).on ('click', 'tr', function () {
-      $ (this).toggleClass ('selected');
+      self.display_results_data (self.finishedTable.row (this).data ());
     });
 
-    const exactNumSearch = function (event) {
+    let exactNumSearch = function (event) {
       if (event.which == 13) {
         event.stopPropagation ();
         event.preventDefault ();
@@ -1049,9 +1143,26 @@
       }
     };
 
-    $ (`#${self.idPrefix}search-skeleton-id`).keydown (exactNumSearch);
+    let stringSearch = function (event) {
+      if (event.which == 13) {
+        event.stopPropagation ();
+        event.preventDefault ();
+      }
+      // Filter with a regular expression
+      let filterValue = event.currentTarget.value;
+      let regex = filterValue === '' ? '' : `.*${filterValue}.*`;
 
-    const $headerInput = $table.find ('thead input');
+      self.finishedTable
+        .column (event.currentTarget.closest ('th'))
+        .search (regex, true, false)
+        .draw ();
+    };
+
+    $ (`#${tableID}-search-job-name`).keyup (stringSearch);
+    $ (`#${tableID}-search-job-status`).keyup (stringSearch);
+    $ (`#${tableID}-search-model-name`).keyup (stringSearch);
+
+    let $headerInput = $table.find ('thead input');
 
     // prevent sorting the column when focusing on the search field
     $headerInput.click (function (event) {
@@ -1066,10 +1177,10 @@
       }
     });
 
-    this.getJobs ();
+    this.get_jobs ();
   };
 
-  FloodfillingWidget.prototype.getJobs = function () {
+  FloodfillingWidget.prototype.get_jobs = function () {
     this.ongoingTable.clear ();
     this.finishedTable.clear ();
     let self = this;
@@ -1088,19 +1199,31 @@
   };
 
   FloodfillingWidget.prototype.appendOne = function (job) {
+    let self = this;
     if (job.status === 'complete') {
       let row = {
         job_id: job.id,
         creation_time: job.creation_time,
-        completion_time: job.completion_time,
         name: job.name,
-        data: job.data,
+        status: job.status,
         config_id: job.config_id,
         model_id: job.model_id,
-        volume_id: job.volume_id,
+        model_name: job.model_id,
         skeleton_id: job.skeleton_id,
+        completion_time: job.completion_time,
+        volume_id: job.volume_id,
+        data: job.data,
       };
-      this.finishedTable.rows.add ([row]);
+      CATMAID.fetch (
+        'ext/floodfilling/' + project.id + '/floodfill-models',
+        'GET',
+        {model_id: job.model_id}
+      ).then (function (result) {
+        let model = result[0];
+        row.model_name = model.name;
+        self.finishedTable.rows.add ([row]);
+        self.finishedTable.draw ();
+      });
     } else {
       let row = {
         job_id: job.id,
@@ -1109,12 +1232,20 @@
         status: job.status,
         config_id: job.config_id,
         model_id: job.model_id,
+        model_name: job.model_id,
         skeleton_id: job.skeleton_id,
       };
-      this.ongoingTable.rows.add ([row]);
+      CATMAID.fetch (
+        'ext/floodfilling/' + project.id + '/floodfill-models',
+        'GET',
+        {model_id: job.model_id}
+      ).then (function (result) {
+        let model = result[0];
+        row.model_name = model.name;
+        self.ongoingTable.rows.add ([row]);
+        self.ongoingTable.draw ();
+      });
     }
-    this.finishedTable.draw ();
-    this.ongoingTable.draw ();
   };
 
   FloodfillingWidget.prototype.clear = function () {
@@ -1535,7 +1666,7 @@
           {model_id: model_id}
         ).then (function (result) {
           let model = result[0];
-          if (model[6] !== server_id) {
+          if (model.server_id !== server_id) {
             CATMAID.msg (
               'warn',
               'Server does not match the server the selected ' +
@@ -1554,12 +1685,12 @@
       ).then (function (json) {
         var servers = json
           .sort (function (a, b) {
-            return CATMAID.tools.compareStrings (a[1], b[1]);
+            return CATMAID.tools.compareStrings (a.name, b.name);
           })
           .map (function (server) {
             return {
-              title: server[1] + ' (#' + server[0] + ')',
-              value: server[0],
+              title: server.name + ' (#' + server.id + ')',
+              value: server.id,
             };
           });
         var selectedServerId = self.settings.run.server_id.value;
@@ -1594,7 +1725,7 @@
         let model = result[0];
 
         if (server_id !== undefined) {
-          if (model[6] !== server_id) {
+          if (model.server_id !== server_id) {
             CATMAID.msg (
               'warn',
               'Server does not match the server the selected ' +
@@ -1603,7 +1734,7 @@
             );
           }
         } else {
-          self.settings.run.server_id.value = model[6];
+          self.settings.run.server_id.value = model.server_id;
           // refresh the server list
           let replacement = $ ('#server_id')[0].rebuild ();
           $ ('#server_id').empty ();
@@ -1619,12 +1750,12 @@
       ).then (function (json) {
         var models = json
           .sort (function (a, b) {
-            return CATMAID.tools.compareStrings (a[5], b[5]);
+            return CATMAID.tools.compareStrings (a.name, b.name);
           })
           .map (function (model) {
             return {
-              title: model[5] + ' (#' + model[0] + ')',
-              value: model[0],
+              title: model.name + ' (#' + model.id + ')',
+              value: model.id,
             };
           });
         var selectedModelId = self.settings.run.model_id.value;
@@ -1995,8 +2126,15 @@
     creator: FloodfillingWidget,
     websocketHandlers: {
       'floodfilling-result-update': function (client, payload) {
-        alert ('message');
-        CATMAID.msg ('warn', 'got a message');
+        // Update all job tables in floodfilling widgets
+        let floodfilling_windows = WindowMaker.getOpenWindows (
+          'floodfilling-widget'
+        );
+        if (floodfilling_windows) {
+          for (let widget of floodfilling_windows.values ()) {
+            widget.get_jobs ();
+          }
+        }
       },
     },
   });
