@@ -95,12 +95,6 @@
           ['test_websockets', this.test_websockets.bind (this)],
         ]);
 
-        CATMAID.DOM.appendToTab (tabs['celery_test'], [
-          ['get', this.test_celery_get.bind (this)],
-          ['put', this.test_celery_put.bind (this)],
-          ['del', this.test_celery_del.bind (this)],
-        ]);
-
         CATMAID.DOM.appendToTab (tabs['optic_flow_test'], [
           ['testOpticalFlow', this.testOpticalFlow.bind (this)],
         ]);
@@ -331,34 +325,6 @@
 
   FloodfillingWidget.prototype.test_results_refresh = function () {
     this.get_jobs ();
-  };
-
-  // CELERY
-  FloodfillingWidget.prototype.test_celery_get = function () {
-    let self = this;
-    let params = {
-      server_id: 1,
-    };
-    CATMAID.fetch (
-      'ext/floodfilling/' + project.id + '/compute-servers',
-      'GET',
-      params
-    ).then (function (e) {
-      console.log (e);
-      self.refreshServers ();
-    });
-  };
-
-  FloodfillingWidget.prototype.test_celery_put = function () {
-    this.getSkeleton ().then (function (result) {
-      console.log (result);
-    });
-  };
-
-  FloodfillingWidget.prototype.test_celery_del = function () {
-    this.getSkeleton ().then (function (result) {
-      console.log (result);
-    });
   };
 
   // FLOODFILLING
