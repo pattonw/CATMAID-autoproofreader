@@ -58,17 +58,19 @@ class FloodfillResult(UserFocusedModel):
     A model to represent the results of a floodfilling task.
     """
 
+    # Necessary for queueing
+    name = models.TextField()
+    status = models.TextField()
+    gpus = ArrayField(base_field=models.BooleanField(), size=None)
     config = models.ForeignKey(FloodfillConfig, on_delete=models.DO_NOTHING)
     skeleton = models.ForeignKey(ClassInstance, on_delete=models.CASCADE)
     skeleton_csv = models.TextField()
     model = models.ForeignKey(FloodfillModel, on_delete=models.DO_NOTHING)
-    completion_time = models.DateTimeField(null=True)
 
+    # Added once the job is done
     volume = models.ForeignKey(Volume, on_delete=models.DO_NOTHING)
-    data = models.TextField()
-    name = models.TextField()
-    status = models.TextField()
-    gpus = ArrayField(base_field=models.BooleanField(), size=None)
+    data = models.TextField()  # will contain results or errors
+    completion_time = models.DateTimeField(null=True)
 
     class Meta:
         db_table = "floodfill_result"
