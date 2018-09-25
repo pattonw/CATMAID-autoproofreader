@@ -55,7 +55,8 @@ class FloodfillTaskAPI(APIView):
             "skeleton.csv",
         ]:
             if x not in files.keys():
-                Exception(x + " is missing!")
+                raise Exception(x + " is missing!")
+
         # pop the job_config since that is needed here, the rest of the files
         # will get passed through to diluvian
         job_config = json.loads(files.pop("job_config.json"))
@@ -102,7 +103,6 @@ class FloodfillTaskAPI(APIView):
         # store a job in the database now so that information about
         # ongoing jobs can be retrieved.
         gpus = self._get_gpus(job_config)
-        print(gpus)
         if self._check_gpu_conflict(gpus):
             raise Exception("Not enough compute resources for this job")
         result = FloodfillResult(
@@ -118,6 +118,8 @@ class FloodfillTaskAPI(APIView):
         )
         result.save()
 
+        msg_user(request.user.id, "floodfilling-result-update", {"status": "queued"})
+
         # retrieve the configurations used during the chosen models training.
         # this is used as the base configuration when running since most
         # settings should not be changed or are irrelevant to floodfilling a
@@ -128,8 +130,6 @@ class FloodfillTaskAPI(APIView):
             model_config = query.config
             file_path = local_temp_dir / "model_config.toml"
             file_path.write_text(model_config)
-
-        msg_user(request.user.id, "floodfilling-result-update", {"status": "queued"})
 
         if self._check_gpu_conflict():
             raise Exception("Not enough compute resources for this job")
@@ -147,12 +147,6 @@ class FloodfillTaskAPI(APIView):
         # Send a response to let the user know the async funcion has started
         return JsonResponse({"task_id": x.task_id, "status": "queued"})
 
-    def get(self, request, project_id):
-
-        msg_user(request.user.id, "floodfilling-result-update", {"status": "queued"})
-
-        return JsonResponse({"stop": "testing"})
-
     def _get_job_name(self, config):
         """
         Get the name of a job. If the job_name field is not provided generate a default
@@ -163,16 +157,25 @@ class FloodfillTaskAPI(APIView):
             skid = str(config.get("skeleton_id", None))
             date = str(datetime.datetime.now().date())
             if skid is None:
-                Exception("missing skeleton id!")
-            return skid + "_" + date
+                raise Exception("missing skeleton id!")
+            name = skid + "_" + date
 
-        return name
+        i = len(FloodfillResult.objects.filter(name__startswith=name))
+        if i > 0:
+            return "{}_{}".format(name, i)
+        else:
+            return name
 
     def _get_gpus(self, config):
         gpus = GPUUtilAPI._query_server(config["server_id"])
         config_gpus = config.get("gpus", [])
         if len(config_gpus) == 0:
             config_gpus = list(range(len(gpus)))
+        for g in config_gpus:
+            if str(g) not in gpus.keys():
+                raise Exception(
+                    "There is no gpu with id ({}) on the chosen server".format(g)
+                )
         usage = [True if (i in config_gpus) else False for i in range(len(gpus))]
         return usage
 
@@ -188,8 +191,10 @@ class FloodfillTaskAPI(APIView):
         gpu_utils = [job.gpus for job in ongoing_jobs]
         if gpus is not None:
             gpu_utils.append(gpus)
+
+        # There is a conflict if at least one gpu is claimed by at least 2 jobs
         return (
-            len(list(filter(lambda x: x > 1, map(lambda *x: sum(x), *gpu_utils)))) > 1
+            len(list(filter(lambda x: x > 1, map(lambda *x: sum(x), *gpu_utils)))) > 0
         )
 
     def _get_diluvian_config(self, user_id, project_id, config):
@@ -222,7 +227,11 @@ def importFloodFilledVolume(project_id, user_id, ff_output_file):
 def flood_fill_async(
     result, project_id, user_id, ssh_key_path, local_temp_dir, server, job_name
 ):
-    return time.sleep(60)
+
+    result.status = "computing"
+    result.save()
+    msg_user(user_id, "floodfilling-result-update", {"status": "computing"})
+
     # copy temp files from django local temp media storage to server temp storage
     setup = "scp -i {ssh_key_path} -pr {local_dir} {server_address}:{server_diluvian_dir}/{server_results_dir}/{job_dir}".format(
         **{
@@ -323,6 +332,8 @@ def flood_fill_async(
     result.status = "complete"
     result.save()
 
+    msg_user(user_id, "floodfilling-result-update", {"status": "completed"})
+
     return "complete"
 
 
@@ -379,64 +390,6 @@ class FloodfillResultAPI(APIView):
                 SELECT * FROM floodfill_result
                 """
             )
-        results = dictfetchall(cursor)
-        return results
-
-
-def dictfetchall(cursor):
-    "Returns all rows from a cursor as a dict"
-    desc = cursor.description
-    return [dict(zip([col[0] for col in desc], row)) for row in cursor.fetchall()]
-
-
-# HELPER FUNCTIONS
-def _DTW(seq_a, seq_b):
-    """
-    Dynamic Time Warping:
-    Common algorithm for comparing the similarity of two time series
-    while allowing for some compression/stretching along the time axis.
-
-    In this case it might make sense for comparing two traces of a neuron
-    since changes in the frequency of node placement should not have a
-    large effect on the similarity of the skeleton as a whole.
-
-    assume seq_a and seq_b are of equal length
-        (interpolate values before passing to this function)
-    """
-    Exception("not yet implemented")
-    assert len(seq_a) == len(seq_b)
-    empty = np.zeros([len(seq_a), len(seq_b)])
-    # TODO
-    return empty
-
-
-def _center_of_mass(nodes, data):
-    """
-    I think we could use center of mass of the floodfilling output segmentations
-    to detect missing branches. Assuming floodfilling would detect a large number
-    of voxels at the base of a missing branch, this should throw off the center
-    of mass of a sliding window following the neurons skeleton. Assuming the
-    base of the branch is relatively small, sudden spikes and subsequent drops
-    back to the original pattern should indicate the presence of a missing branch
-    without the need to excessively expore large regions around the skeleton.
-
-    inputs:
-        - sequence of nodes (id, pid, x, y, z)
-        - query-able binary volume
-    output:
-        - sequence of nodes (id, theta, tau)
-        - theta is measured on the plane (alpha) perpendicular to the skeleton
-        - 0 degrees is the line generated from the intersection of alpha and the xy
-            plane or (1,0) centered at the node.
-        - tau is the magnitude of the vector from the node to the localized center of mass
-    """
-    Exception("not yet implemented")
-
-    for node in nodes:
-        arc_tangent_center, arc_tangent_slope = _get_tangent(node, nodes)
-        volume = _get_data_around_tangent(arc_tangent_center, arc_tangent_slope)
-        center_of_mass_vector = _calculate_center(
-            volume, arc_tangent_center, arc_tangent_slope
-        )
-        return (node, center_of_mass_vector)
+        desc = cursor.description
+        return [dict(zip([col[0] for col in desc], row)) for row in cursor.fetchall()]
 
