@@ -907,6 +907,7 @@
   DATA VIS
   */
   FloodfillingWidget.prototype.display_results_data = function (data) {
+    console.log (data);
     let display = new CATMAID.ResultsWindow ('RESULTS');
     display.show (500, 'auto', true);
   };
