@@ -102,7 +102,8 @@ class ComputeServerAPI(APIView):
                 SELECT * FROM compute_server
                 """
             )
-        return cursor.fetchall()
+        desc = cursor.description
+        return [dict(zip([col[0] for col in desc], row)) for row in cursor.fetchall()]
 
 
 class GPUUtilAPI(APIView):
@@ -147,7 +148,7 @@ class GPUUtilAPI(APIView):
         server = ComputeServerAPI.get_servers(server_id)[0]
 
         bash_script = (
-            "ssh -i {} {}\n".format(settings.SSH_KEY_PATH, server[2])
+            "ssh -i {} {}\n".format(settings.SSH_KEY_PATH, server["address"])
             + "nvidia-smi "
             + "--query-gpu={} ".format(",".join([x[0] for x in fields]))
             + "--format=csv,noheader,nounits"
