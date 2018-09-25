@@ -113,4 +113,5 @@ class FloodfillModelAPI(APIView):
                 SELECT * FROM floodfill_model
                 """
             )
-        return cursor.fetchall()
+        desc = cursor.description
+        return [dict(zip([col[0] for col in desc], row)) for row in cursor.fetchall()]
