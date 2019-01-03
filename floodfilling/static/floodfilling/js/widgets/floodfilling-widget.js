@@ -46,7 +46,6 @@
           'Jobs',
           'Results',
           'floodfilling_test',
-          'celery_test',
           'optic_flow_test',
         ]);
         // Change content based on currently active tab
@@ -92,7 +91,6 @@
 
         CATMAID.DOM.appendToTab (tabs['floodfilling_test'], [
           ['test_gpuutil', this.test_gpuutil.bind (this)],
-          ['test_websockets', this.test_websockets.bind (this)],
         ]);
 
         CATMAID.DOM.appendToTab (tabs['optic_flow_test'], [
@@ -270,7 +268,7 @@
         ],
         file_name
       );
-      container.append (file.name, file, file.name);
+      container.append (file.name, file);
     };
     var post_data = new FormData ();
     add_file (post_data, files.diluvian_config, 'diluvian_config.toml');
@@ -908,7 +906,7 @@
   */
   FloodfillingWidget.prototype.display_results_data = function (data) {
     console.log (data);
-    let display = new CATMAID.ResultsWindow ('RESULTS');
+    let display = new CATMAID.ResultsWindow ('RESULTS', undefined, true);
     display.show (500, 'auto', true);
   };
 
@@ -1274,10 +1272,12 @@
     };
 
     let createAsyncOptionDropdown = function (args) {
-      var async_placeholder = CATMAID.DOM.createLabeledAsyncPlaceholder (
-        args.name,
-        args.async_func (args.async_func_change),
-        args.helptext
+      var async_placeholder = $ (
+        CATMAID.DOM.createLabeledAsyncPlaceholder (
+          args.name,
+          args.async_func (args.async_func_change),
+          args.helptext
+        )
       );
 
       let addbutton = $ ('<button class="add" />')

@@ -5,7 +5,6 @@ from django.conf.urls import url
 from floodfilling.control import (
     compute_server,
     floodfilling,
-    celery_task,
     is_installed,
     floodfill_model,
 )
@@ -42,10 +41,4 @@ urlpatterns += [
         r"^(?P<project_id>\d+)/floodfill-results$",
         floodfilling.FloodfillResultAPI.as_view(),
     )
-]
-
-# Celery Tasks
-urlpatterns += [
-    url(r"^(?P<project_id>\d+)/tasks$", celery_task.get_active_tasks),
-    url(r"^(?P<project_id>\d+)/create-task$", celery_task.create_task),
 ]
