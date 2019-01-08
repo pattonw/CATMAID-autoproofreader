@@ -358,6 +358,102 @@
     return table;
   };
 
+  ResultsWindow.prototype.appendRankingTable = function (data) {
+    let ranking_csv = data['data'];
+    let lines = ranking_csv.split ('\n');
+    let trimmed_lines = lines[lines.length - 1] === ''
+      ? lines.slice (0, -1)
+      : lines;
+    let data_arr = trimmed_lines.map (function (e) {
+      return e.split (',');
+    });
+    let headers = data_arr[0];
+    let numeric_data = data_arr.slice (1).map (function (e) {
+      row = {};
+      for (let i = 0; i < headers.length; i++) {
+        row[headers[i]] = e[i];
+      }
+      return row;
+    });
+
+    var table = this.dialog.appendChild (document.createElement ('table'));
+    var header = table.appendChild (document.createElement ('thead'));
+    var headerRow = header.appendChild (document.createElement ('tr'));
+    headers.map (function (e) {
+      if (!(e.includes ('dx') || e.includes ('dy') || e.includes ('dz'))) {
+        header = headerRow.appendChild (document.createElement ('th'));
+        header.appendChild (document.createTextNode (e || 'default'));
+      }
+    });
+
+    var datatable = $ (table)
+      .DataTable ({
+        order: [],
+        data: numeric_data,
+        autoWidth: false,
+        columns: [
+          {
+            data: 'nid',
+            width: '25%',
+            class: 'cm-center',
+            orderable: false,
+          },
+          {
+            data: 'pid',
+            width: '25%',
+            class: 'cm-center',
+            orderable: false,
+          },
+          {
+            data: 'connectivity_score',
+            width: '25%',
+            class: 'cm-center',
+          },
+          {
+            data: 'branch_score',
+            width: '25%',
+            class: 'cm-center',
+          },
+        ],
+      })
+      .on ('click', 'td', function () {
+        index = datatable.cell (this).index ();
+        let nid = datatable.row (index.row).data ().nid;
+        let node = data.skeleton_csv
+          .split ('\n')
+          .find (o => o.startsWith (`${nid}`));
+        let [z, y, x] = node.split (',').slice (2);
+        SkeletonAnnotations.staticMoveTo (z, y, x).then (e => {
+          var projectCoordinates = project.focusedStackViewer.projectCoordinates ();
+          var parameters = {
+            x: projectCoordinates.x,
+            y: projectCoordinates.y,
+            z: projectCoordinates.z,
+          };
+          parameters['skeleton_id'] = data.skeleton_id;
+          CATMAID.fetch (project.id + '/node/nearest', 'POST', parameters)
+            .then (function (data) {
+              var nodeIDToSelect = data.treenode_id;
+              return SkeletonAnnotations.staticSelectNode (nodeIDToSelect);
+            })
+            .catch (function () {
+              CATMAID.warn (
+                'Going to ' +
+                  'skeleton' +
+                  ' ' +
+                  data.skeleton_id +
+                  ' failed. ' +
+                  'The ' +
+                  'skeleton   ' +
+                  ' may no longer exist.'
+              );
+            });
+        });
+      });
+
+    return table;
+  };
+
   // Make option dialog available in CATMAID namespace
   CATMAID.ResultsWindow = ResultsWindow;
 }) (CATMAID);

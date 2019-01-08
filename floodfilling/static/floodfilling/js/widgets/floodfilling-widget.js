@@ -907,6 +907,7 @@
   FloodfillingWidget.prototype.display_results_data = function (data) {
     console.log (data);
     let display = new CATMAID.ResultsWindow ('RESULTS', undefined, true);
+    display.appendRankingTable (data);
     display.show (500, 'auto', true);
   };
 
@@ -1175,6 +1176,7 @@
         model_id: job.model_id,
         model_name: job.model_id,
         skeleton_id: job.skeleton_id,
+        skeleton_csv: job.skeleton_csv,
         completion_time: job.completion_time,
         volume_id: job.volume_id,
         data: job.data,
