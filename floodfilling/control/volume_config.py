@@ -22,7 +22,9 @@ class VolumeConfigAPI(APIView):
         if any([x is None for x in params]):
             return JsonResponse({"success": False, "results": request.POST})
 
-        volume_config = VolumeConfig(name=name, config=config)
+        volume_config = VolumeConfig(
+            name=name, config=config, user_id=request.user.id, project_id=project_id
+        )
         volume_config.save()
 
         return JsonResponse({"success": True, "warnings": warnings})
@@ -72,15 +74,16 @@ class VolumeConfigAPI(APIView):
 
         return JsonResponse({"success": True})
 
-    def get_volume_configs(self, model_id=None):
+    def get_volume_configs(self, volume_config_id=None):
+        print(volume_config_id)
         cursor = connection.cursor()
-        if model_id is not None:
+        if volume_config_id is not None:
             cursor.execute(
                 """
                 SELECT * FROM volume_config
                 WHERE id = {}
                 """.format(
-                    model_id
+                    volume_config_id
                 )
             )
         else:

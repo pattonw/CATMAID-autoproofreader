@@ -229,32 +229,50 @@
       .catch (CATMAID.handleError);
   };
 
+  FloodfillingWidget.prototype.check_valid_diluvian_job = function (settings) {
+    if (
+      settings.run.server_id === undefined ||
+      settings.run.model_id === undefined
+    ) {
+      let s = settings.run.server_id === undefined;
+      let m = settings.run.model_id === undefined;
+      let message;
+      if (s && m) {
+        message = 'Both server and model not yet selected!';
+      } else if (s) {
+        message = 'Server not yet selected!';
+      } else {
+        message = 'Model not yet selected!';
+      }
+      throw new Error (message);
+    }
+  };
+
+  FloodfillingWidget.prototype.check_valid_cached_job = function (settings) {
+    if (settings.run.segmentation_type != 'jans') {
+      throw new Error ('wierd');
+    }
+  };
+
   FloodfillingWidget.prototype.gatherFiles = function () {
     let self = this;
     let setting_values = self.getSettingValues ();
-    return this.getSkeleton (setting_values.run).then (function (skeleton_csv) {
-      if (
-        setting_values.run.server_id === undefined ||
-        setting_values.run.model_id === undefined
-      ) {
-        let s = setting_values.run.server_id === undefined;
-        let m = setting_values.run.model_id === undefined;
-        let message;
-        if (s && m) {
-          message = 'Both server and model not yet selected!';
-        } else if (s) {
-          message = 'Server not yet selected!';
-        } else {
-          message = 'Model not yet selected!';
-        }
-        throw new Error (message);
-      }
-      return {
-        skeleton: skeleton_csv,
-        volume: toml.dump (self.getVolume ()),
-        job_config: JSON.stringify (setting_values.run),
-        diluvian_config: toml.dump (setting_values['diluvian']),
-      };
+    if (setting_values.run.segmentation_type == 'diluvian') {
+      self.check_valid_diluvian_job (setting_values);
+    } else if (setting_values.run.segmentation_type == 'jans') {
+      self.check_valid_cached_job (setting_values);
+    }
+    return self.getVolume ().then (function (volume_config) {
+      return self
+        .getSkeleton (setting_values.run)
+        .then (function (skeleton_csv) {
+          return {
+            skeleton: skeleton_csv,
+            volume: toml.dump (volume_config),
+            job_config: JSON.stringify (setting_values.run),
+            diluvian_config: toml.dump (setting_values['diluvian']),
+          };
+        });
     });
   };
 
@@ -801,7 +819,28 @@
    * Gather the information for the volume toml
    */
   FloodfillingWidget.prototype.getVolume = function () {
-    return {ImageStack: [this.getImageStackVolume ()]};
+    let self = this;
+    let setting_values = self.getSettingValues ();
+    if ('volume_id' in setting_values.run) {
+      return CATMAID.fetch (
+        'ext/floodfilling/' + project.id + '/volume-configs',
+        'GET',
+        {volume_config_id: setting_values.run.volume_id}
+      ).then (function (e) {
+        console.log ('getting volume config');
+        console.log (e);
+        let config;
+        if (e[0].name == 'default') {
+          config = {ImageStack: [self.getImageStackVolume ()]};
+        } else {
+          config = toml.parse (e[0].config);
+        }
+        console.log (config);
+        return config;
+      });
+    } else {
+      throw Error ('Volume must be selected!');
+    }
   };
 
   /**
@@ -1733,7 +1772,7 @@
           'Compute volume',
           initVolumeList (change_func),
           'The volume to remove.'
-        )[0]
+        )
       );
 
       // Add handler for creating the server
@@ -1741,7 +1780,7 @@
         CATMAID.fetch (
           'ext/floodfilling/' + project.id + '/volume-configs',
           'DELETE',
-          {volume_id: volume}
+          {volume_config_id: volume}
         )
           .then (function (e) {
             // refresh the server list
@@ -1881,7 +1920,7 @@
           'Compute server',
           initServerList (change_func),
           'The server to remove.'
-        )[0]
+        )
       );
 
       // Add handler for creating the server
@@ -2053,7 +2092,7 @@
           'Floodfill Model',
           initModelList (change_func),
           'The model to remove.'
-        )[0]
+        )
       );
 
       // Add handler for removing the model
@@ -2101,8 +2140,8 @@
         label: 'segmentation_type',
         name: 'Segmentation type',
         options: [
-          {name: 'Diluvian', id: 'on_demand'},
-          {name: 'Jans segmentation', id: 'cached'},
+          {name: 'Diluvian', id: 'diluvian'},
+          {name: 'Jans segmentation', id: 'jans'},
         ],
         helptext: 'Type of segmentation to use in the backend. Diluvian ' +
           'will segment the skeleton on demand which will take some time. ' +

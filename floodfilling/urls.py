@@ -7,6 +7,7 @@ from floodfilling.control import (
     floodfilling,
     is_installed,
     floodfill_model,
+    volume_config,
 )
 
 app_name = "floodfilling"
@@ -45,8 +46,5 @@ urlpatterns += [
 
 # Volume Configs
 urlpatterns += [
-    url(
-        r"^(?P<project_id>\d+)/volume-configs$",
-        floodfilling.FloodfillResultAPI.as_view(),
-    )
+    url(r"^(?P<project_id>\d+)/volume-configs$", volume_config.VolumeConfigAPI.as_view())
 ]
