@@ -74,3 +74,15 @@ class FloodfillResult(UserFocusedModel):
 
     class Meta:
         db_table = "floodfill_result"
+
+
+class VolumeConfig(UserFocusedModel):
+    """
+    A model to hold volume configs.
+    """
+
+    name = models.TextField()
+    config = models.TextField()
+
+    class Meta:
+        db_table = "volume_config"

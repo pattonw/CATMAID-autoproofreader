@@ -1277,7 +1277,7 @@
       var async_placeholder = $ (
         CATMAID.DOM.createLabeledAsyncPlaceholder (
           args.name,
-          args.async_func (args.async_func_change),
+          args.async_init (args.async_change),
           args.helptext
         )
       );
@@ -1311,7 +1311,6 @@
        * This function is necessary for refreshing the list when
        * adding or removing servers. 
        * 
-       * async_func:
        * This parameter must be re-passed since it is a promise
        * and the original one has already resolved and thus will
        * not provide the refreshed results.
@@ -1531,7 +1530,8 @@
         max: args.max,
         step: args.step,
         options: args.options,
-        async_func: args.async_func,
+        async_init: args.async_init,
+        async_change: args.async_change,
         async_add: args.async_add,
         async_remove: args.async_remove,
         get_choices: args.get_choices,
@@ -1625,7 +1625,138 @@
       });
     };
 
+    let change_volume = function (volume_id) {
+      console.log ('changing volume');
+      self.settings.run.volume_id.value = volume_id;
+    };
+
+    let initVolumeList = function (change_func) {
+      return CATMAID.fetch (
+        'ext/floodfilling/' + project.id + '/volume-configs',
+        'GET'
+      ).then (function (json) {
+        var volumes = json
+          .sort (function (a, b) {
+            return CATMAID.tools.compareStrings (a.name, b.name);
+          })
+          .map (function (volume) {
+            return {
+              title: volume.name + ' (#' + volume.id + ')',
+              value: volume.id,
+            };
+          });
+        var selectedVolumeId = self.settings.run.volume_id.value;
+        // Create actual element based on the returned data
+        var node = CATMAID.DOM.createRadioSelect (
+          'Volumes',
+          volumes,
+          selectedVolumeId,
+          true
+        );
+        // Add a selection handler
+        node.onchange = function (e) {
+          let volumeId = null;
+          if (e.srcElement.value !== 'none') {
+            volumeId = parseInt (e.srcElement.value, 10);
+          }
+          change_func (volumeId);
+        };
+
+        return node;
+      });
+    };
+
+    function add_volume () {
+      // Add skeleton source message and controls
+      let dialog = new CATMAID.OptionsDialog ('Add Volume');
+
+      dialog.appendMessage ('Please provide the necessary information:');
+      let volume_name = dialog.appendField ('Volume name: ', 'volume_name', '');
+
+      let config;
+      var fileButton = CATMAID.DOM.createFileButton (
+        undefined,
+        false,
+        function (evt) {
+          let reader = new FileReader ();
+          reader.onload = function (e) {
+            config = reader.result;
+          };
+          reader.readAsText (evt.target.files[0]);
+        }
+      );
+      let configbutton = $ ('<button class="uploadSettingsFile" />')
+        .button ({
+          icons: {
+            primary: 'ui-icon-arrowthick-1-n',
+          },
+          text: false,
+        })
+        .click (function () {
+          fileButton.click ();
+        });
+      dialog.appendChild (configbutton[0]);
+
+      // Add handler for creating the server
+      dialog.onOK = function () {
+        return CATMAID.fetch (
+          'ext/floodfilling/' + project.id + '/volume-configs',
+          'PUT',
+          {
+            name: volume_name.value,
+            config: config,
+          }
+        )
+          .then (function (e) {
+            // refresh the server list
+            let replacement = $ ('#volume_id')[0].rebuild ();
+            $ ('#volume_id').empty ();
+            $ ('#volume_id').append (replacement);
+          })
+          .catch (CATMAID.handleError);
+      };
+
+      dialog.show (500, 'auto', true);
+    }
+
+    function remove_volume () {
+      // Add skeleton source message and controls
+      let dialog = new CATMAID.OptionsDialog ('Remove Volume');
+
+      dialog.appendMessage ('Please select a volume:');
+      let volume = self.settings.run.volume_id.value;
+      let change_func = function (volume_id) {
+        volume = volume_id;
+      };
+      dialog.appendChild (
+        CATMAID.DOM.createLabeledAsyncPlaceholder (
+          'Compute volume',
+          initVolumeList (change_func),
+          'The volume to remove.'
+        )[0]
+      );
+
+      // Add handler for creating the server
+      dialog.onOK = function () {
+        CATMAID.fetch (
+          'ext/floodfilling/' + project.id + '/volume-configs',
+          'DELETE',
+          {volume_id: volume}
+        )
+          .then (function (e) {
+            // refresh the server list
+            let replacement = $ ('#volume_id')[0].rebuild ();
+            $ ('#volume_id').empty ();
+            $ ('#volume_id').append (replacement);
+          })
+          .catch (CATMAID.handleError);
+      };
+
+      dialog.show (500, 'auto', true);
+    }
+
     let change_server = function (server_id) {
+      console.log ('changing server');
       self.settings.run.server_id.value = server_id;
       let model_id = self.settings.run.model_id.value;
       if (model_id !== undefined) {
@@ -1683,7 +1814,97 @@
       });
     };
 
+    function add_server () {
+      // Add skeleton source message and controls
+      let dialog = new CATMAID.OptionsDialog ('Add Server');
+
+      dialog.appendMessage ('Please provide the necessary information:');
+      let server_name = dialog.appendField ('Server name: ', 'server_name', '');
+      let server_address = dialog.appendField (
+        'Server address: ',
+        'server_address',
+        'janelia.int.org'
+      );
+
+      let environment_source_path = dialog.appendField (
+        'Source path for floodfilling environment (optional but recommended): ',
+        'env_source_path',
+        ''
+      );
+      let diluvian_path = dialog.appendField (
+        'Path to the diluvian directory: ',
+        'diluvian_path',
+        '~/diluvian'
+      );
+      let results_directory = dialog.appendField (
+        'Path to the results directory in diluvian: ',
+        'results_directory',
+        'results'
+      );
+
+      // Add handler for creating the server
+      dialog.onOK = function () {
+        return CATMAID.fetch (
+          'ext/floodfilling/' + project.id + '/compute-servers',
+          'PUT',
+          {
+            name: server_name.value,
+            address: server_address.value,
+            environment_source_path: environment_source_path.value,
+            diluvian_path: diluvian_path.value,
+            results_directory: results_directory.value,
+          }
+        )
+          .then (function (e) {
+            // refresh the server list
+            let replacement = $ ('#server_id')[0].rebuild ();
+            $ ('#server_id').empty ();
+            $ ('#server_id').append (replacement);
+          })
+          .catch (CATMAID.handleError);
+      };
+
+      dialog.show (500, 'auto', true);
+    }
+
+    function remove_server () {
+      // Add skeleton source message and controls
+      let dialog = new CATMAID.OptionsDialog ('Remove Server');
+
+      dialog.appendMessage ('Please select a server:');
+      let server = self.settings.run.server_id.value;
+      let change_func = function (server_id) {
+        server = server_id;
+      };
+      dialog.appendChild (
+        CATMAID.DOM.createLabeledAsyncPlaceholder (
+          'Compute server',
+          initServerList (change_func),
+          'The server to remove.'
+        )[0]
+      );
+
+      // Add handler for creating the server
+      dialog.onOK = function () {
+        CATMAID.fetch (
+          'ext/floodfilling/' + project.id + '/compute-servers',
+          'DELETE',
+          {server_id: server}
+        )
+          .then (function (e) {
+            // refresh the server list
+            let replacement = $ ('#server_id')[0].rebuild ();
+            $ ('#server_id').empty ();
+            $ ('#server_id').append (replacement);
+          })
+          .catch (CATMAID.handleError);
+      };
+
+      dialog.show (500, 'auto', true);
+    }
+
     let change_model = function (model_id) {
+      console.log ('changing model');
       self.settings.run.model_id.value = model_id;
       let server_id = self.settings.run.server_id.value;
       CATMAID.fetch (
@@ -1748,59 +1969,6 @@
       });
     };
 
-    function add_server () {
-      // Add skeleton source message and controls
-      let dialog = new CATMAID.OptionsDialog ('Add Server');
-
-      dialog.appendMessage ('Please provide the necessary information:');
-      let server_name = dialog.appendField ('Server name: ', 'server_name', '');
-      let server_address = dialog.appendField (
-        'Server address: ',
-        'server_address',
-        'janelia.int.org'
-      );
-
-      let environment_source_path = dialog.appendField (
-        'Source path for floodfilling environment (optional but recommended): ',
-        'env_source_path',
-        ''
-      );
-      let diluvian_path = dialog.appendField (
-        'Path to the diluvian directory: ',
-        'diluvian_path',
-        '~/diluvian'
-      );
-      let results_directory = dialog.appendField (
-        'Path to the results directory in diluvian: ',
-        'results_directory',
-        'results'
-      );
-
-      // Add handler for creating the server
-      dialog.onOK = function () {
-        return CATMAID.fetch (
-          'ext/floodfilling/' + project.id + '/compute-servers',
-          'PUT',
-          {
-            name: server_name.value,
-            address: server_address.value,
-            environment_source_path: environment_source_path.value,
-            diluvian_path: diluvian_path.value,
-            results_directory: results_directory.value,
-          }
-        )
-          .then (function (e) {
-            // refresh the server list
-            let replacement = $ ('#server_id')[0].rebuild ();
-            $ ('#server_id').empty ();
-            $ ('#server_id').append (replacement);
-          })
-          .catch (CATMAID.handleError);
-      };
-
-      dialog.show (500, 'auto', true);
-    }
-
     function add_model () {
       // Add skeleton source message and controls
       let dialog = new CATMAID.OptionsDialog ('WIP');
@@ -1815,7 +1983,7 @@
           'Compute server',
           initServerList (change_func),
           'The server to remove.'
-        )[0]
+        )
       );
       let model_source_path = dialog.appendField (
         'Path to the models weights: ',
@@ -1864,42 +2032,6 @@
             let replacement = $ ('#model_id')[0].rebuild ();
             $ ('#model_id').empty ();
             $ ('#model_id').append (replacement);
-          })
-          .catch (CATMAID.handleError);
-      };
-
-      dialog.show (500, 'auto', true);
-    }
-
-    function remove_server () {
-      // Add skeleton source message and controls
-      let dialog = new CATMAID.OptionsDialog ('Remove Server');
-
-      dialog.appendMessage ('Please select a server:');
-      let server = self.settings.run.server_id.value;
-      let change_func = function (server_id) {
-        server = server_id;
-      };
-      dialog.appendChild (
-        CATMAID.DOM.createLabeledAsyncPlaceholder (
-          'Compute server',
-          initServerList (change_func),
-          'The server to remove.'
-        )[0]
-      );
-
-      // Add handler for creating the server
-      dialog.onOK = function () {
-        CATMAID.fetch (
-          'ext/floodfilling/' + project.id + '/compute-servers',
-          'DELETE',
-          {server_id: server}
-        )
-          .then (function (e) {
-            // refresh the server list
-            let replacement = $ ('#server_id')[0].rebuild ();
-            $ ('#server_id').empty ();
-            $ ('#server_id').append (replacement);
           })
           .catch (CATMAID.handleError);
       };
@@ -1965,11 +2097,38 @@
 
       addSettingTemplate ({
         settings: sub_settings,
+        type: 'option_dropdown',
+        label: 'segmentation_type',
+        name: 'Segmentation type',
+        options: [
+          {name: 'Diluvian', id: 'on_demand'},
+          {name: 'Jans segmentation', id: 'cached'},
+        ],
+        helptext: 'Type of segmentation to use in the backend. Diluvian ' +
+          'will segment the skeleton on demand which will take some time. ' +
+          'Jans segmentation is cached and only needs to be retrieved, which ' +
+          'will be faster but you have less options for customizing the job.',
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
+        type: 'async_option_dropdown',
+        label: 'volume_id',
+        name: 'Image source',
+        async_init: initVolumeList,
+        async_change: change_volume,
+        async_add: add_volume,
+        async_remove: remove_volume,
+        helptext: 'The volume to use for floodfilling',
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
         type: 'async_option_dropdown',
         label: 'model_id',
         name: 'Floodfilling model',
-        async_func: initModelList,
-        async_func_change: change_model,
+        async_init: initModelList,
+        async_change: change_model,
         async_add: add_model,
         async_remove: remove_model,
         helptext: 'The pretrained model to use for floodfilling',
@@ -1980,8 +2139,8 @@
         type: 'async_option_dropdown',
         label: 'server_id',
         name: 'Compute server',
-        async_func: initServerList,
-        async_change_func: change_server,
+        async_init: initServerList,
+        async_change: change_server,
         async_add: add_server,
         async_remove: remove_server,
         helptext: 'The compute server to use for floodfilling',

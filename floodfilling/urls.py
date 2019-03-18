@@ -42,3 +42,11 @@ urlpatterns += [
         floodfilling.FloodfillResultAPI.as_view(),
     )
 ]
+
+# Volume Configs
+urlpatterns += [
+    url(
+        r"^(?P<project_id>\d+)/volume-configs$",
+        floodfilling.FloodfillResultAPI.as_view(),
+    )
+]
