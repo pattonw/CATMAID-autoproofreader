@@ -423,7 +423,11 @@
           .split ('\n')
           .find (o => o.startsWith (`${nid}`));
         let [z, y, x] = node.split (',').slice (2);
-        SkeletonAnnotations.staticMoveTo (z, y, x).then (e => {
+        SkeletonAnnotations.staticMoveTo (
+          parseInt (z),
+          parseInt (y),
+          parseInt (x)
+        ).then (e => {
           var projectCoordinates = project.focusedStackViewer.projectCoordinates ();
           var parameters = {
             x: projectCoordinates.x,
@@ -434,19 +438,35 @@
           CATMAID.fetch (project.id + '/node/nearest', 'POST', parameters)
             .then (function (data) {
               var nodeIDToSelect = data.treenode_id;
-              return SkeletonAnnotations.staticSelectNode (nodeIDToSelect);
+              SkeletonAnnotations.staticSelectNode (nodeIDToSelect);
+              return nodeIDToSelect;
             })
-            .catch (function () {
+            .catch (function (e) {
               CATMAID.warn (
-                'Going to ' +
-                  'skeleton' +
-                  ' ' +
-                  data.skeleton_id +
-                  ' failed. ' +
-                  'The ' +
-                  'skeleton   ' +
-                  ' may no longer exist.'
+                'Going to skeleton ' + data.skeleton_id + ' failed due to: ' + e
               );
+            })
+            .then (function (pid) {
+              let data = datatable.row (index.row).data ();
+              let stack_viewer = project.getStackViewer (project.id);
+              let tracing_layers = stack_viewer.getLayersOfType (
+                CATMAID.TracingLayer
+              );
+              let tracing_layer = tracing_layers[0];
+              tracing_layer.tracingOverlay.createNode (
+                pid,
+                null,
+                parameters.x + parseInt (data.branch_dz) * 40,
+                parameters.y + parseInt (data.branch_dy) * 40,
+                parameters.z + parseInt (data.branch_dx) * 40,
+                -1,
+                0,
+                null
+              );
+            })
+            .catch (function (e) {
+              console.log (e);
+              CATMAID.warn ('Failed to create node!');
             });
         });
       });

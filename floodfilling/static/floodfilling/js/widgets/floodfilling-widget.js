@@ -800,7 +800,7 @@
         tileLayer.stack.resolution.y,
         tileLayer.stack.resolution.z,
       ];
-      stackInfo['dimensions'] = [
+      stackInfo['bounds'] = [
         tileLayer.stack.dimension.x,
         tileLayer.stack.dimension.y,
         tileLayer.stack.dimension.z,
@@ -811,6 +811,7 @@
         tileLayer.stack.translation.z,
       ];
       stackInfo['broken_slices'] = tileLayer.stack.broken_slices;
+      stackInfo['source_base_url'] = stackInfo['image_base']
       return stackInfo;
     }
   };
