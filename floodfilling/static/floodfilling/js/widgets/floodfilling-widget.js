@@ -688,75 +688,11 @@
         let arborParser = new CATMAID.ArborParser ();
         let arbor = arborParser.init ('compact-skeleton', skeleton_json).arbor;
         let nodes = getVertices (skeleton_json[0]);
-        if (run_settings['filter_by_strahler']) {
-          let strahler = arbor.strahlerAnalysis ();
-          if (
-            !Object.values (strahler).filter (
-              index =>
-                index >= run_settings.strahler_filter_min &&
-                index <= run_settings.strahler_filter_max
-            ).length > 0
-          ) {
-            CATMAID.msg (
-              'warn',
-              'The chosen strahler index filter excludes all nodes'
-            );
-            throw 'strahler index too high. Max strahler index in this skeleton is: (' +
-              Object.values (strahler).reduce ((a, b) => Math.max (a, b)) +
-              ')';
-          }
-          [arbor.edges, nodes] = [
-            Object.keys (arbor.edges)
-              .filter (
-                id =>
-                  strahler[id] >= run_settings.strahler_filter_min &&
-                  strahler[id] <= run_settings.strahler_filter_max
-              )
-              .reduce (function (a, b) {
-                a[b] = arbor.edges[b];
-                return a;
-              }, {}),
-            Object.keys (nodes)
-              .filter (
-                id =>
-                  strahler[id] >= run_settings.strahler_filter_min &&
-                  strahler[id] <= run_settings.strahler_filter_max
-              )
-              .reduce (function (a, b) {
-                a[b] = nodes[b];
-                return a;
-              }, {}),
-          ];
-        }
-        if (run_settings['resample']) {
-          [arbor, nodes] = self.sampleSkeleton (
-            arbor,
-            nodes,
-            run_settings.resampling_delta,
-            run_settings.smoothing_sigma
-          );
-        }
         return self.skeletonToCSV (arbor, nodes);
       })
       .catch (function (error) {
         CATMAID.handleError (error);
       });
-  };
-
-  FloodfillingWidget.prototype.sampleSkeleton = function (
-    arbor,
-    nodes,
-    resampling_delta,
-    smoothing_sigma
-  ) {
-    resampling_delta = resampling_delta || 1000;
-    smoothing_sigma = smoothing_sigma || resampling_delta / 4;
-    let downsampled_skeleton = arbor.resampleSlabs (
-      nodes,
-      smoothing_sigma,
-      resampling_delta
-    );
-    return [downsampled_skeleton.arbor, downsampled_skeleton.positions];
   };
 
   FloodfillingWidget.prototype.skeletonToCSV = function (arbor, nodes) {
@@ -767,11 +703,11 @@
         ',' +
         (typeof arbor.edges[i] === 'undefined' ? i : arbor.edges[i]) +
         ',' +
-        nodes[i].z +
+        nodes[i].x +
         ',' +
         nodes[i].y +
         ',' +
-        nodes[i].x +
+        nodes[i].z +
         '\n';
     }
     return csv;
