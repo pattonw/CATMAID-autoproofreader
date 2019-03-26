@@ -392,7 +392,7 @@ def query_segmentation(
         + "source {server_ff_env_path}\n"
         + "cd {server_working_dir}\n"
         + "query --skeleton_csv {skeleton_file} "
-        + "--skeleton_config {job_config_file} "
+        + "--skeleton_config {skeleton_config} "
         + "query-jans-segmentation --output_file {output_file}"
     ).format(
         **{
