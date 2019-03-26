@@ -291,7 +291,7 @@
     add_file (post_data, files.diluvian_config, 'diluvian_config.toml');
     add_file (post_data, files.volume, 'volume.toml');
     add_file (post_data, files.skeleton, 'skeleton.csv');
-    add_file (post_data, files.skeleton_config, 'skeleton_config.toml')
+    add_file (post_data, files.skeleton_config, 'skeleton_config.toml');
     add_file (post_data, files.job_config, 'job_config.json');
 
     CATMAID.fetch (
@@ -681,8 +681,8 @@
 
   FloodfillingWidget.prototype.getSkeleton = function () {
     let self = this;
-    let skeleton_settings = self.getSettingValues (self.settings.skeleton);
-    let skid = skeleton_settings['skeleton_id'];
+    let job_settings = self.getSettingValues (self.settings.job);
+    let skid = job_settings['skeleton_id'];
     return CATMAID.fetch (project.id + '/skeletons/' + skid + '/compact-detail')
       .then (function (skeleton_json) {
         let arborParser = new CATMAID.ArborParser ();
@@ -698,16 +698,19 @@
   FloodfillingWidget.prototype.skeletonToCSV = function (arbor, nodes) {
     let csv = '';
     for (let i = 0; i < Object.keys (nodes).length; i++) {
+      let node_key = Object.keys (nodes)[i];
       csv +=
-        i +
+        node_key +
         ',' +
-        (typeof arbor.edges[i] === 'undefined' ? i : arbor.edges[i]) +
+        (typeof arbor.edges[node_key] === 'undefined'
+          ? node_key
+          : arbor.edges[node_key]) +
         ',' +
-        nodes[i].x +
+        nodes[node_key].x +
         ',' +
-        nodes[i].y +
+        nodes[node_key].y +
         ',' +
-        nodes[i].z +
+        nodes[node_key].z +
         '\n';
     }
     return csv;
@@ -2124,6 +2127,17 @@
 
       addSettingTemplate ({
         settings: sub_settings,
+        type: 'numeric_spinner_int',
+        label: 'skeleton_id',
+        name: 'Skeleton id',
+        helptext: 'The id of the skeleton to be used for flood filling',
+        value: 1,
+        min: 0,
+        step: 1,
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
         type: 'number_list',
         label: 'gpus',
         name: 'GPUs',
@@ -2142,16 +2156,6 @@
      */
     let createSkeletonDefaults = function (settings) {
       let sub_settings = getSubSettings (settings, 'skeleton');
-      addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_int',
-        label: 'skeleton_id',
-        name: 'Skeleton id',
-        helptext: 'The id of the skeleton to be used for flood filling',
-        value: 1,
-        min: 0,
-        step: 1,
-      });
 
       addSettingTemplate ({
         settings: sub_settings,
