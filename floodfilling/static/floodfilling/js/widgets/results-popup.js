@@ -422,7 +422,7 @@
         let node = data.skeleton_csv
           .split ('\n')
           .find (o => o.startsWith (`${nid}`));
-        let [z, y, x] = node.split (',').slice (2);
+        let [x, y, z] = node.split (',').slice (2);
         SkeletonAnnotations.staticMoveTo (
           parseInt (z),
           parseInt (y),
@@ -448,7 +448,7 @@
             })
             .then (function (pid) {
               let data = datatable.row (index.row).data ();
-              let stack_viewer = project.getStackViewer (project.id);
+              let stack_viewer = project.getStackViewer (1);
               let tracing_layers = stack_viewer.getLayersOfType (
                 CATMAID.TracingLayer
               );
