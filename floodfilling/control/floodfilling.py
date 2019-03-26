@@ -5,6 +5,7 @@ from pathlib import Path
 import json
 import numpy as np
 import time
+import pickle
 
 from django.conf import settings
 from django.http import JsonResponse
@@ -442,6 +443,16 @@ def query_segmentation(
     )
     out, err = process.communicate(cleanup)
     print(out)
+
+    new_nodes = pickle.load(
+        open("{}/{}".format(local_temp_dir, job_name + "_nodes.obj"), "rb")
+    )
+    
+    #overwrite input skeleton csv
+    #This should probably be fixed to have input/output skeleton csvs
+    result.skeleton_csv = "\n".join(
+        [",".join([str(c) for c in row]) for row in new_nodes]
+    )
 
     # actually import the volume mesh into the database for 3d Viewer
     if False:
