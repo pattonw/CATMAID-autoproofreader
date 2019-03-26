@@ -2140,7 +2140,7 @@
      * Whether to downsample, use strahler indicies, etc. etc.
      * @param {*} settings 
      */
-    let createRunDefaults = function (settings) {
+    let createSkeletonDefaults = function (settings) {
       let sub_settings = getSubSettings (settings, 'skeleton');
       addSettingTemplate ({
         settings: sub_settings,
