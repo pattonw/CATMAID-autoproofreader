@@ -681,8 +681,8 @@
 
   FloodfillingWidget.prototype.getSkeleton = function () {
     let self = this;
-    let job_settings = self.getSettingValues (self.settings.job);
-    let skid = job_settings['skeleton_id'];
+    let run_settings = self.getSettingValues (self.settings.run);
+    let skid = run_settings['skeleton_id'];
     return CATMAID.fetch (project.id + '/skeletons/' + skid + '/compact-detail')
       .then (function (skeleton_json) {
         let arborParser = new CATMAID.ArborParser ();
