@@ -263,16 +263,15 @@
       self.check_valid_cached_job (setting_values);
     }
     return self.getVolume ().then (function (volume_config) {
-      return self
-        .getSkeleton (setting_values.run)
-        .then (function (skeleton_csv) {
-          return {
-            skeleton: skeleton_csv,
-            volume: toml.dump (volume_config),
-            job_config: JSON.stringify (setting_values.run),
-            diluvian_config: toml.dump (setting_values['diluvian']),
-          };
-        });
+      return self.getSkeleton ().then (function (skeleton_csv) {
+        return {
+          skeleton: skeleton_csv,
+          skeleton_config: toml.dump (setting_values.skeleton),
+          volume: toml.dump (volume_config),
+          job_config: JSON.stringify (setting_values.run),
+          diluvian_config: toml.dump (setting_values['diluvian']),
+        };
+      });
     });
   };
 
@@ -292,6 +291,7 @@
     add_file (post_data, files.diluvian_config, 'diluvian_config.toml');
     add_file (post_data, files.volume, 'volume.toml');
     add_file (post_data, files.skeleton, 'skeleton.csv');
+    add_file (post_data, files.skeleton_config, 'skeleton_config.toml')
     add_file (post_data, files.job_config, 'job_config.json');
 
     CATMAID.fetch (
@@ -681,8 +681,8 @@
 
   FloodfillingWidget.prototype.getSkeleton = function () {
     let self = this;
-    let run_settings = self.getSettingValues (self.settings.run);
-    let skid = run_settings['skeleton_id'];
+    let skeleton_settings = self.getSettingValues (self.settings.skeleton);
+    let skid = skeleton_settings['skeleton_id'];
     return CATMAID.fetch (project.id + '/skeletons/' + skid + '/compact-detail')
       .then (function (skeleton_json) {
         let arborParser = new CATMAID.ArborParser ();
@@ -747,7 +747,7 @@
         tileLayer.stack.translation.z,
       ];
       stackInfo['broken_slices'] = tileLayer.stack.broken_slices;
-      stackInfo['source_base_url'] = stackInfo['image_base']
+      stackInfo['source_base_url'] = stackInfo['image_base'];
       return stackInfo;
     }
   };
@@ -2052,9 +2052,9 @@
     }
 
     /**
-     * These settings control everything to do with input
-     * configuration. Choosing the skeleton, strahler index,
-     * etc. etc.
+     * These settings control everything to do with running the
+     * job on a server. Making sure the server has access to the
+     * volumes/models/segmentation_algorithms you want
      * @param {*} settings 
      */
     let createRunDefaults = function (settings) {
@@ -2133,7 +2133,15 @@
           'you will have to choose which gpus to use for each job.',
         value: [],
       });
+    };
 
+    /**
+     * These settings control everything to do skeleton configuration.
+     * Whether to downsample, use strahler indicies, etc. etc.
+     * @param {*} settings 
+     */
+    let createRunDefaults = function (settings) {
+      let sub_settings = getSubSettings (settings, 'skeleton');
       addSettingTemplate ({
         settings: sub_settings,
         type: 'numeric_spinner_int',
@@ -2204,6 +2212,7 @@
     let createDefaults = function (settings) {
       // Add all settings
       createRunDefaults (settings);
+      createSkeletonDefaults (settings);
       createDiluvianDefaults (settings);
     };
 
