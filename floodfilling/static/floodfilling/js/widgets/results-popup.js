@@ -456,9 +456,9 @@
               tracing_layer.tracingOverlay.createNode (
                 pid,
                 null,
-                parameters.x + parseInt (data.branch_dz) * 40,
+                parameters.x + parseInt (data.branch_dx) * 40,
                 parameters.y + parseInt (data.branch_dy) * 40,
-                parameters.z + parseInt (data.branch_dx) * 40,
+                parameters.z + parseInt (data.branch_dz) * 40,
                 -1,
                 0,
                 null
