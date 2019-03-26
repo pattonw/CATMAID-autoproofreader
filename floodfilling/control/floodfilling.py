@@ -391,7 +391,9 @@ def query_segmentation(
         "ssh -i {ssh_key_path} {server}\n"
         + "source {server_ff_env_path}\n"
         + "cd {server_working_dir}\n"
-        + "python query_segmentation.py {skeleton_file} {output_file} {job_config_file}"
+        + "query --skeleton_csv {skeleton_file} "
+        + "--skeleton_config {job_config_file} "
+        + "query-jans-segmentation --output_file {output_file}"
     ).format(
         **{
             "ssh_key_path": ssh_key_path,
@@ -400,7 +402,7 @@ def query_segmentation(
             "server_working_dir": server["working_dir"],
             "output_file": Path(server["results_dir"], job_name, job_name),
             "skeleton_file": files["skeleton"],
-            "job_config_file": files["job_config"],
+            "skeleton_config": files["skeleton_config"],
         }
     )
 
