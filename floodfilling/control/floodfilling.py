@@ -95,9 +95,6 @@ class FloodfillTaskAPI(APIView):
         model = FloodfillModel.objects.get(id=job_config["model_id"])
         server_paths = {
             "address": server.address,
-            "diluvian_path": server.diluvian_path[2:]
-            if server.diluvian_path.startswith("~/")
-            else server.diluvian_path,
             "working_dir": server.diluvian_path[2:]
             if server.diluvian_path.startswith("~/")
             else server.diluvian_path,
@@ -140,20 +137,9 @@ class FloodfillTaskAPI(APIView):
         if self._check_gpu_conflict():
             raise Exception("Not enough compute resources for this job")
 
-        if job_config.get("segmentation_type", None) == "diluvian":
-            # Flood filling async function
-            x = flood_fill_async.delay(
-                result,
-                project_id,
-                request.user.id,
-                ssh_key_path,
-                local_temp_dir,
-                server_paths,
-                job_name,
-            )
-        elif job_config.get("segmentation_type", None) == "jans":
+        if job_config.get("segmentation_type", None) is not None:
             # Retrieve segmentation
-            x = query_segmentation.delay(
+            x = query_segmentation_async.delay(
                 result,
                 project_id,
                 request.user.id,
@@ -161,6 +147,7 @@ class FloodfillTaskAPI(APIView):
                 local_temp_dir,
                 server_paths,
                 job_name,
+                job_config["segmentation_type"],
             )
         else:
             raise ValueError("Segmentation type not available: {}".format(job_config))
@@ -252,239 +239,6 @@ def query_segmentation_async(
 
     # copy temp files from django local temp media storage to server temp storage
     setup = (
-        "scp -i {ssh_key_path} -pr {local_dir} {server_address}:"
-        + "{server_diluvian_dir}/{server_results_dir}/{job_dir}"
-    ).format(
-        **{
-            "local_dir": local_temp_dir,
-            "server_address": server["address"],
-            "server_diluvian_dir": server["diluvian_path"],
-            "server_results_dir": server["results_dir"],
-            "job_dir": job_name,
-            "ssh_key_path": ssh_key_path,
-        }
-    )
-    files = {}
-    for f in local_temp_dir.iterdir():
-        files[f.name.split(".")[0]] = Path(
-            "~/", server["diluvian_path"], server["results_dir"], job_name, f.name
-        )
-
-    # connect to the server and run the floodfilling algorithm on the provided skeleton
-    flood_fill = """
-    ssh -i {ssh_key_path} {server}
-    source {server_ff_env_path}
-    cd  {server_diluvian_dir}
-    python -m diluvian skeleton-fill-parallel {skeleton_file} -s {output_file} -m {model_file} -c {model_config_file} -c {job_config_file} -v {volume_file} --no-in-memory -l INFO
-    """.format(
-        **{
-            "ssh_key_path": ssh_key_path,
-            "server": server["address"],
-            "server_ff_env_path": server["env_source"],
-            "server_diluvian_dir": server["diluvian_path"],
-            "model_file": server["model_file"],
-            "output_file": Path(server["results_dir"], job_name, job_name + "_output"),
-            "skeleton_file": files["skeleton"],
-            "job_config_file": files["diluvian_config"],
-            "model_config_file": files["model_config"],
-            "volume_file": files["volume"],
-        }
-    )
-
-    # Copy the numpy file containing the volume mesh and the csv containing the node connections
-    # predicted by the floodfilling run.
-    cleanup = """
-    scp -i {ssh_key_path} {server}:{server_diluvian_dir}/{server_results_dir}/{server_job_dir}/{output_file_name}.npy {local_temp_dir}
-    scp -i {ssh_key_path} {server}:{server_diluvian_dir}/{server_results_dir}/{server_job_dir}/{output_file_name}.csv {local_temp_dir}
-    ssh -i {ssh_key_path} {server}
-    rm -r {server_diluvian_dir}/{server_results_dir}/{server_job_dir}
-    """.format(
-        **{
-            "ssh_key_path": ssh_key_path,
-            "server": server["address"],
-            "server_diluvian_dir": server["diluvian_path"],
-            "server_results_dir": server["results_dir"],
-            "server_job_dir": job_name,
-            "output_file_name": job_name + "_output",
-            "local_temp_dir": local_temp_dir,
-        }
-    )
-
-    process = subprocess.Popen(
-        "/bin/bash", stdin=subprocess.PIPE, stdout=subprocess.PIPE, encoding="utf8"
-    )
-    out, err = process.communicate(setup)
-    print(out)
-
-    process = subprocess.Popen(
-        "/bin/bash", stdin=subprocess.PIPE, stdout=subprocess.PIPE, encoding="utf8"
-    )
-    out, err = process.communicate(flood_fill)
-    print(out)
-
-    process = subprocess.Popen(
-        "/bin/bash", stdin=subprocess.PIPE, stdout=subprocess.PIPE, encoding="utf8"
-    )
-    # out, err = process.communicate(cleanup)
-    print(out)
-
-    # actually import the volume Mesh into the database for the 3D viewer
-    if False:
-        importFloodFilledVolume(
-            project_id,
-            user_id,
-            "{}/{}.npy".format(local_temp_dir, job_name + "_output"),
-        )
-
-    if True:
-        msg = Message()
-        msg.user = User.objects.get(pk=int(user_id))
-        msg.read = False
-
-        msg.title = "ASYNC JOB MESSAGE HERE"
-        msg.text = "IM DOING SOME STUFF, CHECK IT OUT"
-        msg.action = "localhost:8000"
-
-        notify_user(user_id, msg.id, msg.title)
-
-    result.completion_time = datetime.datetime.now()
-    with open("{}/{}.csv".format(local_temp_dir, job_name + "_rankings.obj")) as f:
-        result.data = f.read()
-    result.status = "complete"
-    result.save()
-
-    msg_user(user_id, "floodfilling-result-update", {"status": "completed"})
-
-    return "complete"
-
-
-@task()
-def flood_fill_async(
-    result, project_id, user_id, ssh_key_path, local_temp_dir, server, job_name
-):
-    result.status = "computing"
-    result.save()
-    msg_user(user_id, "floodfilling-result-update", {"status": "computing"})
-
-    # copy temp files from django local temp media storage to server temp storage
-    setup = (
-        "scp -i {ssh_key_path} -pr {local_dir} {server_address}:"
-        + "{server_diluvian_dir}/{server_results_dir}/{job_dir}"
-    ).format(
-        **{
-            "local_dir": local_temp_dir,
-            "server_address": server["address"],
-            "server_diluvian_dir": server["diluvian_path"],
-            "server_results_dir": server["results_dir"],
-            "job_dir": job_name,
-            "ssh_key_path": ssh_key_path,
-        }
-    )
-    files = {}
-    for f in local_temp_dir.iterdir():
-        files[f.name.split(".")[0]] = Path(
-            "~/", server["diluvian_path"], server["results_dir"], job_name, f.name
-        )
-
-    # connect to the server and run the floodfilling algorithm on the provided skeleton
-    flood_fill = """
-    ssh -i {ssh_key_path} {server}
-    source {server_ff_env_path}
-    cd  {server_diluvian_dir}
-    python -m diluvian skeleton-fill-parallel {skeleton_file} -s {output_file} -m {model_file} -c {model_config_file} -c {job_config_file} -v {volume_file} --no-in-memory -l INFO
-    """.format(
-        **{
-            "ssh_key_path": ssh_key_path,
-            "server": server["address"],
-            "server_ff_env_path": server["env_source"],
-            "server_diluvian_dir": server["diluvian_path"],
-            "model_file": server["model_file"],
-            "output_file": Path(server["results_dir"], job_name, job_name + "_output"),
-            "skeleton_file": files["skeleton"],
-            "job_config_file": files["diluvian_config"],
-            "model_config_file": files["model_config"],
-            "volume_file": files["volume"],
-        }
-    )
-
-    # Copy the numpy file containing the volume mesh and the csv containing the node connections
-    # predicted by the floodfilling run.
-    cleanup = """
-    scp -i {ssh_key_path} {server}:{server_diluvian_dir}/{server_results_dir}/{server_job_dir}/{output_file_name}.npy {local_temp_dir}
-    scp -i {ssh_key_path} {server}:{server_diluvian_dir}/{server_results_dir}/{server_job_dir}/{output_file_name}.csv {local_temp_dir}
-    ssh -i {ssh_key_path} {server}
-    rm -r {server_diluvian_dir}/{server_results_dir}/{server_job_dir}
-    """.format(
-        **{
-            "ssh_key_path": ssh_key_path,
-            "server": server["address"],
-            "server_diluvian_dir": server["diluvian_path"],
-            "server_results_dir": server["results_dir"],
-            "server_job_dir": job_name,
-            "output_file_name": job_name + "_output",
-            "local_temp_dir": local_temp_dir,
-        }
-    )
-
-    process = subprocess.Popen(
-        "/bin/bash", stdin=subprocess.PIPE, stdout=subprocess.PIPE, encoding="utf8"
-    )
-    out, err = process.communicate(setup)
-    print(out)
-
-    process = subprocess.Popen(
-        "/bin/bash", stdin=subprocess.PIPE, stdout=subprocess.PIPE, encoding="utf8"
-    )
-    out, err = process.communicate(flood_fill)
-    print(out)
-
-    process = subprocess.Popen(
-        "/bin/bash", stdin=subprocess.PIPE, stdout=subprocess.PIPE, encoding="utf8"
-    )
-    # out, err = process.communicate(cleanup)
-    print(out)
-
-    # actually import the volume Mesh into the database for the 3D viewer
-    if False:
-        importFloodFilledVolume(
-            project_id,
-            user_id,
-            "{}/{}.npy".format(local_temp_dir, job_name + "_output"),
-        )
-
-    if True:
-        msg = Message()
-        msg.user = User.objects.get(pk=int(user_id))
-        msg.read = False
-
-        msg.title = "ASYNC JOB MESSAGE HERE"
-        msg.text = "IM DOING SOME STUFF, CHECK IT OUT"
-        msg.action = "localhost:8000"
-
-        notify_user(user_id, msg.id, msg.title)
-
-    result.completion_time = datetime.datetime.now()
-    with open("{}/{}.csv".format(local_temp_dir, job_name + "_rankings.obj")) as f:
-        result.data = f.read()
-    result.status = "complete"
-    result.save()
-
-    msg_user(user_id, "floodfilling-result-update", {"status": "completed"})
-
-    return "complete"
-
-
-@task()
-def query_segmentation(
-    result, project_id, user_id, ssh_key_path, local_temp_dir, server, job_name
-):
-
-    result.status = "computing"
-    result.save()
-    msg_user(user_id, "floodfilling-result-update", {"status": "computing"})
-
-    # copy temp files from django local temp media storage to server temp storage
-    setup = (
         "scp -i {ssh_key_path} -pr {local_dir} "
         + "{server_address}:{server_working_dir}/{server_results_dir}/{job_dir}"
     ).format(
@@ -520,6 +274,27 @@ def query_segmentation(
             "output_file": Path(server["results_dir"], job_name, job_name),
             "skeleton_file": files["skeleton"],
             "skeleton_config": files["skeleton_config"],
+        }
+    )
+
+    # connect to the server and run the floodfilling algorithm on the provided skeleton
+    flood_fill = """
+    ssh -i {ssh_key_path} {server}
+    source {server_ff_env_path}
+    cd  {server_diluvian_dir}
+    python -m diluvian skeleton-fill-parallel {skeleton_file} -s {output_file} -m {model_file} -c {model_config_file} -c {job_config_file} -v {volume_file} --no-in-memory -l INFO
+    """.format(
+        **{
+            "ssh_key_path": ssh_key_path,
+            "server": server["address"],
+            "server_ff_env_path": server["env_source"],
+            "server_diluvian_dir": server["diluvian_path"],
+            "model_file": server["model_file"],
+            "output_file": Path(server["results_dir"], job_name, job_name + "_output"),
+            "skeleton_file": files["skeleton"],
+            "job_config_file": files["diluvian_config"],
+            "model_config_file": files["model_config"],
+            "volume_file": files["volume"],
         }
     )
 
@@ -563,9 +338,9 @@ def query_segmentation(
     new_nodes = pickle.load(
         open("{}/{}".format(local_temp_dir, job_name + "_nodes.obj"), "rb")
     )
-    
-    #overwrite input skeleton csv
-    #This should probably be fixed to have input/output skeleton csvs
+
+    # overwrite input skeleton csv
+    # This should probably be fixed to have input/output skeleton csvs
     result.skeleton_csv = "\n".join(
         [",".join([str(c) for c in row]) for row in new_nodes]
     )
