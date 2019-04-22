@@ -29,7 +29,7 @@
   $.extend (FloodfillingWidget.prototype, new InstanceRegistry ());
 
   FloodfillingWidget.prototype.getName = function () {
-    return 'Floodfilling Widget ' + this.widgetID;
+    return 'Autoproofreading Widget ' + this.widgetID;
   };
 
   FloodfillingWidget.prototype.getWidgetConfiguration = function () {
@@ -45,8 +45,6 @@
           'Run',
           'Jobs',
           'Results',
-          'floodfilling_test',
-          'optic_flow_test',
         ]);
         // Change content based on currently active tab
         controls.firstChild.onclick = this.refocus.bind (this);
@@ -61,7 +59,7 @@
 
         // create validation tab
         CATMAID.DOM.appendToTab (tabs['Run'], [
-          ['Floodfill', this.floodfill.bind (this)],
+          ['Segment', this.floodfill.bind (this)],
           [
             'Download Settings',
             function () {
@@ -87,14 +85,6 @@
         CATMAID.DOM.appendToTab (tabs['Results'], [
           ['refresh', this.test_results_refresh.bind (this)],
           ['clear', this.test_results_clear.bind (this)],
-        ]);
-
-        CATMAID.DOM.appendToTab (tabs['floodfilling_test'], [
-          ['test_gpuutil', this.test_gpuutil.bind (this)],
-        ]);
-
-        CATMAID.DOM.appendToTab (tabs['optic_flow_test'], [
-          ['testOpticalFlow', this.testOpticalFlow.bind (this)],
         ]);
         $ (controls).tabs ();
       },
@@ -249,7 +239,7 @@
   };
 
   FloodfillingWidget.prototype.check_valid_cached_job = function (settings) {
-    if (settings.run.segmentation_type != 'jans') {
+    if (settings.run.segmentation_type != 'watershed') {
       throw new Error ('wierd');
     }
   };
@@ -259,14 +249,14 @@
     let setting_values = self.getSettingValues ();
     if (setting_values.run.segmentation_type == 'diluvian') {
       self.check_valid_diluvian_job (setting_values);
-    } else if (setting_values.run.segmentation_type == 'jans') {
+    } else if (setting_values.run.segmentation_type == 'watershed') {
       self.check_valid_cached_job (setting_values);
     }
     return self.getVolume ().then (function (volume_config) {
       return self.getSkeleton ().then (function (skeleton_csv) {
         return {
           skeleton: skeleton_csv,
-          skeleton_config: toml.dump (setting_values.skeleton),
+          sarbor_config: toml.dump (setting_values.sarbor),
           volume: toml.dump (volume_config),
           job_config: JSON.stringify (setting_values.run),
           diluvian_config: toml.dump (setting_values['diluvian']),
@@ -1590,7 +1580,7 @@
         type: 'number_list',
         label: 'input_resolution',
         name: 'Input resolution',
-        helptext: 'The resolution of the floodfilling network input. ' +
+        helptext: 'The resolution of the segmenting network input. ' +
           'The highest possible resolution is the resolution of the ' +
           'image stack since upsampling is not supported. You may downsample ' +
           'by an arbitrary number of factors of 2 on each axis.',
@@ -1806,7 +1796,7 @@
       );
 
       let environment_source_path = dialog.appendField (
-        'Source path for floodfilling environment (optional but recommended): ',
+        'Source path for segmenting environment (optional but recommended): ',
         'env_source_path',
         ''
       );
@@ -2081,11 +2071,11 @@
         name: 'Segmentation type',
         options: [
           {name: 'Diluvian', id: 'diluvian'},
-          {name: 'Jans segmentation', id: 'jans'},
+          {name: 'watershed segmentation', id: 'watershed'},
         ],
         helptext: 'Type of segmentation to use in the backend. Diluvian ' +
           'will segment the skeleton on demand which will take some time. ' +
-          'Jans segmentation is cached and only needs to be retrieved, which ' +
+          'watershed segmentation is cached and only needs to be retrieved, which ' +
           'will be faster but you have less options for customizing the job.',
       });
 
@@ -2098,19 +2088,19 @@
         async_change: change_volume,
         async_add: add_volume,
         async_remove: remove_volume,
-        helptext: 'The volume to use for floodfilling',
+        helptext: 'The volume to use for segmenting',
       });
 
       addSettingTemplate ({
         settings: sub_settings,
         type: 'async_option_dropdown',
         label: 'model_id',
-        name: 'Floodfilling model',
+        name: 'Segmenting model',
         async_init: initModelList,
         async_change: change_model,
         async_add: add_model,
         async_remove: remove_model,
-        helptext: 'The pretrained model to use for floodfilling',
+        helptext: 'The pretrained model to use for segmenting',
       });
 
       addSettingTemplate ({
@@ -2122,7 +2112,7 @@
         async_change: change_server,
         async_add: add_server,
         async_remove: remove_server,
-        helptext: 'The compute server to use for floodfilling',
+        helptext: 'The compute server to use for segmenting',
       });
 
       addSettingTemplate ({
@@ -2130,7 +2120,7 @@
         type: 'numeric_spinner_int',
         label: 'skeleton_id',
         name: 'Skeleton id',
-        helptext: 'The id of the skeleton to be used for flood filling',
+        helptext: 'The id of the skeleton to be used for segmenting',
         value: 1,
         min: 0,
         step: 1,
@@ -2141,7 +2131,7 @@
         type: 'number_list',
         label: 'gpus',
         name: 'GPUs',
-        helptext: 'Which gpus to use for floodfilling. ' +
+        helptext: 'Which gpus to use for segmenting. ' +
           'Leave blank to use all available gpus.' +
           'If you want to run multiple jobs simultaneously, ' +
           'you will have to choose which gpus to use for each job.',
@@ -2164,7 +2154,7 @@
         name: 'Resample',
         value: true,
         helptext: 'Whether or not you want to resample the skeleton at ' +
-          'regular intervals. This is highly recommended for floodfilling.',
+          'regular intervals. This is highly recommended for segmenting.',
       });
 
       addSettingTemplate ({
@@ -2195,7 +2185,7 @@
         type: 'numeric_spinner_int',
         label: 'strahler_filter_min',
         name: 'Strahler filter minimum',
-        helptext: 'The minimum strahler index to perform flood filling on.',
+        helptext: 'The minimum strahler index to perform segmenting on.',
         value: 0,
         min: 0,
         step: 1,
@@ -2237,7 +2227,7 @@
   CATMAID.FloodfillingWidget = FloodfillingWidget;
 
   CATMAID.registerWidget ({
-    name: 'floodfilling Widget',
+    name: 'Autoproofreading Widget',
     description: 'Widget associated with the floodfilling app',
     key: 'floodfilling-widget',
     creator: FloodfillingWidget,

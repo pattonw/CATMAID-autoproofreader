@@ -213,25 +213,17 @@ class FloodfillTaskAPI(APIView):
         return FloodfillConfig(user_id=user_id, project_id=project_id, config=config)
 
 
-def importFloodFilledVolume(project_id, user_id, ff_output_file):
-    x = np.load(ff_output_file)
-    verts = x[0]
-    faces = x[1]
-    verts = [[v[i] for i in range(len(v))] for v in verts]
-    faces = [list(f) for f in faces]
-
-    x = [verts, faces]
-
-    options = {"type": "trimesh", "mesh": x, "title": "skeleton_test"}
-    volume = get_volume_instance(project_id, user_id, options)
-    volume.save()
-
-    return JsonResponse({"success": True})
-
 
 @task()
 def query_segmentation_async(
-    result, project_id, user_id, ssh_key_path, local_temp_dir, server, job_name
+    result,
+    project_id,
+    user_id,
+    ssh_key_path,
+    local_temp_dir,
+    server,
+    job_name,
+    job_type,
 ):
     result.status = "computing"
     result.save()
@@ -240,12 +232,11 @@ def query_segmentation_async(
     # copy temp files from django local temp media storage to server temp storage
     setup = (
         "scp -i {ssh_key_path} -pr {local_dir} "
-        + "{server_address}:{server_working_dir}/{server_results_dir}/{job_dir}"
+        + "{server_address}:{server_results_dir}/{job_dir}"
     ).format(
         **{
             "local_dir": local_temp_dir,
             "server_address": server["address"],
-            "server_working_dir": server["working_dir"],
             "server_results_dir": server["results_dir"],
             "job_dir": job_name,
             "ssh_key_path": ssh_key_path,
@@ -254,47 +245,46 @@ def query_segmentation_async(
     files = {}
     for f in local_temp_dir.iterdir():
         files[f.name.split(".")[0]] = Path(
-            "~/", server["working_dir"], server["results_dir"], job_name, f.name
+            "~/", server["results_dir"], job_name, f.name
         )
+
+    if job_type == "diluvian":
+        extra_parameters = (
+            "--model-weights-file {model_file} "
+            + "--model-training-config {model_config_file} "
+            + "--model-job-config {job_config_file} "
+            + "--volume-file {volume_file} "
+        ).format(
+            **{
+                "model_file": server["model_file"],
+                "model_config_file": files["model_config"],
+                "job_config_file": files["diluvian_config"],
+                "volume_file": files["volume"],
+            }
+        )
+    elif job_type == "watershed":
+        extra_parameters = ""
 
     # connect to the server and run the floodfilling algorithm on the provided skeleton
     query_seg = (
         "ssh -i {ssh_key_path} {server}\n"
         + "source {server_ff_env_path}\n"
-        + "cd {server_working_dir}\n"
-        + "query --skeleton_csv {skeleton_file} "
-        + "--skeleton_config {skeleton_config} "
-        + "query-jans-segmentation --output_file {output_file}"
+        + "sarbor-error-detector "
+        + "--skeleton-csv {skeleton_file} "
+        + "--sarbor-config {sarbor_config} "
+        + "--output-file {output_file} "
+        + "{segmentation_type} "
+        + "{type_parameters}"
     ).format(
         **{
             "ssh_key_path": ssh_key_path,
             "server": server["address"],
             "server_ff_env_path": server["env_source"],
-            "server_working_dir": server["working_dir"],
+            "skeleton_file": files["skeleton"],
+            "sarbor_config": files["sarbor_config"],
             "output_file": Path(server["results_dir"], job_name, job_name),
-            "skeleton_file": files["skeleton"],
-            "skeleton_config": files["skeleton_config"],
-        }
-    )
-
-    # connect to the server and run the floodfilling algorithm on the provided skeleton
-    flood_fill = """
-    ssh -i {ssh_key_path} {server}
-    source {server_ff_env_path}
-    cd  {server_diluvian_dir}
-    python -m diluvian skeleton-fill-parallel {skeleton_file} -s {output_file} -m {model_file} -c {model_config_file} -c {job_config_file} -v {volume_file} --no-in-memory -l INFO
-    """.format(
-        **{
-            "ssh_key_path": ssh_key_path,
-            "server": server["address"],
-            "server_ff_env_path": server["env_source"],
-            "server_diluvian_dir": server["diluvian_path"],
-            "model_file": server["model_file"],
-            "output_file": Path(server["results_dir"], job_name, job_name + "_output"),
-            "skeleton_file": files["skeleton"],
-            "job_config_file": files["diluvian_config"],
-            "model_config_file": files["model_config"],
-            "volume_file": files["volume"],
+            "segmentation_type": job_type,
+            "type_parameters": extra_parameters,
         }
     )
 
@@ -303,13 +293,12 @@ def query_segmentation_async(
 
     #    "rm -r {server_working_dir}/{server_results_dir}/{server_job_dir}\n"
     cleanup = (
-        "scp -i {ssh_key_path} -r {server}:{server_working_dir}/"
+        "scp -i {ssh_key_path} -r {server}:"
         + "{server_results_dir}/{server_job_dir}/* {local_temp_dir}\n"
     ).format(
         **{
             "ssh_key_path": ssh_key_path,
             "server": server["address"],
-            "server_working_dir": server["working_dir"],
             "server_results_dir": server["results_dir"],
             "server_job_dir": job_name,
             "output_file_name": job_name + "_output",
@@ -336,7 +325,7 @@ def query_segmentation_async(
     print(out)
 
     new_nodes = pickle.load(
-        open("{}/{}".format(local_temp_dir, job_name + "_nodes.obj"), "rb")
+        open("{}/{}/{}".format(local_temp_dir, job_name, "nodes.obj"), "rb")
     )
 
     # overwrite input skeleton csv
@@ -345,27 +334,18 @@ def query_segmentation_async(
         [",".join([str(c) for c in row]) for row in new_nodes]
     )
 
-    # actually import the volume mesh into the database for 3d Viewer
-    if False:
-        importFloodFilledVolume(
-            project_id,
-            user_id,
-            "{}/{}.npy".format(local_temp_dir, job_name + "_output"),
-        )
+    msg = Message()
+    msg.user = User.objects.get(pk=int(user_id))
+    msg.read = False
 
-    if True:
-        msg = Message()
-        msg.user = User.objects.get(pk=int(user_id))
-        msg.read = False
+    msg.title = "Job {} complete!"
+    msg.text = "IM DOING SOME STUFF, CHECK IT OUT"
+    msg.action = "localhost:8000"
 
-        msg.title = "ASYNC JOB MESSAGE HERE"
-        msg.text = "IM DOING SOME STUFF, CHECK IT OUT"
-        msg.action = "localhost:8000"
-
-        notify_user(user_id, msg.id, msg.title)
+    notify_user(user_id, msg.id, msg.title)
 
     result.completion_time = datetime.datetime.now()
-    with open("{}/{}.csv".format(local_temp_dir, job_name + "_rankings")) as f:
+    with open("{}/{}/{}.csv".format(local_temp_dir, job_name, "rankings")) as f:
         result.data = f.read()
     result.status = "complete"
     result.save()

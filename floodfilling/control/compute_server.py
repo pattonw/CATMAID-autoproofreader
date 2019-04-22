@@ -107,6 +107,10 @@ class ComputeServerAPI(APIView):
 
 
 class GPUUtilAPI(APIView):
+    """
+    API for querying gpu status on the server. Could be used to inform user
+    whether server is currently in use, or which gpus are currently free.
+    """
     @method_decorator(requires_user_role(UserRole.Browse))
     def get(self, request, project_id):
         """
