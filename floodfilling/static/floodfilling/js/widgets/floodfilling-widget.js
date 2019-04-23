@@ -281,7 +281,7 @@
     add_file (post_data, files.diluvian_config, 'diluvian_config.toml');
     add_file (post_data, files.volume, 'volume.toml');
     add_file (post_data, files.skeleton, 'skeleton.csv');
-    add_file (post_data, files.skeleton_config, 'skeleton_config.toml');
+    add_file (post_data, files.sarbor_config, 'sarbor_config.toml');
     add_file (post_data, files.job_config, 'job_config.json');
 
     CATMAID.fetch (
@@ -1589,8 +1589,6 @@
           self.getImageStackVolume ().resolution[1],
           self.getImageStackVolume ().resolution[0],
         ],
-        min: 0,
-        step: 1,
       });
     };
 
@@ -2144,11 +2142,13 @@
      * Whether to downsample, use strahler indicies, etc. etc.
      * @param {*} settings 
      */
-    let createSkeletonDefaults = function (settings) {
-      let sub_settings = getSubSettings (settings, 'skeleton');
+    let createSarborDefaults = function (settings) {
+      let sub_settings = getSubSettings (settings, 'sarbor');
+
+      let skeleton_settings = getSubSettings(sub_settings, "skeleton")
 
       addSettingTemplate ({
-        settings: sub_settings,
+        settings: skeleton_settings,
         type: 'checkbox',
         label: 'resample',
         name: 'Resample',
@@ -2158,20 +2158,32 @@
       });
 
       addSettingTemplate ({
-        settings: sub_settings,
+        settings: skeleton_settings,
+        type: 'option_dropdown',
+        label: 'smoothing',
+        name: 'Smoothing',
+        options: [
+          {name: 'None', id: 'none'},
+          {name: 'Gaussian', id: 'gaussian'},
+        ],
+        helptext: 'Type of smoothing to apply to skeleton when resampling points.',
+      });
+
+      addSettingTemplate ({
+        settings: skeleton_settings,
         type: 'numeric_spinner_int',
-        label: 'resampling_delta',
+        label: 'resample_delta',
         name: 'Resampling delta',
-        helptext: 'The distance to use when downsampling a skeleton. ' +
-          'Each new neuron will have approximately a distance of delta ' +
-          'nm to its neighbors',
+        helptext: 'The distance d to use when downsampling a skeleton. ' +
+          'Each sample node will be seperated from neighbors by between ' +
+          'd/2 and 3d/2 nanometers.',
         value: 1000,
         min: 0,
         step: 1,
       });
 
       addSettingTemplate ({
-        settings: sub_settings,
+        settings: skeleton_settings,
         type: 'checkbox',
         label: 'filter_by_strahler',
         name: 'Filter by strahler index',
@@ -2181,7 +2193,7 @@
       });
 
       addSettingTemplate ({
-        settings: sub_settings,
+        settings: skeleton_settings,
         type: 'numeric_spinner_int',
         label: 'strahler_filter_min',
         name: 'Strahler filter minimum',
@@ -2191,22 +2203,38 @@
         step: 1,
       });
 
+      let segmentation_settings = getSubSettings(sub_settings, "segmentations")
+
       addSettingTemplate ({
-        settings: sub_settings,
-        type: 'numeric_spinner_int',
-        label: 'strahler_filter_max',
-        name: 'Strahler filter maximum',
-        helptext: 'The maximum strahler index to perform flood filling on.',
-        value: 10,
-        min: 0,
-        step: 1,
+        settings: segmentation_settings,
+        type: 'number_list',
+        label: 'downsample',
+        name: 'Downsample',
+        helptext: 'How much to downsample the segmentations on each axis. ' +
+          'Full resolution is often not necessary for finding high order branches ' +
+          'so you can downsample to save memory if you like.', 
+        value: [
+          1,1,1
+        ],
+      });
+
+      addSettingTemplate ({
+        settings: segmentation_settings,
+        type: 'number_list',
+        label: 'fov_shape',
+        name: 'Field of view shape',
+        helptext: 'The field of view in nanometers around each node that you would ' +
+          'like to consider when looking for missing branches.', 
+        value: [
+          1240,1240,1240
+        ],
       });
     };
 
     let createDefaults = function (settings) {
       // Add all settings
       createRunDefaults (settings);
-      createSkeletonDefaults (settings);
+      createSarborDefaults (settings);
       createDiluvianDefaults (settings);
     };
 
