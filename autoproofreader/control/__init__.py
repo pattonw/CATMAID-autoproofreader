@@ -6,5 +6,5 @@ from django.http import JsonResponse
 
 @api_view(['GET'])
 def is_installed(request, project_id=None):
-    """Check whether the extension CATMAID-floodfilling is installed."""
-    return JsonResponse({'is_installed': True, 'msg': 'CATMAID-floodfilling is installed'})
+    """Check whether the extension CATMAID-autoproofreader is installed."""
+    return JsonResponse({'is_installed': True, 'msg': 'CATMAID-autoproofreader is installed'})

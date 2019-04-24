@@ -8,9 +8,9 @@
   */
 
   'use strict';
-  let FloodfillingWidget = function () {
+  let AutoproofreaderWidget = function () {
     this.widgetID = this.registerInstance ();
-    this.idPrefix = `floodfilling-widget${this.widgetID}-`;
+    this.idPrefix = `autoproofreader-widget${this.widgetID}-`;
 
     this.ongoingTable = null;
     this.finishedTable = null;
@@ -20,19 +20,19 @@
     this.supported_fields = [];
   };
 
-  FloodfillingWidget.prototype = Object.create (
+  AutoproofreaderWidget.prototype = Object.create (
     CATMAID.SkeletonSource.prototype
   );
 
-  FloodfillingWidget.prototype.constructor = FloodfillingWidget;
+  AutoproofreaderWidget.prototype.constructor = AutoproofreaderWidget;
 
-  $.extend (FloodfillingWidget.prototype, new InstanceRegistry ());
+  $.extend (AutoproofreaderWidget.prototype, new InstanceRegistry ());
 
-  FloodfillingWidget.prototype.getName = function () {
+  AutoproofreaderWidget.prototype.getName = function () {
     return 'Autoproofreading Widget ' + this.widgetID;
   };
 
-  FloodfillingWidget.prototype.getWidgetConfiguration = function () {
+  AutoproofreaderWidget.prototype.getWidgetConfiguration = function () {
     const jobsTableID = this.idPrefix + 'datatable-jobs';
     const resultsTableID = this.idPrefix + 'datatable-results';
     let self = this;
@@ -173,7 +173,7 @@
   /**
    * initialize the widget
    */
-  FloodfillingWidget.prototype.init = function () {
+  AutoproofreaderWidget.prototype.init = function () {
     this.initTables ();
 
     this.initSettings ();
@@ -184,7 +184,7 @@
   /**
    * Change the widget layout to show the appropriate content per tab.
    */
-  FloodfillingWidget.prototype.refocus = function () {
+  AutoproofreaderWidget.prototype.refocus = function () {
     let content = document.getElementById ('content-wrapper');
     let views = {
       Run: 'settings',
@@ -210,7 +210,7 @@
   RUNNING
   */
 
-  FloodfillingWidget.prototype.floodfill = function () {
+  AutoproofreaderWidget.prototype.floodfill = function () {
     let self = this;
     this.gatherFiles ()
       .then (function (files) {
@@ -219,7 +219,7 @@
       .catch (CATMAID.handleError);
   };
 
-  FloodfillingWidget.prototype.check_valid_diluvian_job = function (settings) {
+  AutoproofreaderWidget.prototype.check_valid_diluvian_job = function (settings) {
     if (
       settings.run.server_id === undefined ||
       settings.run.model_id === undefined
@@ -238,13 +238,13 @@
     }
   };
 
-  FloodfillingWidget.prototype.check_valid_cached_job = function (settings) {
+  AutoproofreaderWidget.prototype.check_valid_cached_job = function (settings) {
     if (settings.run.segmentation_type != 'watershed') {
       throw new Error ('wierd');
     }
   };
 
-  FloodfillingWidget.prototype.gatherFiles = function () {
+  AutoproofreaderWidget.prototype.gatherFiles = function () {
     let self = this;
     let setting_values = self.getSettingValues ();
     if (setting_values.run.segmentation_type == 'diluvian') {
@@ -265,7 +265,7 @@
     });
   };
 
-  FloodfillingWidget.prototype.sendJob = function (files) {
+  AutoproofreaderWidget.prototype.sendJob = function (files) {
     let add_file = function (container, data, file_name) {
       let file = new File (
         [
@@ -285,7 +285,7 @@
     add_file (post_data, files.job_config, 'job_config.json');
 
     CATMAID.fetch (
-      'ext/floodfilling/' + project.id + '/flood-fill',
+      'ext/autoproofreader/' + project.id + '/flood-fill',
       'PUT',
       post_data,
       undefined,
@@ -308,15 +308,15 @@
   */
 
   // RESULTS
-  FloodfillingWidget.prototype.test_results_clear = function () {
+  AutoproofreaderWidget.prototype.test_results_clear = function () {
     CATMAID.fetch (
-      'ext/floodfilling/' + project.id + '/floodfill-results',
+      'ext/autoproofreader/' + project.id + '/floodfill-results',
       'GET'
     )
       .then (function (results) {
         results.forEach (function (result) {
           CATMAID.fetch (
-            'ext/floodfilling/' + project.id + '/floodfill-results',
+            'ext/autoproofreader/' + project.id + '/floodfill-results',
             'DELETE',
             {result_id: result.id}
           )
@@ -329,14 +329,14 @@
       .catch (CATMAID.handleError);
   };
 
-  FloodfillingWidget.prototype.test_results_refresh = function () {
+  AutoproofreaderWidget.prototype.test_results_refresh = function () {
     this.get_jobs ();
   };
 
   // FLOODFILLING
-  FloodfillingWidget.prototype.test_gpuutil = function () {
+  AutoproofreaderWidget.prototype.test_gpuutil = function () {
     let self = this;
-    CATMAID.fetch ('ext/floodfilling/' + project.id + '/gpu-util', 'GET', {
+    CATMAID.fetch ('ext/autoproofreader/' + project.id + '/gpu-util', 'GET', {
       server_id: self.getServer (),
     })
       .then (function (response) {
@@ -345,9 +345,9 @@
       .catch (CATMAID.handleError);
   };
 
-  FloodfillingWidget.prototype.test_websockets = function () {
+  AutoproofreaderWidget.prototype.test_websockets = function () {
     let self = this;
-    CATMAID.fetch ('ext/floodfilling/' + project.id + '/flood-fill', 'GET', {
+    CATMAID.fetch ('ext/autoproofreader/' + project.id + '/flood-fill', 'GET', {
       server_id: self.getServer (),
     })
       .then (function (response) {
@@ -357,7 +357,7 @@
   };
 
   // OPTIC FLOW
-  FloodfillingWidget.prototype.testOpticalFlow = function () {
+  AutoproofreaderWidget.prototype.testOpticalFlow = function () {
     let tileLayers = project.focusedStackViewer.getLayersOfType (
       CATMAID.TileLayer
     );
@@ -669,7 +669,7 @@
     }, {});
   };
 
-  FloodfillingWidget.prototype.getSkeleton = function () {
+  AutoproofreaderWidget.prototype.getSkeleton = function () {
     let self = this;
     let run_settings = self.getSettingValues (self.settings.run);
     let skid = run_settings['skeleton_id'];
@@ -685,7 +685,7 @@
       });
   };
 
-  FloodfillingWidget.prototype.skeletonToCSV = function (arbor, nodes) {
+  AutoproofreaderWidget.prototype.skeletonToCSV = function (arbor, nodes) {
     let csv = '';
     for (let i = 0; i < Object.keys (nodes).length; i++) {
       let node_key = Object.keys (nodes)[i];
@@ -712,7 +712,7 @@
   This section deals with the volume toml
   */
 
-  FloodfillingWidget.prototype.getImageStackVolume = function () {
+  AutoproofreaderWidget.prototype.getImageStackVolume = function () {
     let tileLayers = project.focusedStackViewer.getLayersOfType (
       CATMAID.TileLayer
     );
@@ -748,12 +748,12 @@
   /**
    * Gather the information for the volume toml
    */
-  FloodfillingWidget.prototype.getVolume = function () {
+  AutoproofreaderWidget.prototype.getVolume = function () {
     let self = this;
     let setting_values = self.getSettingValues ();
     if ('volume_id' in setting_values.run) {
       return CATMAID.fetch (
-        'ext/floodfilling/' + project.id + '/volume-configs',
+        'ext/autoproofreader/' + project.id + '/volume-configs',
         'GET',
         {volume_config_id: setting_values.run.volume_id}
       ).then (function (e) {
@@ -776,7 +776,7 @@
   /**
    * Save the volume data in a toml
    */
-  FloodfillingWidget.prototype.saveVolumes = function () {
+  AutoproofreaderWidget.prototype.saveVolumes = function () {
     this.saveToml (this.getVolume (), 'volumes');
   };
 
@@ -785,15 +785,15 @@
   SERVER
   */
 
-  FloodfillingWidget.prototype.getServer = function () {
+  AutoproofreaderWidget.prototype.getServer = function () {
     let server = this.getSettingValues (this.settings.run.server_id);
     return server;
   };
 
-  FloodfillingWidget.prototype.refreshServers = function () {
+  AutoproofreaderWidget.prototype.refreshServers = function () {
     let self = this;
     CATMAID.fetch (
-      'ext/floodfilling/' + project.id + '/compute-servers',
+      'ext/autoproofreader/' + project.id + '/compute-servers',
       'GET'
     ).then (function (e) {
       let options = [];
@@ -816,14 +816,14 @@
   /**
    * Save an object as a toml file
    */
-  FloodfillingWidget.prototype.saveToml = function (object, name) {
+  AutoproofreaderWidget.prototype.saveToml = function (object, name) {
     let filename = name + '.toml';
     if (!filename) return;
     let data = toml.dump (object);
     saveAs (new Blob ([data], {type: 'text/plain'}), filename);
   };
 
-  FloodfillingWidget.prototype.uploadSettingsToml = function (files, settings) {
+  AutoproofreaderWidget.prototype.uploadSettingsToml = function (files, settings) {
     let self = this;
     if (!CATMAID.containsSingleValidFile (files, 'toml')) {
       return;
@@ -873,7 +873,7 @@
   --------------------------------------------------------------------------------
   DATA VIS
   */
-  FloodfillingWidget.prototype.display_results_data = function (data) {
+  AutoproofreaderWidget.prototype.display_results_data = function (data) {
     console.log (data);
     let display = new CATMAID.ResultsWindow ('RESULTS', undefined, true);
     display.appendRankingTable (data);
@@ -884,12 +884,12 @@
   --------------------------------------------------------------------------------
   TABLE
   */
-  FloodfillingWidget.prototype.initTables = function () {
+  AutoproofreaderWidget.prototype.initTables = function () {
     this.initJobsTable ();
     this.initResultsTable ();
   };
 
-  FloodfillingWidget.prototype.initJobsTable = function () {
+  AutoproofreaderWidget.prototype.initJobsTable = function () {
     const self = this;
     const tableID = this.idPrefix + 'datatable-jobs';
     const $table = $ ('#' + tableID);
@@ -1001,7 +1001,7 @@
     });
   };
 
-  FloodfillingWidget.prototype.initResultsTable = function () {
+  AutoproofreaderWidget.prototype.initResultsTable = function () {
     const self = this;
     const tableID = this.idPrefix + 'datatable-results';
     const $table = $ ('#' + tableID);
@@ -1115,12 +1115,12 @@
     this.get_jobs ();
   };
 
-  FloodfillingWidget.prototype.get_jobs = function () {
+  AutoproofreaderWidget.prototype.get_jobs = function () {
     this.ongoingTable.clear ();
     this.finishedTable.clear ();
     let self = this;
     CATMAID.fetch (
-      'ext/floodfilling/' + project.id + '/floodfill-results',
+      'ext/autoproofreader/' + project.id + '/floodfill-results',
       'GET'
     )
       .then (function (results) {
@@ -1133,7 +1133,7 @@
       .catch (CATMAID.handleError);
   };
 
-  FloodfillingWidget.prototype.appendOne = function (job) {
+  AutoproofreaderWidget.prototype.appendOne = function (job) {
     let self = this;
     if (job.status === 'complete') {
       let row = {
@@ -1151,7 +1151,7 @@
         data: job.data,
       };
       CATMAID.fetch (
-        'ext/floodfilling/' + project.id + '/floodfill-models',
+        'ext/autoproofreader/' + project.id + '/floodfill-models',
         'GET',
         {model_id: job.model_id}
       ).then (function (result) {
@@ -1172,7 +1172,7 @@
         skeleton_id: job.skeleton_id,
       };
       CATMAID.fetch (
-        'ext/floodfilling/' + project.id + '/floodfill-models',
+        'ext/autoproofreader/' + project.id + '/floodfill-models',
         'GET',
         {model_id: job.model_id}
       ).then (function (result) {
@@ -1184,12 +1184,12 @@
     }
   };
 
-  FloodfillingWidget.prototype.clear = function () {
+  AutoproofreaderWidget.prototype.clear = function () {
     this.oTable.clear ();
     this.oTable.draw ();
   };
 
-  FloodfillingWidget.prototype.update = function () {
+  AutoproofreaderWidget.prototype.update = function () {
     this.oTable.draw ();
   };
 
@@ -1199,13 +1199,13 @@
   This section contains the settings
   */
 
-  FloodfillingWidget.prototype.initSettings = function () {
+  AutoproofreaderWidget.prototype.initSettings = function () {
     this.createDefaultSettings ();
 
     this.createSettings ();
   };
 
-  FloodfillingWidget.prototype.createSettings = function () {
+  AutoproofreaderWidget.prototype.createSettings = function () {
     let self = this;
 
     let createNumericInputSpinner = function (args) {
@@ -1446,7 +1446,7 @@
     refresh ();
   };
 
-  FloodfillingWidget.prototype.getSettingValues = function (
+  AutoproofreaderWidget.prototype.getSettingValues = function (
     settings,
     setting_values
   ) {
@@ -1478,7 +1478,7 @@
     return setting_values;
   };
 
-  FloodfillingWidget.prototype.createDefaultSettings = function () {
+  AutoproofreaderWidget.prototype.createDefaultSettings = function () {
     /**
    * Adds necessary information for a new setting into the
    * default settings variable. This will later be used
@@ -1599,7 +1599,7 @@
 
     let initVolumeList = function (change_func) {
       return CATMAID.fetch (
-        'ext/floodfilling/' + project.id + '/volume-configs',
+        'ext/autoproofreader/' + project.id + '/volume-configs',
         'GET'
       ).then (function (json) {
         var volumes = json
@@ -1667,7 +1667,7 @@
       // Add handler for creating the server
       dialog.onOK = function () {
         return CATMAID.fetch (
-          'ext/floodfilling/' + project.id + '/volume-configs',
+          'ext/autoproofreader/' + project.id + '/volume-configs',
           'PUT',
           {
             name: volume_name.value,
@@ -1706,7 +1706,7 @@
       // Add handler for creating the server
       dialog.onOK = function () {
         CATMAID.fetch (
-          'ext/floodfilling/' + project.id + '/volume-configs',
+          'ext/autoproofreader/' + project.id + '/volume-configs',
           'DELETE',
           {volume_config_id: volume}
         )
@@ -1728,7 +1728,7 @@
       let model_id = self.settings.run.model_id.value;
       if (model_id !== undefined) {
         CATMAID.fetch (
-          'ext/floodfilling/' + project.id + '/floodfill-models',
+          'ext/autoproofreader/' + project.id + '/floodfill-models',
           'GET',
           {model_id: model_id}
         ).then (function (result) {
@@ -1747,7 +1747,7 @@
 
     let initServerList = function (change_func) {
       return CATMAID.fetch (
-        'ext/floodfilling/' + project.id + '/compute-servers',
+        'ext/autoproofreader/' + project.id + '/compute-servers',
         'GET'
       ).then (function (json) {
         var servers = json
@@ -1812,7 +1812,7 @@
       // Add handler for creating the server
       dialog.onOK = function () {
         return CATMAID.fetch (
-          'ext/floodfilling/' + project.id + '/compute-servers',
+          'ext/autoproofreader/' + project.id + '/compute-servers',
           'PUT',
           {
             name: server_name.value,
@@ -1854,7 +1854,7 @@
       // Add handler for creating the server
       dialog.onOK = function () {
         CATMAID.fetch (
-          'ext/floodfilling/' + project.id + '/compute-servers',
+          'ext/autoproofreader/' + project.id + '/compute-servers',
           'DELETE',
           {server_id: server}
         )
@@ -1875,7 +1875,7 @@
       self.settings.run.model_id.value = model_id;
       let server_id = self.settings.run.server_id.value;
       CATMAID.fetch (
-        'ext/floodfilling/' + project.id + '/floodfill-models',
+        'ext/autoproofreader/' + project.id + '/floodfill-models',
         'GET',
         {model_id: model_id}
       ).then (function (result) {
@@ -1902,7 +1902,7 @@
 
     let initModelList = function (change_func) {
       return CATMAID.fetch (
-        'ext/floodfilling/' + project.id + '/floodfill-models',
+        'ext/autoproofreader/' + project.id + '/floodfill-models',
         'GET'
       ).then (function (json) {
         var models = json
@@ -1984,7 +1984,7 @@
       // Add handler for creating the model
       dialog.onOK = function () {
         CATMAID.fetch (
-          'ext/floodfilling/' + project.id + '/floodfill-models',
+          'ext/autoproofreader/' + project.id + '/floodfill-models',
           'PUT',
           {
             name: model_name.value,
@@ -2026,7 +2026,7 @@
       // Add handler for removing the model
       dialog.onOK = function () {
         CATMAID.fetch (
-          'ext/floodfilling/' + project.id + '/floodfill-models',
+          'ext/autoproofreader/' + project.id + '/floodfill-models',
           'DELETE',
           {model_id: model}
         )
@@ -2247,26 +2247,26 @@
   This section just registers the widget
   */
 
-  FloodfillingWidget.prototype.destroy = function () {
+  AutoproofreaderWidget.prototype.destroy = function () {
     this.unregisterInstance ();
     this.unregisterSource ();
   };
 
-  CATMAID.FloodfillingWidget = FloodfillingWidget;
+  CATMAID.AutoproofreaderWidget = AutoproofreaderWidget;
 
   CATMAID.registerWidget ({
     name: 'Autoproofreading Widget',
-    description: 'Widget associated with the floodfilling app',
-    key: 'floodfilling-widget',
-    creator: FloodfillingWidget,
+    description: 'Widget associated with the autoproofreader app',
+    key: 'autoproofreader-widget',
+    creator: AutoproofreaderWidget,
     websocketHandlers: {
-      'floodfilling-result-update': function (client, payload) {
-        // Update all job tables in floodfilling widgets
-        let floodfilling_windows = WindowMaker.getOpenWindows (
-          'floodfilling-widget'
+      'autoproofreader-result-update': function (client, payload) {
+        // Update all job tables in autoproofreader widgets
+        let autoproofreader_windows = WindowMaker.getOpenWindows (
+          'autoproofreader-widget'
         );
-        if (floodfilling_windows) {
-          for (let widget of floodfilling_windows.values ()) {
+        if (autoproofreader_windows) {
+          for (let widget of autoproofreader_windows.values ()) {
             widget.get_jobs ();
           }
         }

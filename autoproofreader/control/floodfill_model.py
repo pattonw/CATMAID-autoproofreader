@@ -5,7 +5,7 @@ from django.utils.decorators import method_decorator
 
 from catmaid.control.authentication import requires_user_role
 from catmaid.models import UserRole
-from floodfilling.models import FloodfillModel, FloodfillConfig
+from autoproofreader.models import FloodfillModel, FloodfillConfig
 from rest_framework.views import APIView
 
 
@@ -52,7 +52,7 @@ class FloodfillModelAPI(APIView):
     @method_decorator(requires_user_role(UserRole.Browse))
     def get(self, request, project_id):
         """
-        List all available floodfilling models
+        List all available autoproofreader models
         ---
         parameters:
           - name: project_id

@@ -5,7 +5,7 @@ from django.utils.decorators import method_decorator
 
 from catmaid.control.authentication import requires_user_role
 from catmaid.models import UserRole
-from floodfilling.models import VolumeConfig
+from autoproofreader.models import VolumeConfig
 from rest_framework.views import APIView
 
 

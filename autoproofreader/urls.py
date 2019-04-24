@@ -2,7 +2,7 @@
 from __future__ import unicode_literals
 
 from django.conf.urls import url
-from floodfilling.control import (
+from autoproofreader.control import (
     compute_server,
     floodfilling,
     is_installed,
@@ -10,7 +10,7 @@ from floodfilling.control import (
     volume_config,
 )
 
-app_name = "floodfilling"
+app_name = "autoproofreader"
 
 urlpatterns = [url(r"^is-installed$", is_installed)]
 
