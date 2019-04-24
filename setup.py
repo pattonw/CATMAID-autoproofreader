@@ -9,14 +9,14 @@ with open(os.path.join(os.path.dirname(__file__), 'README.md')) as readme:
 os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 
 setup(
-    name='CATMAID-floodfilling',
+    name='CATMAID-autoproofreader',
     version='0.0.1',
     packages=find_packages(exclude='travis'),
     include_package_data=True,
     license='MIT license',
     description='A django app which acts as a drop-in extension for CATMAID.',
     long_description=README,
-    url='https://github.com/willp24/CATMAID-floodfilling',
+    url='https://github.com/willp24/CATMAID-autoproofreader',
     author='William Patton',
     author_email='pattonw@janelia.hhmi.org',
     classifiers=[

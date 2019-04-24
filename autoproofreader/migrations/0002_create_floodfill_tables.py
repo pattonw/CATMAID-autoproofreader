@@ -70,7 +70,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ("floodfilling", "0001_create_compute_server_table"),
+        ("autoproofreader", "0001_create_compute_server_table"),
     ]
 
     operations = [

@@ -6,7 +6,7 @@ from django.conf import settings
 
 from catmaid.control.authentication import requires_user_role
 from catmaid.models import UserRole
-from floodfilling.models import ComputeServer
+from autoproofreader.models import ComputeServer
 from rest_framework.views import APIView
 
 import subprocess

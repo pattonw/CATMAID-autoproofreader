@@ -30,7 +30,7 @@ class ComputeServer(models.Model):
 
 class FloodfillConfig(UserFocusedModel):
     """
-    The configurations necessary to run floodfilling.
+    The configurations necessary to run autoproofreader.
     """
 
     config = models.TextField()
@@ -55,7 +55,7 @@ class FloodfillModel(UserFocusedModel):
 
 class FloodfillResult(UserFocusedModel):
     """
-    A model to represent the results of a floodfilling task.
+    A model to represent the results of a autoproofreader task.
     """
 
     # Necessary for queueing

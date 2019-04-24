@@ -1,7 +1,7 @@
 {
-  "name": "CATMAID-floodfilling",
+  "name": "CATMAID-autoproofreader",
   "version": "1.0.0",
-  "description": "[![Build Status](https://travis-ci.org/willp24/CATMAID-floodfilling.svg?branch=master)](https://travis-ci.org/willp24/CATMAID-floodfilling) [![Coverage Status](https://coveralls.io/repos/github/willp24/CATMAID-floodfilling/badge.svg?branch=master)](https://coveralls.io/github/willp24/CATMAID-floodfilling?branch=master)",
+  "description": "[![Build Status](https://travis-ci.org/willp24/CATMAID-autoproofreader.svg?branch=master)](https://travis-ci.org/willp24/CATMAID-autoproofreader) [![Coverage Status](https://coveralls.io/repos/github/willp24/CATMAID-autoproofreader/badge.svg?branch=master)](https://coveralls.io/github/willp24/CATMAID-autoproofreader?branch=master)",
   "main": "index.js",
   "dependencies": {
     "jsfeat": "^0.0.8"
@@ -12,13 +12,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/willp24/CATMAID-floodfilling.git"
+    "url": "git+https://github.com/willp24/CATMAID-autoproofreader.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/willp24/CATMAID-floodfilling/issues"
+    "url": "https://github.com/willp24/CATMAID-autoproofreader/issues"
   },
-  "homepage": "https://github.com/willp24/CATMAID-floodfilling#readme"
+  "homepage": "https://github.com/willp24/CATMAID-autoproofreader#readme"
 }

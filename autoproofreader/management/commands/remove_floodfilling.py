@@ -8,7 +8,7 @@ from psycopg2.extensions import AsIs
 
 
 class Command(BaseCommand):
-    help = 'Drops all database tables backing the floodfilling models.'
+    help = 'Drops all database tables backing the autoproofreader models.'
 
     def add_arguments(self, parser):
         parser.add_argument('-y', action='store_true', dest='yes', default=False)
@@ -16,7 +16,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         selection = 'y' if options['yes'] else 'not an option'
         while selection.lower() not in ['y', 'n', '']:
-            selection = input('This will drop all floodfilling-related tables. Are you sure ([y]/n)? ')
+            selection = input('This will drop all autoproofreader-related tables. Are you sure ([y]/n)? ')
 
         if selection == 'n':
             self.stdout.write(self.style.FAILURE('Aborting'))
@@ -24,7 +24,7 @@ class Command(BaseCommand):
 
         cursor = connection.cursor()
 
-        for ss_model in apps.get_app_config('floodfilling').get_models():
+        for ss_model in apps.get_app_config('autoproofreader').get_models():
             table = ss_model._meta.db_table
             self.stdout.write(
                 '{}: Dropping {}...'.format(ss_model.__name__, table)
@@ -33,6 +33,6 @@ class Command(BaseCommand):
             cursor.execute('DROP TABLE IF EXISTS %s CASCADE;', (AsIs(table),))
 
         self.stdout.write(self.style.SUCCESS(
-            'Successfully dropped floodfilling tables. '
-            '`pip uninstall floodfilling` and remove from your INSTALLED_APPS to finish uninstall.'
+            'Successfully dropped autoproofreader tables. '
+            '`pip uninstall autoproofreader` and remove from your INSTALLED_APPS to finish uninstall.'
         ))

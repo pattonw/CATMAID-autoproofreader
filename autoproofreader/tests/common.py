@@ -3,7 +3,7 @@ from catmaid.tests.apis.common import CatmaidApiTestCase
 
 
 class FloodfillingTestCase(CatmaidApiTestCase):
-    fixtures = CatmaidApiTestCase.fixtures + ['floodfilling_testdata.json']
+    fixtures = CatmaidApiTestCase.fixtures + ['autoproofreader_testdata.json']
 
     @classmethod
     def setUpTestData(cls):

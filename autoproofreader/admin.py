@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from floodfilling.models import (
+from autoproofreader.models import (
     ComputeServer,
     FloodfillConfig,
     FloodfillModel,

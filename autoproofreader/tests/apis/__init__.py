@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 import json
-from floodfilling.tests.common import FloodfillingTestCase
+from autoproofreader.tests.common import FloodfillingTestCase
 
 
-URL_PREFIX = '/ext/floodfilling'
+URL_PREFIX = '/ext/autoproofreader'
 
 
 class InstallationTest(FloodfillingTestCase):
