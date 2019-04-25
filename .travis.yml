@@ -31,6 +31,7 @@ install:
 before_script:
   - cd $CATMAID_DIR
   - sudo apt-get install postgis
+  - sudo apt install postgresql-10-postgis-scripts
   - bash scripts/travis/setup_database.sh
   - bash scripts/travis/configure_catmaid.sh
 
