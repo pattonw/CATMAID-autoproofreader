@@ -4,7 +4,6 @@ from __future__ import unicode_literals
 from django.db import models
 from django.utils import timezone
 from catmaid.models import User, Volume, UserFocusedModel, ClassInstance
-from django.contrib.postgres.fields import ArrayField
 
 
 class ComputeServer(models.Model):
@@ -20,9 +19,6 @@ class ComputeServer(models.Model):
         related_name="compute_server_editor",
         db_column="editor_id",
     )
-
-    class Meta:
-        db_table = "compute_server"
 
     def __str__(self):
         return self.name
@@ -69,9 +65,6 @@ class AutoproofreaderResult(UserFocusedModel):
     volume = models.ForeignKey(Volume, on_delete=models.SET_NULL, null=True, blank=True)
     data = models.TextField(null=True, blank=True)  # will contain results or errors
     completion_time = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        db_table = "floodfill_result"
 
 
 class ImageVolumeConfig(UserFocusedModel):
