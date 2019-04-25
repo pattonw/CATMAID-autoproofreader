@@ -20,6 +20,7 @@ echo "SERVE_STATIC = True" >> projects/mysite/settings.py
 echo "PIPELINE['PIPELINE_ENABLED'] = False" >> projects/mysite/settings.py
 # Add floodfilling to the pipeline KNOWN_EXTENSIONS field
 echo "KNOWN_EXTENSIONS = ('floodfilling',)" >> projects/mysite/pipelinefiles.py
+tail projects/mysite/pipelinefiles.py
 # Disable cache-busting for front-end tests
 echo "STATICFILES_STORAGE = 'pipeline.storage.PipelineStorage'" >> projects/mysite/settings.py
 # Enable front-end tess
