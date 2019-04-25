@@ -37,7 +37,7 @@
     const resultsTableID = this.idPrefix + 'datatable-results';
     let self = this;
     return {
-      helpText: 'Floodfilling Widget: ',
+      helpText: 'Automated proofreading Widget: ',
       controlsID: this.idPrefix + 'controls',
       createControls: function (controls) {
         // Create the tabs
@@ -59,7 +59,7 @@
 
         // create validation tab
         CATMAID.DOM.appendToTab (tabs['Run'], [
-          ['Segment', this.floodfill.bind (this)],
+          ['Segment', this.proofread.bind (this)],
           [
             'Download Settings',
             function () {
@@ -210,7 +210,7 @@
   RUNNING
   */
 
-  AutoproofreaderWidget.prototype.floodfill = function () {
+  AutoproofreaderWidget.prototype.proofread = function () {
     let self = this;
     this.gatherFiles ()
       .then (function (files) {
@@ -285,7 +285,7 @@
     add_file (post_data, files.job_config, 'job_config.json');
 
     CATMAID.fetch (
-      'ext/autoproofreader/' + project.id + '/flood-fill',
+      'ext/autoproofreader/' + project.id + '/autoproofreader',
       'PUT',
       post_data,
       undefined,
@@ -310,13 +310,13 @@
   // RESULTS
   AutoproofreaderWidget.prototype.test_results_clear = function () {
     CATMAID.fetch (
-      'ext/autoproofreader/' + project.id + '/floodfill-results',
+      'ext/autoproofreader/' + project.id + '/autoproofreader-results',
       'GET'
     )
       .then (function (results) {
         results.forEach (function (result) {
           CATMAID.fetch (
-            'ext/autoproofreader/' + project.id + '/floodfill-results',
+            'ext/autoproofreader/' + project.id + '/autoproofreader-results',
             'DELETE',
             {result_id: result.id}
           )
@@ -333,7 +333,7 @@
     this.get_jobs ();
   };
 
-  // FLOODFILLING
+  // AUTOMATIC PROOFREADING
   AutoproofreaderWidget.prototype.test_gpuutil = function () {
     let self = this;
     CATMAID.fetch ('ext/autoproofreader/' + project.id + '/gpu-util', 'GET', {
@@ -347,7 +347,7 @@
 
   AutoproofreaderWidget.prototype.test_websockets = function () {
     let self = this;
-    CATMAID.fetch ('ext/autoproofreader/' + project.id + '/flood-fill', 'GET', {
+    CATMAID.fetch ('ext/autoproofreader/' + project.id + '/autoproofreader', 'GET', {
       server_id: self.getServer (),
     })
       .then (function (response) {
@@ -753,7 +753,7 @@
     let setting_values = self.getSettingValues ();
     if ('volume_id' in setting_values.run) {
       return CATMAID.fetch (
-        'ext/autoproofreader/' + project.id + '/volume-configs',
+        'ext/autoproofreader/' + project.id + '/image-volume-configs',
         'GET',
         {volume_config_id: setting_values.run.volume_id}
       ).then (function (e) {
@@ -1120,7 +1120,7 @@
     this.finishedTable.clear ();
     let self = this;
     CATMAID.fetch (
-      'ext/autoproofreader/' + project.id + '/floodfill-results',
+      'ext/autoproofreader/' + project.id + '/autoproofreader-results',
       'GET'
     )
       .then (function (results) {
@@ -1151,7 +1151,7 @@
         data: job.data,
       };
       CATMAID.fetch (
-        'ext/autoproofreader/' + project.id + '/floodfill-models',
+        'ext/autoproofreader/' + project.id + '/diluvian-models',
         'GET',
         {model_id: job.model_id}
       ).then (function (result) {
@@ -1172,7 +1172,7 @@
         skeleton_id: job.skeleton_id,
       };
       CATMAID.fetch (
-        'ext/autoproofreader/' + project.id + '/floodfill-models',
+        'ext/autoproofreader/' + project.id + '/proofreader-models',
         'GET',
         {model_id: job.model_id}
       ).then (function (result) {
@@ -1599,7 +1599,7 @@
 
     let initVolumeList = function (change_func) {
       return CATMAID.fetch (
-        'ext/autoproofreader/' + project.id + '/volume-configs',
+        'ext/autoproofreader/' + project.id + '/image-volume-configs',
         'GET'
       ).then (function (json) {
         var volumes = json
@@ -1667,7 +1667,7 @@
       // Add handler for creating the server
       dialog.onOK = function () {
         return CATMAID.fetch (
-          'ext/autoproofreader/' + project.id + '/volume-configs',
+          'ext/autoproofreader/' + project.id + '/image-volume-configs',
           'PUT',
           {
             name: volume_name.value,
@@ -1706,7 +1706,7 @@
       // Add handler for creating the server
       dialog.onOK = function () {
         CATMAID.fetch (
-          'ext/autoproofreader/' + project.id + '/volume-configs',
+          'ext/autoproofreader/' + project.id + '/image-volume-configs',
           'DELETE',
           {volume_config_id: volume}
         )
@@ -1728,7 +1728,7 @@
       let model_id = self.settings.run.model_id.value;
       if (model_id !== undefined) {
         CATMAID.fetch (
-          'ext/autoproofreader/' + project.id + '/floodfill-models',
+          'ext/autoproofreader/' + project.id + '/proofreader-models',
           'GET',
           {model_id: model_id}
         ).then (function (result) {
@@ -1875,7 +1875,7 @@
       self.settings.run.model_id.value = model_id;
       let server_id = self.settings.run.server_id.value;
       CATMAID.fetch (
-        'ext/autoproofreader/' + project.id + '/floodfill-models',
+        'ext/autoproofreader/' + project.id + '/proofreader-models',
         'GET',
         {model_id: model_id}
       ).then (function (result) {
@@ -1902,7 +1902,7 @@
 
     let initModelList = function (change_func) {
       return CATMAID.fetch (
-        'ext/autoproofreader/' + project.id + '/floodfill-models',
+        'ext/autoproofreader/' + project.id + '/diluvian-models',
         'GET'
       ).then (function (json) {
         var models = json
@@ -1984,7 +1984,7 @@
       // Add handler for creating the model
       dialog.onOK = function () {
         CATMAID.fetch (
-          'ext/autoproofreader/' + project.id + '/floodfill-models',
+          'ext/autoproofreader/' + project.id + '/diluvian-models',
           'PUT',
           {
             name: model_name.value,
@@ -2017,7 +2017,7 @@
       };
       dialog.appendChild (
         CATMAID.DOM.createLabeledAsyncPlaceholder (
-          'Floodfill Model',
+          'Diluvian Model',
           initModelList (change_func),
           'The model to remove.'
         )
@@ -2026,7 +2026,7 @@
       // Add handler for removing the model
       dialog.onOK = function () {
         CATMAID.fetch (
-          'ext/autoproofreader/' + project.id + '/floodfill-models',
+          'ext/autoproofreader/' + project.id + '/diluvian-models',
           'DELETE',
           {model_id: model}
         )
