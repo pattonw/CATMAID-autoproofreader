@@ -30,6 +30,7 @@ install:
   - export PATH=$(npm bin):$PATH
 before_script:
   - cd $CATMAID_DIR
+  - sudo apt-get install postgis
   - bash scripts/travis/setup_database.sh
   - bash scripts/travis/configure_catmaid.sh
 
