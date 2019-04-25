@@ -6,6 +6,10 @@ language: python
 cache: pip
 python:
   - "3.6"
+global:
+  - CATMAID_DIR=$TRAVIS_BUILD_DIR/travis/CATMAID
+  - PACKAGE_DIR=$TRAVIS_BUILD_DIR/floodfilling
+  - JS_DIR=$PACKAGE_DIR/static/floodfilling/js
 env:
   - CATMAID_BRANCH=master
   - CATMAID_BRANCH=dev
