@@ -43,10 +43,6 @@
         "fields": {
             "name": "test_result",
             "status": "queued",
-            "gpus": [
-                true,
-                false
-            ],
             "config": 1,
             "skeleton": 1,
             "skeleton_csv": "0,0,1,2,3",
