@@ -20,18 +20,20 @@ before_install:
   - cd $CATMAID_DIR
   - bash scripts/travis/install_postgres.sh
   - bash scripts/travis/install_python.sh
+  - nvm install 11
 install:
   - cd $CATMAID_DIR
   - bash scripts/travis/install_requirements.sh
   - pip install -e $TRAVIS_BUILD_DIR
   - cd django/projects
   - pip install coveralls flake8
-  - npm install jslint
+  - npm install
   - export PATH=$(npm bin):$PATH
 before_script:
   - cd $CATMAID_DIR
-  - sudo apt-get install postgis
-  - sudo apt install postgresql-10-postgis-scripts
+  # This solves the issue of no file "/usr/share/postgresql/10/extension/postgis.control"
+  # However it installs postgis-2.5 and throws a new error "$libdir/postgis-2.5": No such file or directory
+  - sudo apt install postgresql-10-postgis-2.4-scripts
   - bash scripts/travis/setup_database.sh
   - bash scripts/travis/configure_catmaid.sh
 
