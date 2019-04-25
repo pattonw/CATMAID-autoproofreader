@@ -34,6 +34,7 @@ install:
   - bash scripts/travis/install_requirements.sh
   - pip install coveralls flake8
   - npm install 11
+  - npm install jshint jsdoc
   # install extension
   - pip install -e $TRAVIS_BUILD_DIR
 before_script:
@@ -49,7 +50,7 @@ script:
   - python manage.py migrate --noinput
   - python manage.py collectstatic --link --noinput
   - coverage run --source=floodfilling manage.py test floodfilling.tests
-  - flake8 --config=$CATMAID_DIR/.travis.flake8 --statistics --count --exit-zero -q -q $PACKAGE_DIR
+  - flake8 --config=$CATMAID_DIR/.travis.flake8 --statistics --count $PACKAGE_DIR
   - jshint --config=$CATMAID_DIR/.travis.jshintrc --exclude-path=$CATMAID_DIR/.travis.jshintignore $JS_DIR
 after_success:
   - coveralls
