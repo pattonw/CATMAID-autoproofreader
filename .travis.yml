@@ -41,7 +41,7 @@ script:
   - cd $CATMAID_DIR/django/projects
   - python manage.py migrate --noinput
   - python manage.py collectstatic --link --noinput
-  - coverage run --source=autoproofreader manage.py test autoproofreader.tests
+  - coverage run --source=floodfilling manage.py test floodfilling.tests
   - cd $TRAVIS_BUILD_DIR
   - flake8 --config .travis.flake8 --exclude=$CATMAID_DIR .
   - jshint --config .travis.jshintrc --exclude=$CATMAID_DIR .
