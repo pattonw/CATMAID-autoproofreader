@@ -38,6 +38,7 @@ before_script:
   - bash scripts/travis/configure_catmaid.sh
 
 script:
+  - cd $CATMAID_DIR/django/projects
   - python manage.py migrate --noinput
   - python manage.py collectstatic --link --noinput
   - coverage run --source=autoproofreader manage.py test autoproofreader.tests
