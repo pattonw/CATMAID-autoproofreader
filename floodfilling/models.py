@@ -68,9 +68,9 @@ class FloodfillResult(UserFocusedModel):
     model = models.ForeignKey(FloodfillModel, on_delete=models.CASCADE)
 
     # Added once the job is done
-    volume = models.ForeignKey(Volume, on_delete=models.SET_NULL)
-    data = models.TextField()  # will contain results or errors
-    completion_time = models.DateTimeField(null=True)
+    volume = models.ForeignKey(Volume, on_delete=models.SET_NULL, null=True, blank=True)
+    data = models.TextField(null=True, blank=True)  # will contain results or errors
+    completion_time = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "floodfill_result"
