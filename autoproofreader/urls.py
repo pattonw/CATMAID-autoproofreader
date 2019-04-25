@@ -4,10 +4,10 @@ from __future__ import unicode_literals
 from django.conf.urls import url
 from autoproofreader.control import (
     compute_server,
-    floodfilling,
+    autoproofreader,
     is_installed,
-    floodfill_model,
-    volume_config,
+    diluvian_model,
+    image_volume_config,
 )
 
 app_name = "autoproofreader"
@@ -16,7 +16,10 @@ urlpatterns = [url(r"^is-installed$", is_installed)]
 
 # Skeleton flood filling
 urlpatterns += [
-    url(r"^(?P<project_id>\d+)/flood-fill$", floodfilling.FloodfillTaskAPI.as_view())
+    url(
+        r"^(?P<project_id>\d+)/autoproofreader$",
+        autoproofreader.AutoproofreaderTaskAPI.as_view(),
+    )
 ]
 
 # Compute Servers
@@ -31,20 +34,23 @@ urlpatterns += [
 # Floodfilling Models
 urlpatterns += [
     url(
-        r"^(?P<project_id>\d+)/floodfill-models$",
-        floodfill_model.FloodfillModelAPI.as_view(),
+        r"^(?P<project_id>\d+)/diluvian-models$",
+        diluvian_model.DiluvianModelAPI.as_view(),
     )
 ]
 
 # Floodfilling Results
 urlpatterns += [
     url(
-        r"^(?P<project_id>\d+)/floodfill-results$",
-        floodfilling.FloodfillResultAPI.as_view(),
+        r"^(?P<project_id>\d+)/autoproofreader-results$",
+        autoproofreader.AutoproofreaderResultAPI.as_view(),
     )
 ]
 
 # Volume Configs
 urlpatterns += [
-    url(r"^(?P<project_id>\d+)/volume-configs$", volume_config.VolumeConfigAPI.as_view())
+    url(
+        r"^(?P<project_id>\d+)/image-volume-configs$",
+        image_volume_config.ImageVolumeConfigAPI.as_view(),
+    )
 ]

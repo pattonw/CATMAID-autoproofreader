@@ -28,32 +28,28 @@ class ComputeServer(models.Model):
         return self.name
 
 
-class FloodfillConfig(UserFocusedModel):
+class ConfigFile(UserFocusedModel):
     """
     The configurations necessary to run autoproofreader.
     """
 
     config = models.TextField()
 
-    class Meta:
-        db_table = "floodfill_config"
 
-
-class FloodfillModel(UserFocusedModel):
+class DiluvianModel(UserFocusedModel):
     """
-    This model is to store production ready networks and their configurations.
+    This model stores a Floodfilling network trained with diluvian.
     """
 
     name = models.TextField()
-    server = models.ForeignKey(ComputeServer, on_delete=models.CASCADE)
+    # The server on which the network was trained. Allows us to avoid storing weights locally
+    server = models.ForeignKey(ComputeServer, on_delete=models.DO_NOTHING)
+    # Path to the directory containing the model weights and config files
     model_source_path = models.TextField()
     config = models.ForeignKey(FloodfillConfig, on_delete=models.CASCADE)
 
-    class Meta:
-        db_table = "floodfill_model"
 
-
-class FloodfillResult(UserFocusedModel):
+class AutoproofreaderResult(UserFocusedModel):
     """
     A model to represent the results of a autoproofreader task.
     """
@@ -61,11 +57,13 @@ class FloodfillResult(UserFocusedModel):
     # Necessary for queueing
     name = models.TextField()
     status = models.TextField()
-    gpus = ArrayField(base_field=models.BooleanField(), size=None)
-    config = models.ForeignKey(FloodfillConfig, on_delete=models.CASCADE)
+    # Full configuration for this job for reproducibility
+    config = models.ForeignKey(ConfigFile, on_delete=models.CASCADE)
     skeleton = models.ForeignKey(ClassInstance, on_delete=models.CASCADE)
     skeleton_csv = models.TextField()
-    model = models.ForeignKey(FloodfillModel, on_delete=models.CASCADE)
+    # necessary only if diluvian is used for obtaining segmentations
+    # This should be replaced with a more general option for any segmentation source
+    model = models.ForeignKey(DiluvianModel, on_delete=models.CASCADE)
 
     # Added once the job is done
     volume = models.ForeignKey(Volume, on_delete=models.SET_NULL, null=True, blank=True)
@@ -76,13 +74,11 @@ class FloodfillResult(UserFocusedModel):
         db_table = "floodfill_result"
 
 
-class VolumeConfig(UserFocusedModel):
+class ImageVolumeConfig(UserFocusedModel):
     """
-    A model to hold volume configs.
+    A model to hold volume configs. Volume configurations are stored as toml files
     """
 
     name = models.TextField()
     config = models.TextField()
 
-    class Meta:
-        db_table = "volume_config"
