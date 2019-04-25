@@ -1,3 +1,15 @@
-{
-
-}
+[
+    {
+        "model": "floodfilling.computeserver",
+        "pk": 1,
+        "fields": {
+            "name": "test",
+            "address": "test",
+            "edition_time": "2017-05-31T19:57:35.142Z",
+            "diluvian_path": "diluvian",
+            "results_directory": "results",
+            "environment_source_path": "test",
+            "editor": 1
+        }
+    },
+]
