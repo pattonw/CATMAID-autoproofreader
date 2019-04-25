@@ -11,5 +11,49 @@
             "environment_source_path": "test",
             "editor": 1
         }
+    },
+    {
+        "model": "floodfilling.floodfillconfig",
+        "pk": 1,
+        "fields": {
+            "config": "test"
+        }
+    },
+    {
+        "model": "floodfilling.floodfillmodel",
+        "pk": 1,
+        "fields": {
+            "name": "test_model",
+            "server": 1,
+            "model_source_path": "none",
+            "config": 1
+        }
+    },
+    {
+        "model": "floodfilling.floodfillresult",
+        "pk": 1,
+        "fields": {
+            "name": "test_result",
+            "status": "queued",
+            "gpus": [
+                true,
+                false
+            ],
+            "config": 1,
+            "skeleton": 1,
+            "skeleton_csv": "0,0,1,2,3",
+            "model": 1,
+            "volume": 1,
+            "data": "nothing",
+            "completion_time": "2017-05-31T19:57:35.142Z"
+        }
+    },
+    {
+        "model": "floodfilling.volumeconfig",
+        "pk": 1,
+        "fields": {
+            "name": "test_volume",
+            "config": "volume"
+        }
     }
 ]
