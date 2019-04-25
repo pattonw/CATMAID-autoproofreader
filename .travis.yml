@@ -1,18 +1,24 @@
 dist: xenial
 sudo: required
+notifications:
+  email: false
 language: python
 cache: pip
 python:
   - "3.6"
 env:
-  - CATMAID_DIR=$TRAVIS_BUILD_DIR/travis/CATMAID CATMAID_BRANCH=master
-  - CATMAID_DIR=$TRAVIS_BUILD_DIR/travis/CATMAID CATMAID_BRANCH=dev
+  global:
+    - CATMAID_DIR=$TRAVIS_BUILD_DIR/travis/CATMAID
+    - PACKAGE_DIR=$TRAVIS_BUILD_DIR/floodfilling
+    - JS_DIR=$PACKAGE_DIR/static/floodfilling/js
+  - CATMAID_BRANCH=master
+  - CATMAID_BRANCH=dev
 matrix:
   fast_finish: true
   allow_failures:
-    - env: CATMAID_DIR=$TRAVIS_BUILD_DIR/travis/CATMAID CATMAID_BRANCH=dev
+    - env: CATMAID_BRANCH=dev
 addons:
-  postgresql: 10  # will be replaced by v10, travis doesn't have it yet
+  postgresql: 10
 before_install:
   - travis_retry sudo apt-get update -y -qq
   # setup CATMAID
@@ -24,11 +30,10 @@ before_install:
 install:
   - cd $CATMAID_DIR
   - bash scripts/travis/install_requirements.sh
-  - pip install -e $TRAVIS_BUILD_DIR
-  - cd django/projects
   - pip install coveralls flake8
-  - npm install
-  - export PATH=$(npm bin):$PATH
+  - npm install 11
+  # install extension
+  - pip install -e $TRAVIS_BUILD_DIR
 before_script:
   - cd $CATMAID_DIR
   # This solves the issue of no file "/usr/share/postgresql/10/extension/postgis.control"
@@ -42,9 +47,7 @@ script:
   - python manage.py migrate --noinput
   - python manage.py collectstatic --link --noinput
   - coverage run --source=floodfilling manage.py test floodfilling.tests
-  - cd $TRAVIS_BUILD_DIR
-  - flake8 --config .travis.flake8 --exclude=$CATMAID_DIR .
-  - jshint --config .travis.jshintrc --exclude=$CATMAID_DIR .
+  - flake8 --config=$CATMAID_DIR/.travis.flake8 --statistics --count --exit-zero -q -q $PACKAGE_DIR
+  - jshint --config=$CATMAID_DIR/.travis.jshintrc --exclude-path=$CATMAID_DIR/.travis.jshintignore $JS_DIR
 after_success:
   - coveralls
-
