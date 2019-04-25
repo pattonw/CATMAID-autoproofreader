@@ -35,6 +35,8 @@ install:
   - pip install coveralls flake8
   - npm install 11
   - npm install jshint jsdoc
+  - npm bin
+  - export PATH=$(npm bin):$PATH
   # install extension
   - pip install -e $TRAVIS_BUILD_DIR
 before_script:
