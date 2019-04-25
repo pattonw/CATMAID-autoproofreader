@@ -19,8 +19,8 @@ echo "SERVE_STATIC = True" >> projects/mysite/settings.py
 # TODO: Enable pipeline. Right now it doesn't seem to play well with Sauce Labs.
 echo "PIPELINE['PIPELINE_ENABLED'] = False" >> projects/mysite/settings.py
 # Add floodfilling to the pipeline KNOWN_EXTENSIONS field
-echo "KNOWN_EXTENSIONS = ('floodfilling',)" >> projects/mysite/pipelinefiles.py
-tail projects/mysite/pipelinefiles.py
+sed -i "i28\floodfilling," projects/mysite/pipelinefiles.py
+head -n 30 projects/mysite/pipelinefiles.py
 # Disable cache-busting for front-end tests
 echo "STATICFILES_STORAGE = 'pipeline.storage.PipelineStorage'" >> projects/mysite/settings.py
 # Enable front-end tess
