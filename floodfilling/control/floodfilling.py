@@ -3,8 +3,6 @@ import datetime
 import subprocess
 from pathlib import Path
 import json
-import numpy as np
-import time
 import pickle
 
 from django.conf import settings
@@ -14,7 +12,6 @@ from django.db import connection
 from django.shortcuts import get_object_or_404
 
 from catmaid.consumers import msg_user
-from catmaid.control.volume import get_volume_instance
 from catmaid.control.authentication import requires_user_role
 from catmaid.models import Message, User, UserRole
 from catmaid.control.message import notify_user
@@ -213,7 +210,6 @@ class FloodfillTaskAPI(APIView):
         return FloodfillConfig(user_id=user_id, project_id=project_id, config=config)
 
 
-
 @task()
 def query_segmentation_async(
     result,
@@ -410,4 +406,3 @@ class FloodfillResultAPI(APIView):
             )
         desc = cursor.description
         return [dict(zip([col[0] for col in desc], row)) for row in cursor.fetchall()]
-

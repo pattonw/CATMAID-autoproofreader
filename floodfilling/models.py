@@ -45,9 +45,9 @@ class FloodfillModel(UserFocusedModel):
     """
 
     name = models.TextField()
-    server = models.ForeignKey(ComputeServer, on_delete=models.DO_NOTHING)
+    server = models.ForeignKey(ComputeServer, on_delete=models.CASCADE)
     model_source_path = models.TextField()
-    config = models.ForeignKey(FloodfillConfig, on_delete=models.DO_NOTHING)
+    config = models.ForeignKey(FloodfillConfig, on_delete=models.CASCADE)
 
     class Meta:
         db_table = "floodfill_model"
@@ -62,15 +62,15 @@ class FloodfillResult(UserFocusedModel):
     name = models.TextField()
     status = models.TextField()
     gpus = ArrayField(base_field=models.BooleanField(), size=None)
-    config = models.ForeignKey(FloodfillConfig, on_delete=models.DO_NOTHING)
+    config = models.ForeignKey(FloodfillConfig, on_delete=models.CASCADE)
     skeleton = models.ForeignKey(ClassInstance, on_delete=models.CASCADE)
     skeleton_csv = models.TextField()
-    model = models.ForeignKey(FloodfillModel, on_delete=models.DO_NOTHING)
+    model = models.ForeignKey(FloodfillModel, on_delete=models.CASCADE)
 
     # Added once the job is done
-    volume = models.ForeignKey(Volume, on_delete=models.DO_NOTHING)
-    data = models.TextField()  # will contain results or errors
-    completion_time = models.DateTimeField(null=True)
+    volume = models.ForeignKey(Volume, on_delete=models.SET_NULL, null=True, blank=True)
+    data = models.TextField(null=True, blank=True)  # will contain results or errors
+    completion_time = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "floodfill_result"

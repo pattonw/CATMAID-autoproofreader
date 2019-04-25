@@ -10,9 +10,6 @@ from floodfilling.models import ComputeServer
 from rest_framework.views import APIView
 
 import subprocess
-from subprocess import PIPE, Popen
-import numpy as np
-import os
 
 
 class ComputeServerAPI(APIView):

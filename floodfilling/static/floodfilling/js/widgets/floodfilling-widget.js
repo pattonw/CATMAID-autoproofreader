@@ -2145,7 +2145,7 @@
     let createSarborDefaults = function (settings) {
       let sub_settings = getSubSettings (settings, 'sarbor');
 
-      let skeleton_settings = getSubSettings(sub_settings, "skeleton")
+      let skeleton_settings = getSubSettings(sub_settings, "skeleton");
 
       addSettingTemplate ({
         settings: skeleton_settings,
@@ -2203,7 +2203,7 @@
         step: 1,
       });
 
-      let segmentation_settings = getSubSettings(sub_settings, "segmentations")
+      let segmentation_settings = getSubSettings(sub_settings, "segmentations");
 
       addSettingTemplate ({
         settings: segmentation_settings,
