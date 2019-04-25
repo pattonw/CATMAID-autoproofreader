@@ -1,5 +1,5 @@
-[![Build Status](https://travis-ci.org/willp24/CATMAID-autoproofreader.svg?branch=master)](https://travis-ci.org/willp24/CATMAID-autoproofreader)
-[![Coverage Status](https://coveralls.io/repos/github/willp24/CATMAID-autoproofreader/badge.svg?branch=master)](https://coveralls.io/github/willp24/CATMAID-autoproofreader?branch=master)
+[![Build Status](https://travis-ci.org/pattonw/CATMAID-autoproofreader.svg?branch=master)](https://travis-ci.org/pattonw/CATMAID-autoproofreader)
+[![Coverage Status](https://coveralls.io/repos/github/pattonw/CATMAID-autoproofreader/badge.svg?branch=master)](https://coveralls.io/github/pattonw/CATMAID-autoproofreader?branch=master)
 
 # CATMAID-autoproofreader
 

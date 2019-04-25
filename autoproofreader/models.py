@@ -46,7 +46,7 @@ class DiluvianModel(UserFocusedModel):
     server = models.ForeignKey(ComputeServer, on_delete=models.DO_NOTHING)
     # Path to the directory containing the model weights and config files
     model_source_path = models.TextField()
-    config = models.ForeignKey(FloodfillConfig, on_delete=models.CASCADE)
+    config = models.ForeignKey(ConfigFile, on_delete=models.CASCADE)
 
 
 class AutoproofreaderResult(UserFocusedModel):

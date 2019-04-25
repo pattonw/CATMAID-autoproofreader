@@ -1,6 +1,6 @@
 [
     {
-        "model": "floodfilling.computeserver",
+        "model": "autoproofreader.computeserver",
         "pk": 1,
         "fields": {
             "name": "test",
@@ -13,7 +13,7 @@
         }
     },
     {
-        "model": "floodfilling.floodfillconfig",
+        "model": "autoproofreader.configfile",
         "pk": 1,
         "fields": {
             "config": "test",
@@ -24,7 +24,7 @@
         }
     },
     {
-        "model": "floodfilling.floodfillmodel",
+        "model": "autoproofreader.diluvianmodel",
         "pk": 1,
         "fields": {
             "name": "test_model",
@@ -38,7 +38,7 @@
         }
     },
     {
-        "model": "floodfilling.floodfillresult",
+        "model": "autoproofreader.autoproofreaderresult",
         "pk": 1,
         "fields": {
             "name": "test_result",
@@ -60,7 +60,7 @@
         }
     },
     {
-        "model": "floodfilling.volumeconfig",
+        "model": "autoproofreader.imagevolumeconfig",
         "pk": 1,
         "fields": {
             "name": "test_volume",

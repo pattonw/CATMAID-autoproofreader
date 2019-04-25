@@ -16,7 +16,7 @@ setup(
     license='MIT license',
     description='A django app which acts as a drop-in extension for CATMAID.',
     long_description=README,
-    url='https://github.com/willp24/CATMAID-autoproofreader',
+    url='https://github.com/pattonw/CATMAID-autoproofreader',
     author='William Patton',
     author_email='pattonw@janelia.hhmi.org',
     classifiers=[

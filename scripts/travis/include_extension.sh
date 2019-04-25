@@ -3,4 +3,4 @@
 set -ev
 
 cd django
-sed -i "28i\    'floodfilling'," projects/mysite/pipelinefiles.py
+sed -i "28i\    'autoproofreader'," projects/mysite/pipelinefiles.py
