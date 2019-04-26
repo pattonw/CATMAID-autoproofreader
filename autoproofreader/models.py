@@ -74,4 +74,3 @@ class ImageVolumeConfig(UserFocusedModel):
 
     name = models.TextField()
     config = models.TextField()
-
