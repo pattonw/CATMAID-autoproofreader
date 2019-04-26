@@ -82,6 +82,8 @@ class ComputeServerAPI(APIView):
                 "asked": server_id,
                 "servers": [server.id for server in ComputeServer.objects.all()],
                 "query_params": request.query_params,
+                "request dir": dir(request),
+                "request POST": request.POST,
             }
         )
 
