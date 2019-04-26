@@ -14,7 +14,6 @@ class ComputeServerTest(AutoproofreaderTestCase):
         )
         self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
-        raise Exception(parsed_response)
         expected_result = [
             {
                 "name": "test_server_1",
