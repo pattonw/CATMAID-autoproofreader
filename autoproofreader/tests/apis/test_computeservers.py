@@ -106,16 +106,25 @@ class ComputeServerTest(AutoproofreaderTestCase):
     def test_delete(self):
         self.fake_authentication()
         assign_perm("can_administer", self.test_user, self.test_project)
+        # make sure server 1 is in the database
+        response = self.client.get(
+            "{url_prefix}/{project_id}/compute-servers".format(
+                **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}
+            ),
+            {"server_id": 1},
+        )
+        self.assertEqual(response.status_code, 200)
+
         response = self.client.delete(
             "{url_prefix}/{project_id}/compute-servers".format(
                 **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}
             ),
             {"server_id": 1},
         )
+        self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
         expected_result = {"success": True}
         self.assertEqual(expected_result, parsed_response)
-        self.assertEqual(response.status_code, 200)
 
         response = self.client.delete(
             "{url_prefix}/{project_id}/compute-servers".format(
