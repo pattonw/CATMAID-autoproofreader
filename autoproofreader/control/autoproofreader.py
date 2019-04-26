@@ -210,7 +210,6 @@ class AutoproofreaderTaskAPI(APIView):
         return ConfigFile(user_id=user_id, project_id=project_id, config=config)
 
 
-
 @task()
 def query_segmentation_async(
     result,
@@ -407,4 +406,3 @@ class AutoproofreaderResultAPI(APIView):
             )
         desc = cursor.description
         return [dict(zip([col[0] for col in desc], row)) for row in cursor.fetchall()]
-
