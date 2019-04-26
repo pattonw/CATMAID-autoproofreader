@@ -22,7 +22,8 @@ class ComputeServerTest(AutoproofreaderTestCase):
                 "diluvian_path": "test_1_diluvian",
                 "results_directory": "test_1_results",
                 "environment_source_path": "test_1_env",
-                "editor": 1,
+                "editor_id": 3,
+                "id": 1,
             },
             {
                 "name": "test_server_2",
@@ -31,7 +32,8 @@ class ComputeServerTest(AutoproofreaderTestCase):
                 "diluvian_path": "test_2_diluvian",
                 "results_directory": "test_2_results",
                 "environment_source_path": "test_2_env",
-                "editor": 1,
+                "editor_id": 3,
+                "id": 2,
             },
         ]
         self.assertEqual(expected_result, parsed_response)
@@ -51,7 +53,8 @@ class ComputeServerTest(AutoproofreaderTestCase):
             "diluvian_path": "test_1_diluvian",
             "results_directory": "test_1_results",
             "environment_source_path": "test_1_env",
-            "editor": 1,
+            "editor_id": 3,
+            "id": 1,
         }
         self.assertEqual(expected_result, parsed_response)
 
