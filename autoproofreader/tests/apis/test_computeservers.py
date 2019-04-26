@@ -1,5 +1,6 @@
 import json
 from autoproofreader.tests.common import AutoproofreaderTestCase
+from guardian.shortcuts import assign_perm
 
 URL_PREFIX = "/ext/autoproofreader"
 
@@ -62,6 +63,7 @@ class ComputeServerTest(AutoproofreaderTestCase):
 
     def test_put(self):
         self.fake_authentication()
+        assign_perm("can_administer", self.test_user, self.test_project)
         response = self.client.put(
             "{url_prefix}/{project_id}/compute-servers".format(
                 **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}
@@ -103,6 +105,7 @@ class ComputeServerTest(AutoproofreaderTestCase):
 
     def test_delete(self):
         self.fake_authentication()
+        assign_perm("can_administer", self.test_user, self.test_project)
         response = self.client.delete(
             "{url_prefix}/{project_id}/compute-servers".format(
                 **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}

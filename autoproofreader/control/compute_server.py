@@ -13,7 +13,7 @@ import subprocess
 
 
 class ComputeServerAPI(APIView):
-    @method_decorator(requires_user_role(UserRole.QueueComputeTask))
+    @method_decorator(requires_user_role(UserRole.Admin))
     def put(self, request, project_id):
         address = request.POST.get("address")
         if "name" in request.POST:
@@ -72,7 +72,7 @@ class ComputeServerAPI(APIView):
             result, safe=False, json_dumps_params={"sort_keys": True, "indent": 4}
         )
 
-    @method_decorator(requires_user_role(UserRole.QueueComputeTask))
+    @method_decorator(requires_user_role(UserRole.Admin))
     def delete(self, request, project_id):
         # can_edit_or_fail(request.user, point_id, "point")
         server_id = request.query_params.get("server_id", None)
@@ -108,6 +108,7 @@ class GPUUtilAPI(APIView):
     API for querying gpu status on the server. Could be used to inform user
     whether server is currently in use, or which gpus are currently free.
     """
+
     @method_decorator(requires_user_role(UserRole.Browse))
     def get(self, request, project_id):
         """
