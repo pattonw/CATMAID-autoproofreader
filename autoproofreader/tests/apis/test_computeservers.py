@@ -7,8 +7,8 @@ URL_PREFIX = "/ext/autoproofreader"
 class ComputeServerTest(AutoproofreaderTestCase):
     def test_get(self):
         response = self.client.get(
-            "/{project_id}/compute-servers".format(
-                **{"project_id": self.test_project_id}
+            "{url_prefix}/{project_id}/compute-servers".format(
+                **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}
             )
         )
         self.assertEqual(response.status_code, 200)
