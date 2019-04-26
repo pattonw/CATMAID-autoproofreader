@@ -3,12 +3,25 @@
         "model": "autoproofreader.computeserver",
         "pk": 1,
         "fields": {
-            "name": "test",
-            "address": "test",
-            "edition_time": "2017-05-31T19:57:35.142Z",
-            "diluvian_path": "diluvian",
-            "results_directory": "results",
-            "environment_source_path": "test",
+            "name": "test_server_1",
+            "address": "test_server_1.org",
+            "edition_time": "2001-01-01T01:01:01.001Z",
+            "diluvian_path": "test_1_diluvian",
+            "results_directory": "test_1_results",
+            "environment_source_path": "test_1_env",
+            "editor": 1
+        }
+    },
+    {
+        "model": "autoproofreader.computeserver",
+        "pk": 2,
+        "fields": {
+            "name": "test_server_2",
+            "address": "test_server_2.org",
+            "edition_time": "2002-02-02T02:02:02.002Z",
+            "diluvian_path": "test_2_diluvian",
+            "results_directory": "test_2_results",
+            "environment_source_path": "test_2_env",
             "editor": 1
         }
     },
@@ -16,11 +29,11 @@
         "model": "autoproofreader.configfile",
         "pk": 1,
         "fields": {
-            "config": "test",
+            "config": "test_config",
             "user": 1,
             "project": 1,
-            "creation_time": "2017-05-31T19:57:35.142Z",
-            "edition_time": "2017-05-31T19:57:35.142Z"
+            "creation_time": "2001-01-01T01:01:01.001Z",
+            "edition_time": "2002-01-01T01:01:01.001Z"
         }
     },
     {

@@ -392,7 +392,7 @@ class AutoproofreaderResultAPI(APIView):
         if result_id is not None:
             cursor.execute(
                 """
-                SELECT * FROM floodfill_result
+                SELECT * FROM autoproofreader_autoproofreaderresult
                 WHERE id = {}
                 """.format(
                     result_id
@@ -401,7 +401,7 @@ class AutoproofreaderResultAPI(APIView):
         else:
             cursor.execute(
                 """
-                SELECT * FROM floodfill_result
+                SELECT * FROM autoproofreader_autoproofreaderresult
                 """
             )
         desc = cursor.description

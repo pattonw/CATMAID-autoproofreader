@@ -80,7 +80,7 @@ class ImageVolumeConfigAPI(APIView):
         if volume_config_id is not None:
             cursor.execute(
                 """
-                SELECT * FROM volume_config
+                SELECT * FROM autoproofreader_imagevolumeconfig
                 WHERE id = {}
                 """.format(
                     volume_config_id
@@ -89,7 +89,7 @@ class ImageVolumeConfigAPI(APIView):
         else:
             cursor.execute(
                 """
-                SELECT * FROM volume_config
+                SELECT * FROM autoproofreader_imagevolumeconfig
                 """
             )
         desc = cursor.description

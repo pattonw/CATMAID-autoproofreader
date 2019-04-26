@@ -101,7 +101,7 @@ class DiluvianModelAPI(APIView):
         if model_id is not None:
             cursor.execute(
                 """
-                SELECT * FROM floodfill_model
+                SELECT * FROM autoproofreader_diluvianmodel
                 WHERE id = {}
                 """.format(
                     model_id
@@ -110,7 +110,7 @@ class DiluvianModelAPI(APIView):
         else:
             cursor.execute(
                 """
-                SELECT * FROM floodfill_model
+                SELECT * FROM autoproofreader_diluvianmodel
                 """
             )
         desc = cursor.description

@@ -87,7 +87,7 @@ class ComputeServerAPI(APIView):
         if server_id is not None:
             cursor.execute(
                 """
-                SELECT * FROM compute_server
+                SELECT * FROM autoproofreader_computeserver
                 WHERE id = {}
                 """.format(
                     server_id
@@ -96,7 +96,7 @@ class ComputeServerAPI(APIView):
         else:
             cursor.execute(
                 """
-                SELECT * FROM compute_server
+                SELECT * FROM autoproofreader_computeserver
                 """
             )
         desc = cursor.description
