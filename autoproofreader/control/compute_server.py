@@ -76,6 +76,7 @@ class ComputeServerAPI(APIView):
     def delete(self, request, project_id):
         # can_edit_or_fail(request.user, point_id, "point")
         server_id = request.query_params.get("server_id", None)
+        print(server_id)
 
         server = get_object_or_404(ComputeServer, id=server_id)
         server.delete()
