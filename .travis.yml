@@ -42,8 +42,6 @@ install:
 before_script:
   - cd $CATMAID_DIR
   # This solves the issue of no file "/usr/share/postgresql/10/extension/postgis.control"
-  # However this line is also in the install_postgres.sh file on line 21, so I'm not sure why this is needed
-  - sudo apt install postgresql-10-postgis-2.4-scripts
   - bash scripts/travis/setup_database.sh
   - bash scripts/travis/configure_catmaid.sh
   - bash $TRAVIS_BUILD_DIR/scripts/travis/include_extension.sh
