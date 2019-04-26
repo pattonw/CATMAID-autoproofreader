@@ -9,7 +9,7 @@
             "diluvian_path": "test_1_diluvian",
             "results_directory": "test_1_results",
             "environment_source_path": "test_1_env",
-            "editor": 1
+            "editor": 3
         }
     },
     {
@@ -22,7 +22,7 @@
             "diluvian_path": "test_2_diluvian",
             "results_directory": "test_2_results",
             "environment_source_path": "test_2_env",
-            "editor": 1
+            "editor": 3
         }
     },
     {
@@ -30,8 +30,8 @@
         "pk": 1,
         "fields": {
             "config": "test_config",
-            "user": 1,
-            "project": 1,
+            "user": 3,
+            "project": 3,
             "creation_time": "2001-01-01T01:01:01.001Z",
             "edition_time": "2002-01-01T01:01:01.001Z"
         }
@@ -44,8 +44,8 @@
             "server": 1,
             "model_source_path": "none",
             "config": 1,
-            "user": 1,
-            "project": 1,
+            "user": 3,
+            "project": 3,
             "creation_time": "2017-05-31T19:57:35.142Z",
             "edition_time": "2017-05-31T19:57:35.142Z"
         }
@@ -62,8 +62,8 @@
             "model": 1,
             "data": "nothing",
             "completion_time": "2017-05-31T19:57:35.142Z",
-            "user": 1,
-            "project": 1,
+            "user": 3,
+            "project": 3,
             "creation_time": "2017-05-31T19:57:35.142Z",
             "edition_time": "2017-05-31T19:57:35.142Z"
         }
@@ -74,8 +74,8 @@
         "fields": {
             "name": "test_volume",
             "config": "volume",
-            "user": 1,
-            "project": 1,
+            "user": 3,
+            "project": 3,
             "creation_time": "2017-05-31T19:57:35.142Z",
             "edition_time": "2017-05-31T19:57:35.142Z"
         }
