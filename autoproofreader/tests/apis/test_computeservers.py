@@ -68,13 +68,14 @@ class ComputeServerTest(AutoproofreaderTestCase):
             "{url_prefix}/{project_id}/compute-servers".format(
                 **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}
             ),
-            {
+            data={
                 "name": "test_server_3",
                 "address": "test_server_3.org",
                 "diluvian_path": "test_3_diluvian",
                 "results_directory": "test_3_results",
                 "environment_source_path": "test_3_env",
             },
+            content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
@@ -106,50 +107,56 @@ class ComputeServerTest(AutoproofreaderTestCase):
     def test_delete(self):
         self.fake_authentication()
         assign_perm("can_administer", self.test_user, self.test_project)
-        # make sure server 1 is in the database
+
+        # Delete a server
+        response = self.client.delete(
+            "{url_prefix}/{project_id}/compute-servers".format(
+                **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}
+            ),
+            data={"server_id": 1},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        parsed_response = json.loads(response.content.decode("utf-8"))
+        expected_result = {"success": True}
+        self.assertEqual(expected_result, parsed_response)
+
+        # Attempt to delete it again
+        response = self.client.delete(
+            "{url_prefix}/{project_id}/compute-servers".format(
+                **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}
+            ),
+            data={"server_id": 1},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 404)
+
+        # Delete the second server
+        response = self.client.delete(
+            "{url_prefix}/{project_id}/compute-servers".format(
+                **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}
+            ),
+            {"server_id": 2},
+        )
+        self.assertEqual(response.status_code, 200)
+        parsed_response = json.loads(response.content.decode("utf-8"))
+        expected_result = {"success": True}
+        self.assertEqual(expected_result, parsed_response)
+
+        # Attempt to delete it again
+        response = self.client.delete(
+            "{url_prefix}/{project_id}/compute-servers".format(
+                **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}
+            ),
+            {"server_id": 2},
+        )
+        self.assertEqual(response.status_code, 404)
+
+        # Assert that there are no more servers
         response = self.client.get(
             "{url_prefix}/{project_id}/compute-servers".format(
                 **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}
-            ),
-            {"server_id": 1},
+            )
         )
-        self.assertEqual(response.status_code, 200)
-
-        response = self.client.delete(
-            "{url_prefix}/{project_id}/compute-servers".format(
-                **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}
-            ),
-            {"server_id": 1},
-        )
-        self.assertEqual(response.status_code, 200)
-        parsed_response = json.loads(response.content.decode("utf-8"))
-        expected_result = {"success": True}
-        self.assertEqual(expected_result, parsed_response)
-
-        response = self.client.delete(
-            "{url_prefix}/{project_id}/compute-servers".format(
-                **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}
-            ),
-            {"server_id": 1},
-        )
-        self.assertEqual(response.status_code, 404)
-
-        response = self.client.delete(
-            "{url_prefix}/{project_id}/compute-servers".format(
-                **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}
-            ),
-            {"server_id": 2},
-        )
-        self.assertEqual(response.status_code, 200)
-        parsed_response = json.loads(response.content.decode("utf-8"))
-        expected_result = {"success": True}
-        self.assertEqual(expected_result, parsed_response)
-
-        response = self.client.delete(
-            "{url_prefix}/{project_id}/compute-servers".format(
-                **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}
-            ),
-            {"server_id": 2},
-        )
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(len(json.loads(response.content.decode("utf-8"))), 0)
 

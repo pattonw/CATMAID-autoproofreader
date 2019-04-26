@@ -1,4 +1,4 @@
-from django.http import JsonResponse
+from django.http import JsonResponse, QueryDict
 from django.db import connection
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
@@ -75,17 +75,8 @@ class ComputeServerAPI(APIView):
     @method_decorator(requires_user_role(UserRole.Admin))
     def delete(self, request, project_id):
         # can_edit_or_fail(request.user, point_id, "point")
-        server_id = request.query_params.get("server_id", None)
-
-        return JsonResponse(
-            {
-                "asked": server_id,
-                "servers": [server.id for server in ComputeServer.objects.all()],
-                "query_params": request.query_params,
-                "request dir": dir(request),
-                "request data": str(request.data),
-                "request POST": str(request.POST),
-            }
+        server_id = request.query_params.get(
+            "server_id", request.data.get("server_id", None)
         )
 
         server = get_object_or_404(ComputeServer, id=server_id)
