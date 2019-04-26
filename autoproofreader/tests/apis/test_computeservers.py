@@ -114,8 +114,8 @@ class ComputeServerTest(AutoproofreaderTestCase):
         )
         parsed_response = json.loads(response.content.decode("utf-8"))
         expected_result = {"success": True}
-        self.assertEqual(response.status_code, 200)
         self.assertEqual(expected_result, parsed_response)
+        self.assertEqual(response.status_code, 200)
 
         response = self.client.delete(
             "{url_prefix}/{project_id}/compute-servers".format(
