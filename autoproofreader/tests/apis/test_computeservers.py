@@ -8,7 +8,7 @@ class ComputeServerTest(AutoproofreaderTestCase):
         response = self.client.get(
             "/{project_id}/compute-servers".format(**{"project_id": 0})
         )
-        print(response)
+        raise Exception(str(response))
         self.assertEqual(response.status_code, 200)
 
     def test_post(self):
