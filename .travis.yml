@@ -9,8 +9,8 @@ python:
 env:
   global:
     - CATMAID_DIR=$TRAVIS_BUILD_DIR/travis/CATMAID
-    - PACKAGE_DIR=$TRAVIS_BUILD_DIR/floodfilling
-    - JS_DIR=$PACKAGE_DIR/static/floodfilling/js
+    - PACKAGE_DIR=$TRAVIS_BUILD_DIR/autoproofreader
+    - JS_DIR=$PACKAGE_DIR/static/autoproofreader/js
   matrix:
     - CATMAID_BRANCH=master
     - CATMAID_BRANCH=dev
