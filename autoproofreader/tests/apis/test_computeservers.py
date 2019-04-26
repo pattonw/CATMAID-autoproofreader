@@ -2,17 +2,13 @@ import json
 from autoproofreader.tests.common import AutoproofreaderTestCase
 from guardian.shortcuts import assign_perm
 
-URL_PREFIX = "/ext/autoproofreader"
+COMPUTE_SERVER_URL = "/ext/autoproofreader/{}/compute_server"
 
 
 class ComputeServerTest(AutoproofreaderTestCase):
     def test_get(self):
         self.fake_authentication()
-        response = self.client.get(
-            "{url_prefix}/{project_id}/compute-servers".format(
-                **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}
-            )
-        )
+        response = self.client.get(COMPUTE_SERVER_URL.format(self.test_project_id))
         self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
         expected_result = [
@@ -40,10 +36,7 @@ class ComputeServerTest(AutoproofreaderTestCase):
         self.assertEqual(expected_result, parsed_response)
 
         response = self.client.get(
-            "{url_prefix}/{project_id}/compute-servers".format(
-                **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}
-            ),
-            {"server_id": 1},
+            COMPUTE_SERVER_URL.format(self.test_project_id), {"server_id": 1}
         )
         self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
@@ -65,9 +58,7 @@ class ComputeServerTest(AutoproofreaderTestCase):
         self.fake_authentication()
         assign_perm("can_administer", self.test_user, self.test_project)
         response = self.client.put(
-            "{url_prefix}/{project_id}/compute-servers".format(
-                **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}
-            ),
+            COMPUTE_SERVER_URL.format(self.test_project_id),
             data={
                 "name": "test_server_3",
                 "address": "test_server_3.org",
@@ -83,10 +74,7 @@ class ComputeServerTest(AutoproofreaderTestCase):
         self.assertEqual(expected_result, parsed_response)
 
         response = self.client.get(
-            "{url_prefix}/{project_id}/compute-servers".format(
-                **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}
-            ),
-            {"server_id": 3},
+            COMPUTE_SERVER_URL.format(self.test_project_id), {"server_id": 3}
         )
         self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
@@ -110,9 +98,7 @@ class ComputeServerTest(AutoproofreaderTestCase):
 
         # Delete a server
         response = self.client.delete(
-            "{url_prefix}/{project_id}/compute-servers".format(
-                **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}
-            ),
+            COMPUTE_SERVER_URL.format(self.test_project_id),
             data={"server_id": 1},
             content_type="application/json",
         )
@@ -123,9 +109,7 @@ class ComputeServerTest(AutoproofreaderTestCase):
 
         # Attempt to delete it again
         response = self.client.delete(
-            "{url_prefix}/{project_id}/compute-servers".format(
-                **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}
-            ),
+            COMPUTE_SERVER_URL.format(self.test_project_id),
             data={"server_id": 1},
             content_type="application/json",
         )
@@ -133,10 +117,7 @@ class ComputeServerTest(AutoproofreaderTestCase):
 
         # Delete the second server
         response = self.client.delete(
-            "{url_prefix}/{project_id}/compute-servers".format(
-                **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}
-            ),
-            {"server_id": 2},
+            COMPUTE_SERVER_URL.format(self.test_project_id), {"server_id": 2}
         )
         self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
@@ -145,18 +126,11 @@ class ComputeServerTest(AutoproofreaderTestCase):
 
         # Attempt to delete it again
         response = self.client.delete(
-            "{url_prefix}/{project_id}/compute-servers".format(
-                **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}
-            ),
-            {"server_id": 2},
+            COMPUTE_SERVER_URL.format(self.test_project_id), {"server_id": 2}
         )
         self.assertEqual(response.status_code, 404)
 
         # Assert that there are no more servers
-        response = self.client.get(
-            "{url_prefix}/{project_id}/compute-servers".format(
-                **{"url_prefix": URL_PREFIX, "project_id": self.test_project_id}
-            )
-        )
+        response = self.client.get(COMPUTE_SERVER_URL.format(self.test_project_id))
         self.assertEqual(len(json.loads(response.content.decode("utf-8"))), 0)
 
