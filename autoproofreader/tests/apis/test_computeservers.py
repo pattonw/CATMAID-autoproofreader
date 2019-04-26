@@ -56,6 +56,8 @@ class ComputeServerTest(AutoproofreaderTestCase):
             "editor_id": 3,
             "id": 1,
         }
+        for k, v in expected_result.items():
+            self.assertEqual(v, parsed_response[k])
         self.assertEqual(expected_result, parsed_response)
 
     def test_post(self):
