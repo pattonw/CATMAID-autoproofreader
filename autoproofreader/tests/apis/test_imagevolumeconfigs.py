@@ -47,8 +47,8 @@ class ImageVolumeConfigTest(AutoproofreaderTestCase):
                 "id": 1,
                 "name": "test_volume_1",
                 "config": "1",
-                "user": 3,
-                "project": 3,
+                "user_id": 3,
+                "project_id": 3,
                 "creation_time": "2001-01-01T01:01:01.001Z",
                 "edition_time": "2002-01-01T01:01:01.001Z",
             }
