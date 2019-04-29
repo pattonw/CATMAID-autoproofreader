@@ -39,7 +39,9 @@ class DiluvianModel(UserFocusedModel):
 
     name = models.TextField()
     # The server on which the network was trained. Allows us to avoid storing weights locally
-    server = models.ForeignKey(ComputeServer, on_delete=models.DO_NOTHING)
+    server = models.ForeignKey(
+        ComputeServer, on_delete=models.SET_NULL, null=True, blank=True
+    )
     # Path to the directory containing the model weights and config files
     model_source_path = models.TextField()
     config = models.ForeignKey(ConfigFile, on_delete=models.CASCADE)

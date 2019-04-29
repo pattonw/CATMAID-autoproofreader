@@ -14,10 +14,12 @@ class DiluvianModelAPI(APIView):
     def put(self, request, project_id):
         warnings = []
 
-        name = request.POST.get("name", None)
-        server_id = request.POST.get("server_id", None)
-        model_source_path = request.POST.get("model_source_path", None)
-        config = request.POST.get("config", None)
+        name = request.POST.get("name", request.data.get("name", None))
+        server_id = request.POST.get("server_id", request.data.get("server_id", None))
+        model_source_path = request.POST.get(
+            "model_source_path", request.data.get("model_source_path", None)
+        )
+        config = request.POST.get("config", request.data.get("config", None))
 
         params = [name, server_id, model_source_path]
 
@@ -47,9 +49,11 @@ class DiluvianModelAPI(APIView):
         )
         model.save()
 
-        return JsonResponse({"success": True, "warnings": warnings})
+        return JsonResponse(
+            {"success": True, "warnings": warnings, "model_id": model.id}
+        )
 
-    @method_decorator(requires_user_role(UserRole.Browse))
+    @method_decorator(requires_user_role(UserRole.QueueComputeTask))
     def get(self, request, project_id):
         """
         List all available autoproofreader models
@@ -79,7 +83,9 @@ class DiluvianModelAPI(APIView):
                 config_id,
             ]
         """
-        model_id = request.query_params.get("model_id", None)
+        model_id = request.query_params.get(
+            "model_id", request.data.get("model_id", None)
+        )
         result = self.get_models(model_id)
 
         return JsonResponse(
@@ -89,7 +95,9 @@ class DiluvianModelAPI(APIView):
     @method_decorator(requires_user_role(UserRole.QueueComputeTask))
     def delete(self, request, project_id):
         # can_edit_or_fail(request.user, point_id, "point")
-        model_id = request.query_params.get("model_id", None)
+        model_id = request.query_params.get(
+            "model_id", request.data.get("model_id", None)
+        )
 
         model = get_object_or_404(DiluvianModel, id=model_id)
         model.delete()
@@ -101,7 +109,7 @@ class DiluvianModelAPI(APIView):
         if model_id is not None:
             cursor.execute(
                 """
-                SELECT * FROM floodfill_model
+                SELECT * FROM autoproofreader_diluvianmodel
                 WHERE id = {}
                 """.format(
                     model_id
@@ -110,7 +118,7 @@ class DiluvianModelAPI(APIView):
         else:
             cursor.execute(
                 """
-                SELECT * FROM floodfill_model
+                SELECT * FROM autoproofreader_diluvianmodel
                 """
             )
         desc = cursor.description

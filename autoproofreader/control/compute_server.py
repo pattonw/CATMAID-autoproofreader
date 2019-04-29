@@ -13,16 +13,22 @@ import subprocess
 
 
 class ComputeServerAPI(APIView):
-    @method_decorator(requires_user_role(UserRole.QueueComputeTask))
+    @method_decorator(requires_user_role(UserRole.Admin))
     def put(self, request, project_id):
-        address = request.POST.get("address")
-        if "name" in request.POST:
-            name = request.POST.get("name")
+        address = request.POST.get("address", request.data.get("address", None))
+        if "name" in request.POST or "name" in request.data:
+            name = request.POST.get("name", request.data.get("name", None))
         else:
             name = address.split(".")[0]
-        environment_source_path = request.POST.get("environment_source_path", None)
-        diluvian_path = request.POST.get("diluvian_path", None)
-        results_directory = request.POST.get("results_directory", None)
+        environment_source_path = request.POST.get(
+            "environment_source_path", request.data.get("environment_source_path", None)
+        )
+        diluvian_path = request.POST.get(
+            "diluvian_path", request.data.get("diluvian_path", None)
+        )
+        results_directory = request.POST.get(
+            "results_directory", request.data.get("results_directory", None)
+        )
 
         server = ComputeServer(
             name=name,
@@ -34,7 +40,7 @@ class ComputeServerAPI(APIView):
         )
         server.save()
 
-        return JsonResponse({"success": True})
+        return JsonResponse({"success": True, "server_id": server.id})
 
     @method_decorator(requires_user_role(UserRole.Browse))
     def get(self, request, project_id):
@@ -72,10 +78,12 @@ class ComputeServerAPI(APIView):
             result, safe=False, json_dumps_params={"sort_keys": True, "indent": 4}
         )
 
-    @method_decorator(requires_user_role(UserRole.QueueComputeTask))
+    @method_decorator(requires_user_role(UserRole.Admin))
     def delete(self, request, project_id):
         # can_edit_or_fail(request.user, point_id, "point")
-        server_id = request.query_params.get("server_id", None)
+        server_id = request.query_params.get(
+            "server_id", request.data.get("server_id", None)
+        )
 
         server = get_object_or_404(ComputeServer, id=server_id)
         server.delete()
@@ -87,7 +95,7 @@ class ComputeServerAPI(APIView):
         if server_id is not None:
             cursor.execute(
                 """
-                SELECT * FROM compute_server
+                SELECT * FROM autoproofreader_computeserver
                 WHERE id = {}
                 """.format(
                     server_id
@@ -96,7 +104,7 @@ class ComputeServerAPI(APIView):
         else:
             cursor.execute(
                 """
-                SELECT * FROM compute_server
+                SELECT * FROM autoproofreader_computeserver
                 """
             )
         desc = cursor.description
@@ -108,6 +116,7 @@ class GPUUtilAPI(APIView):
     API for querying gpu status on the server. Could be used to inform user
     whether server is currently in use, or which gpus are currently free.
     """
+
     @method_decorator(requires_user_role(UserRole.Browse))
     def get(self, request, project_id):
         """

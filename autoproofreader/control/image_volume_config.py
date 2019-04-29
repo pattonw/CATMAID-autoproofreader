@@ -14,20 +14,26 @@ class ImageVolumeConfigAPI(APIView):
     def put(self, request, project_id):
         warnings = []
 
-        name = request.POST.get("name", None)
-        config = request.POST.get("config", None)
+        name = request.POST.get("name", request.data.get("name", None))
+        config = request.POST.get("config", request.data.get("config", None))
 
         params = [name, config]
 
         if any([x is None for x in params]):
-            return JsonResponse({"success": False, "results": request.POST})
+            return JsonResponse({"success": False, "results": request.data})
 
-        volume_config = ImageVolumeConfig(
+        image_volume_config = ImageVolumeConfig(
             name=name, config=config, user_id=request.user.id, project_id=project_id
         )
-        volume_config.save()
+        image_volume_config.save()
 
-        return JsonResponse({"success": True, "warnings": warnings})
+        return JsonResponse(
+            {
+                "success": True,
+                "warnings": warnings,
+                "image_volume_config_id": image_volume_config.id,
+            }
+        )
 
     @method_decorator(requires_user_role(UserRole.Browse))
     def get(self, request, project_id):
@@ -57,8 +63,10 @@ class ImageVolumeConfigAPI(APIView):
                 config,
             ]
         """
-        volume_config_id = request.query_params.get("volume_config_id", None)
-        result = self.get_volume_configs(volume_config_id)
+        image_volume_config_id = request.query_params.get(
+            "image_volume_config_id", request.data.get("image_volume_config_id", None)
+        )
+        result = self.get_volume_configs(image_volume_config_id)
 
         return JsonResponse(
             result, safe=False, json_dumps_params={"sort_keys": True, "indent": 4}
@@ -66,21 +74,21 @@ class ImageVolumeConfigAPI(APIView):
 
     @method_decorator(requires_user_role(UserRole.QueueComputeTask))
     def delete(self, request, project_id):
-        # can_edit_or_fail(request.user, point_id, "point")
-        volume_config_id = request.query_params.get("volume_config_id", None)
+        image_volume_config_id = request.query_params.get(
+            "image_volume_config_id", request.data.get("image_volume_config_id", None)
+        )
 
-        model = get_object_or_404(ImageVolumeConfig, id=volume_config_id)
-        model.delete()
+        image_volume = get_object_or_404(ImageVolumeConfig, id=image_volume_config_id)
+        image_volume.delete()
 
         return JsonResponse({"success": True})
 
     def get_volume_configs(self, volume_config_id=None):
-        print(volume_config_id)
         cursor = connection.cursor()
         if volume_config_id is not None:
             cursor.execute(
                 """
-                SELECT * FROM volume_config
+                SELECT * FROM autoproofreader_imagevolumeconfig
                 WHERE id = {}
                 """.format(
                     volume_config_id
@@ -89,7 +97,7 @@ class ImageVolumeConfigAPI(APIView):
         else:
             cursor.execute(
                 """
-                SELECT * FROM volume_config
+                SELECT * FROM autoproofreader_imagevolumeconfig
                 """
             )
         desc = cursor.description

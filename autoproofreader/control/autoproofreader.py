@@ -370,7 +370,9 @@ class AutoproofreaderResultAPI(APIView):
             required: false
             defaultValue: false
         """
-        result_id = request.query_params.get("result_id", None)
+        result_id = request.query_params.get(
+            "result_id", request.data.get("result_id", None)
+        )
         result = self.get_results(result_id)
 
         return JsonResponse(
@@ -380,7 +382,9 @@ class AutoproofreaderResultAPI(APIView):
     @method_decorator(requires_user_role(UserRole.QueueComputeTask))
     def delete(self, request, project_id):
         # can_edit_or_fail(request.user, point_id, "point")
-        result_id = request.query_params.get("result_id", None)
+        result_id = request.query_params.get(
+            "result_id", request.data.get("result_id", None)
+        )
         if result_id is not None:
             result = get_object_or_404(AutoproofreaderResult, id=result_id)
             result.delete()
@@ -392,7 +396,7 @@ class AutoproofreaderResultAPI(APIView):
         if result_id is not None:
             cursor.execute(
                 """
-                SELECT * FROM floodfill_result
+                SELECT * FROM autoproofreader_autoproofreaderresult
                 WHERE id = {}
                 """.format(
                     result_id
@@ -401,7 +405,7 @@ class AutoproofreaderResultAPI(APIView):
         else:
             cursor.execute(
                 """
-                SELECT * FROM floodfill_result
+                SELECT * FROM autoproofreader_autoproofreaderresult
                 """
             )
         desc = cursor.description
