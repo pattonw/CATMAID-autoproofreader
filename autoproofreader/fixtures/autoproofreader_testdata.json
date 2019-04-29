@@ -9,7 +9,9 @@
             "diluvian_path": "test_1_diluvian",
             "results_directory": "test_1_results",
             "environment_source_path": "test_1_env",
-            "editor": 3
+            "editor": 3,
+            "ssh_user": "test_user_1",
+            "ssh_key": "test_key_1"
         }
     },
     {
@@ -22,7 +24,9 @@
             "diluvian_path": "test_2_diluvian",
             "results_directory": "test_2_results",
             "environment_source_path": "test_2_env",
-            "editor": 3
+            "editor": 3,
+            "ssh_user": "test_user_2",
+            "ssh_key": "test_key_2"
         }
     },
     {
@@ -114,7 +118,9 @@
             "user": 3,
             "project": 3,
             "creation_time": "2001-06-01T01:01:01.001Z",
-            "edition_time": "2002-01-01T01:01:01.001Z"
+            "edition_time": "2002-01-01T01:01:01.001Z",
+            "private": false,
+            "permanent": true
         }
     },
     {
@@ -132,7 +138,9 @@
             "user": 3,
             "project": 3,
             "creation_time": "2002-02-02T02:02:02.002Z",
-            "edition_time": "2003-02-02T02:02:02.002Z"
+            "edition_time": "2003-02-02T02:02:02.002Z",
+            "private": false,
+            "permanent": true
         }
     }
 ]

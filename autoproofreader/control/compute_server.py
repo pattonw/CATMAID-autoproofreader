@@ -29,6 +29,8 @@ class ComputeServerAPI(APIView):
         results_directory = request.POST.get(
             "results_directory", request.data.get("results_directory", None)
         )
+        ssh_user = request.POST.get("ssh_user", request.data.get("ssh_user", None))
+        ssh_key = request.POST.get("ssh_key", request.data.get("ssh_key", None))
 
         server = ComputeServer(
             name=name,
@@ -37,6 +39,8 @@ class ComputeServerAPI(APIView):
             environment_source_path=environment_source_path,
             diluvian_path=diluvian_path,
             results_directory=results_directory,
+            ssh_key=ssh_key,
+            ssh_user=ssh_user,
         )
         server.save()
 

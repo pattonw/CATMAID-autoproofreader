@@ -30,6 +30,8 @@ class ResultsTest(AutoproofreaderTestCase):
                 "creation_time": "2001-06-01T01:01:01.001Z",
                 "edition_time": "2002-01-01T01:01:01.001Z",
                 "volume_id": None,
+                "private": False,
+                "permanent": True,
             },
             {
                 "id": 2,
@@ -46,6 +48,8 @@ class ResultsTest(AutoproofreaderTestCase):
                 "creation_time": "2002-02-02T02:02:02.002Z",
                 "edition_time": "2003-02-02T02:02:02.002Z",
                 "volume_id": None,
+                "private": False,
+                "permanent": True,
             },
         ]
         self.assertEqual(expected_result, parsed_response)
@@ -71,6 +75,8 @@ class ResultsTest(AutoproofreaderTestCase):
                 "creation_time": "2001-06-01T01:01:01.001Z",
                 "edition_time": "2002-01-01T01:01:01.001Z",
                 "volume_id": None,
+                "private": False,
+                "permanent": True,
             }
         ]
         self.assertEqual(expected_result, parsed_response)

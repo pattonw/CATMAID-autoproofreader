@@ -22,6 +22,8 @@ class ComputeServerTest(AutoproofreaderTestCase):
                 "environment_source_path": "test_1_env",
                 "editor_id": 3,
                 "id": 1,
+                "ssh_user": "test_user_1",
+                "ssh_key": "test_key_1",
             },
             {
                 "name": "test_server_2",
@@ -32,6 +34,8 @@ class ComputeServerTest(AutoproofreaderTestCase):
                 "environment_source_path": "test_2_env",
                 "editor_id": 3,
                 "id": 2,
+                "ssh_user": "test_user_2",
+                "ssh_key": "test_key_2",
             },
         ]
         self.assertEqual(expected_result, parsed_response)
@@ -51,6 +55,8 @@ class ComputeServerTest(AutoproofreaderTestCase):
                 "environment_source_path": "test_1_env",
                 "editor_id": 3,
                 "id": 1,
+                "ssh_user": "test_user_1",
+                "ssh_key": "test_key_1",
             }
         ]
         self.assertEqual(expected_result, parsed_response)
@@ -66,6 +72,7 @@ class ComputeServerTest(AutoproofreaderTestCase):
                 "diluvian_path": "test_3_diluvian",
                 "results_directory": "test_3_results",
                 "environment_source_path": "test_3_env",
+                "ssh_user": "test_user_3",
             },
             content_type="application/json",
         )
@@ -87,6 +94,8 @@ class ComputeServerTest(AutoproofreaderTestCase):
             "environment_source_path": "test_3_env",
             "editor_id": 3,
             "id": 3,
+            "ssh_user": "test_user_3",
+            "ssh_key": "test_server_3",
         }
         # edition time can't be known exactly so check the rest
         self.assertEqual(len(parsed_response), 1)

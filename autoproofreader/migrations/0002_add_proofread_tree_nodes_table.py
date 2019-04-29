@@ -12,7 +12,7 @@ import django.db.models.deletion
 import django.utils.timezone
 
 forward_create_tables = """
-    CREATE TABLE autoproofreader_proofread_tree_nodes (
+    CREATE TABLE autoproofreader_proofreadtreenodes (
         id serial NOT NULL PRIMARY KEY,
         node_id integer NOT NULL,
         parent_id integer,
@@ -32,15 +32,15 @@ forward_create_tables = """
     );
 
     -- Create history tables
-    SELECT create_history_table('autoproofreader_proofread_tree_nodes'::regclass, 'edition_time', 'txid');
+    SELECT create_history_table('autoproofreader_proofreadtreenodes'::regclass, 'edition_time', 'txid');
 """
 
 backward_create_tables = """
-    SELECT disable_history_tracking_for_table('autoproofreader_proofread_tree_nodes'::regclass,
-        get_history_table_name('autoproofreader_proofread_tree_nodes'::regclass));
-    SELECT drop_history_table('autoproofreader_proofread_tree_nodes'::regclass);
+    SELECT disable_history_tracking_for_table('autoproofreader_proofreadtreenodes'::regclass,
+        get_history_table_name('autoproofreader_proofreadtreenodes'::regclass));
+    SELECT drop_history_table('autoproofreader_proofreadtreenodes'::regclass);
 
-    DROP TABLE autoproofreader_proofread_tree_nodes CASCADE;
+    DROP TABLE autoproofreader_proofreadtreenodes CASCADE;
 """
 
 
