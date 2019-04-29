@@ -16,7 +16,7 @@ forward_create_tables = """
         id serial NOT NULL PRIMARY KEY,
         node_id integer NOT NULL,
         parent_id integer,
-        result integer NOT NULL,
+        result_id integer NOT NULL,
         x float NOT NULL,
         y float NOT NULL,
         z float NOT NULL,
