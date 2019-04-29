@@ -83,7 +83,26 @@ class AutoproofreaderResult(UserFocusedModel):
     errors = models.TextField()
     # storage of rankings is moving to its own table
     data = models.TextField(null=True, blank=True)  # will contain results or errors
-    completion_time = models.DateTimeField(null=True, blank=True)
+
+
+class ProofreadTreeNodes(models.Model):
+    """
+    Stores all proofread nodes allong with their scores for connectivity and missing branches.
+    Also keeps track of which nodes have been visited
+    """
+
+    node_id = models.IntegerField()
+    parent = models.ForeignKey("self", on_delete=models.CASCADE)
+    x = models.FloatField()
+    y = models.FloatField()
+    z = models.FloatField()
+    branch_score = models.FloatField()
+    branch_dx = models.FloatField()
+    branch_dy = models.FloatField()
+    branch_dz = models.FloatField()
+    connectivity_score = models.FloatField()
+    reviewed = models.BooleanField(default=False)
+    result = models.ForeignKey(AutoproofreaderResult, on_delete=models.CASCADE)
 
 
 class ImageVolumeConfig(UserFocusedModel):
