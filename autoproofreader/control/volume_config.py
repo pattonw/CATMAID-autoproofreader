@@ -27,7 +27,13 @@ class ImageVolumeConfigAPI(APIView):
         )
         image_volume_config.save()
 
-        return JsonResponse({"success": True, "warnings": warnings})
+        return JsonResponse(
+            {
+                "success": True,
+                "warnings": warnings,
+                "image_volume_config_id": image_volume_config.id,
+            }
+        )
 
     @method_decorator(requires_user_role(UserRole.Browse))
     def get(self, request, project_id):

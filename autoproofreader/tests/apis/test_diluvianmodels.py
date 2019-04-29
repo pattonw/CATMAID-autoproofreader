@@ -41,7 +41,7 @@ class DiluvianModelTest(AutoproofreaderTestCase):
         self.assertEqual(expected_result, parsed_response)
 
         response = self.client.get(
-            DILUVIAN_MODEL_URL.format(self.test_project_id), {"server_id": 1}
+            DILUVIAN_MODEL_URL.format(self.test_project_id), {"model_id": 1}
         )
         self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))

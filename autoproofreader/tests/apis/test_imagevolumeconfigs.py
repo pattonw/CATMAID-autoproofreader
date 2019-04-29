@@ -18,7 +18,7 @@ class ImageVolumeConfigTest(AutoproofreaderTestCase):
             {
                 "id": 1,
                 "name": "test_volume_1",
-                "config_id": 1,
+                "config": "1",
                 "user": 3,
                 "project": 3,
                 "creation_time": "2001-01-01T01:01:01.001Z",
@@ -27,7 +27,7 @@ class ImageVolumeConfigTest(AutoproofreaderTestCase):
             {
                 "id": 2,
                 "name": "test_volume_2",
-                "config_id": 2,
+                "config": "2",
                 "user_id": 3,
                 "project_id": 3,
                 "creation_time": "2002-02-02T02:02:02.002Z",
@@ -37,7 +37,8 @@ class ImageVolumeConfigTest(AutoproofreaderTestCase):
         self.assertEqual(expected_result, parsed_response)
 
         response = self.client.get(
-            IMAGE_VOLUME_CONFIG_URL.format(self.test_project_id), {"server_id": 1}
+            IMAGE_VOLUME_CONFIG_URL.format(self.test_project_id),
+            {"image_volume_config_id": 1},
         )
         self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
@@ -45,7 +46,7 @@ class ImageVolumeConfigTest(AutoproofreaderTestCase):
             {
                 "id": 1,
                 "name": "test_volume_1",
-                "config_id": 1,
+                "config": "1",
                 "user": 3,
                 "project": 3,
                 "creation_time": "2001-01-01T01:01:01.001Z",
@@ -61,7 +62,7 @@ class ImageVolumeConfigTest(AutoproofreaderTestCase):
         # Test putting a image_volumes
         response = self.client.put(
             IMAGE_VOLUME_CONFIG_URL.format(self.test_project_id),
-            data={"name": "test_diluvian_model_3", "config": "test_config_3"},
+            data={"name": "test_volume_3", "config": "test_config_3"},
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
@@ -78,7 +79,7 @@ class ImageVolumeConfigTest(AutoproofreaderTestCase):
         parsed_response = json.loads(response.content.decode("utf-8"))
         expected_result = {
             "id": put_ivc,
-            "name": "test_volume_1",
+            "name": "test_volume_3",
             # "config_id": 1,
             "user_id": 3,
             "project_id": 3,

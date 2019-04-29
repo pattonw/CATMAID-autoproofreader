@@ -49,7 +49,9 @@ class DiluvianModelAPI(APIView):
         )
         model.save()
 
-        return JsonResponse({"success": True, "warnings": warnings})
+        return JsonResponse(
+            {"success": True, "warnings": warnings, "model_id": model.id}
+        )
 
     @method_decorator(requires_user_role(UserRole.QueueComputeTask))
     def get(self, request, project_id):
