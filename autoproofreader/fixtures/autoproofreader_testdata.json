@@ -103,18 +103,36 @@
         "model": "autoproofreader.autoproofreaderresult",
         "pk": 1,
         "fields": {
-            "name": "test_result",
+            "name": "test_result_1",
             "status": "queued",
             "config": 1,
             "skeleton": 1,
             "skeleton_csv": "0,0,1,2,3",
             "model": 1,
-            "data": "nothing",
-            "completion_time": "2017-05-31T19:57:35.142Z",
+            "data": "test_1",
+            "completion_time": "2001-01-01T01:01:01.001Z",
             "user": 3,
             "project": 3,
-            "creation_time": "2017-05-31T19:57:35.142Z",
-            "edition_time": "2017-05-31T19:57:35.142Z"
+            "creation_time": "2001-06-01T01:01:01.001Z",
+            "edition_time": "2002-01-01T01:01:01.001Z"
+        }
+    },
+    {
+        "model": "autoproofreader.autoproofreaderresult",
+        "pk": 2,
+        "fields": {
+            "name": "test_result_2",
+            "status": "computing",
+            "config": 2,
+            "skeleton": 2,
+            "skeleton_csv": "0,0,1,2,3",
+            "model": 2,
+            "data": "test_2",
+            "completion_time": "2002-06-01T01:01:01.001Z",
+            "user": 3,
+            "project": 3,
+            "creation_time": "2002-02-02T02:02:02.002Z",
+            "edition_time": "2003-02-02T02:02:02.002Z"
         }
     }
 ]
