@@ -1,6 +1,8 @@
 import json
-from autoproofreader.tests.common import AutoproofreaderTestCase
 from guardian.shortcuts import assign_perm
+
+from autoproofreader.tests.common import AutoproofreaderTestCase
+from autoproofreader.models import ComputeServer
 
 COMPUTE_SERVER_URL = "/ext/autoproofreader/{}/compute_server"
 
@@ -96,6 +98,8 @@ class ComputeServerTest(AutoproofreaderTestCase):
         self.fake_authentication()
         assign_perm("can_administer", self.test_user, self.test_project)
 
+        pre_delete_servers = ComputeServer.objects.all()
+
         # Delete a server
         response = self.client.delete(
             COMPUTE_SERVER_URL.format(self.test_project_id),
@@ -137,4 +141,9 @@ class ComputeServerTest(AutoproofreaderTestCase):
         # Assert that there are no more servers
         response = self.client.get(COMPUTE_SERVER_URL.format(self.test_project_id))
         self.assertEqual(len(json.loads(response.content.decode("utf-8"))), 0)
+
+        # Re-save the servers so that they are available for other tests:
+        pre_delete_servers.save()
+        response = self.client.get(COMPUTE_SERVER_URL.format(self.test_project_id))
+        self.assertEqual(len(json.loads(response.content.decode("utf-8"))), 2)
 

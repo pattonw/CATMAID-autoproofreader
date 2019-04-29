@@ -15,14 +15,20 @@ import subprocess
 class ComputeServerAPI(APIView):
     @method_decorator(requires_user_role(UserRole.Admin))
     def put(self, request, project_id):
-        address = request.POST.get("address")
-        if "name" in request.POST:
-            name = request.POST.get("name")
+        address = request.POST.get("address", request.data.get("address", None))
+        if "name" in request.POST or "name" in request.data:
+            name = request.POST.get("name", request.data.get("name", None))
         else:
             name = address.split(".")[0]
-        environment_source_path = request.POST.get("environment_source_path", None)
-        diluvian_path = request.POST.get("diluvian_path", None)
-        results_directory = request.POST.get("results_directory", None)
+        environment_source_path = request.POST.get(
+            "environment_source_path", request.data.get("environment_source_path", None)
+        )
+        diluvian_path = request.POST.get(
+            "diluvian_path", request.data.get("diluvian_path", None)
+        )
+        results_directory = request.POST.get(
+            "results_directory", request.data.get("results_directory", None)
+        )
 
         server = ComputeServer(
             name=name,
