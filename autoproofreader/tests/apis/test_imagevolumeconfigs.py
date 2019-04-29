@@ -9,7 +9,7 @@ IMAGE_VOLUME_CONFIG_URL = "/ext/autoproofreader/{}/image-volume-configs"
 class ImageVolumeConfigTest(AutoproofreaderTestCase):
     def test_get(self):
         self.fake_authentication()
-        assign_perm("can_queue_compute_task", self.test_user, self.test_project)
+        assign_perm("can_browse", self.test_user, self.test_project)
 
         response = self.client.get(IMAGE_VOLUME_CONFIG_URL.format(self.test_project_id))
         self.assertEqual(response.status_code, 200)
@@ -58,7 +58,7 @@ class ImageVolumeConfigTest(AutoproofreaderTestCase):
         self.fake_authentication()
         assign_perm("can_queue_compute_task", self.test_user, self.test_project)
 
-        # Test putting a model
+        # Test putting a image_volumes
         response = self.client.put(
             IMAGE_VOLUME_CONFIG_URL.format(self.test_project_id),
             data={"name": "test_diluvian_model_3", "config": "test_config_3"},
@@ -67,17 +67,17 @@ class ImageVolumeConfigTest(AutoproofreaderTestCase):
         self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
         self.assertTrue(parsed_response.get("success", False))
-        put_server = parsed_response.get("server_id")
+        put_ivc = parsed_response.get("image_volume_config_id")
 
-        # Test retrieving a model after it has been put
+        # Test retrieving a image_volumes after it has been put
         response = self.client.get(
             IMAGE_VOLUME_CONFIG_URL.format(self.test_project_id),
-            {"server_id": put_server},
+            {"image_volume_config_id": put_ivc},
         )
         self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
         expected_result = {
-            "id": 1,
+            "id": put_ivc,
             "name": "test_volume_1",
             # "config_id": 1,
             "user_id": 3,
@@ -94,10 +94,10 @@ class ImageVolumeConfigTest(AutoproofreaderTestCase):
         self.fake_authentication()
         assign_perm("can_queue_compute_task", self.test_user, self.test_project)
 
-        # Delete a server
+        # Delete a image_volumes
         response = self.client.delete(
             IMAGE_VOLUME_CONFIG_URL.format(self.test_project_id),
-            data={"model_id": 1},
+            data={"image_volume_config_id": 1},
             content_type="application/json",
         )
         # self.assertEqual(response.status_code, 200)
@@ -108,15 +108,15 @@ class ImageVolumeConfigTest(AutoproofreaderTestCase):
         # Attempt to delete it again
         response = self.client.delete(
             IMAGE_VOLUME_CONFIG_URL.format(self.test_project_id),
-            data={"model_id": 1},
+            data={"image_volume_config_id": 1},
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 404)
 
-        # Delete the second server
+        # Delete the second image_volumes
         response = self.client.delete(
             IMAGE_VOLUME_CONFIG_URL.format(self.test_project_id),
-            data={"model_id": 2},
+            data={"image_volume_config_id": 2},
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
@@ -127,11 +127,11 @@ class ImageVolumeConfigTest(AutoproofreaderTestCase):
         # Attempt to delete it again
         response = self.client.delete(
             IMAGE_VOLUME_CONFIG_URL.format(self.test_project_id),
-            data={"model_id": 2},
+            data={"image_volume_config_id": 2},
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 404)
 
-        # Assert that there are no more servers
+        # Assert that there are no more image_volumes
         response = self.client.get(IMAGE_VOLUME_CONFIG_URL.format(self.test_project_id))
         self.assertEqual(len(json.loads(response.content.decode("utf-8"))), 0)

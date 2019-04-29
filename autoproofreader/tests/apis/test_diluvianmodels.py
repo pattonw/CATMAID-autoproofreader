@@ -78,16 +78,16 @@ class DiluvianModelTest(AutoproofreaderTestCase):
         self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
         self.assertTrue(parsed_response.get("success", False))
-        put_server = parsed_response.get("server_id")
+        put_model = parsed_response.get("model_id")
 
         # Test retrieving a model after it has been put
         response = self.client.get(
-            DILUVIAN_MODEL_URL.format(self.test_project_id), {"server_id": put_server}
+            DILUVIAN_MODEL_URL.format(self.test_project_id), {"model_id": put_model}
         )
         self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
         expected_result = {
-            "id": 3,
+            "id": put_model,
             "name": "test_diluvian_model_3",
             "server_id": 2,
             "model_source_path": "test_3_source_path",
@@ -106,13 +106,13 @@ class DiluvianModelTest(AutoproofreaderTestCase):
         self.fake_authentication()
         assign_perm("can_queue_compute_task", self.test_user, self.test_project)
 
-        # Delete a server
+        # Delete a model
         response = self.client.delete(
             DILUVIAN_MODEL_URL.format(self.test_project_id),
             data={"model_id": 1},
             content_type="application/json",
         )
-        # self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
         expected_result = {"success": True}
         self.assertEqual(expected_result, parsed_response)
@@ -125,7 +125,7 @@ class DiluvianModelTest(AutoproofreaderTestCase):
         )
         self.assertEqual(response.status_code, 404)
 
-        # Delete the second server
+        # Delete the second model
         response = self.client.delete(
             DILUVIAN_MODEL_URL.format(self.test_project_id),
             data={"model_id": 2},
@@ -144,6 +144,6 @@ class DiluvianModelTest(AutoproofreaderTestCase):
         )
         self.assertEqual(response.status_code, 404)
 
-        # Assert that there are no more servers
+        # Assert that there are no more models
         response = self.client.get(DILUVIAN_MODEL_URL.format(self.test_project_id))
         self.assertEqual(len(json.loads(response.content.decode("utf-8"))), 0)
