@@ -98,6 +98,7 @@ class ComputeServerTest(AutoproofreaderTestCase):
         self.fake_authentication()
 
         # Copy from working script
+        assign_perm("can_administer", self.test_user, self.test_project)
         test_server = ComputeServer(
             name="test_server",
             address="test_server.org",
@@ -126,7 +127,6 @@ class ComputeServerTest(AutoproofreaderTestCase):
 
         # regular test
 
-        assign_perm("can_administer", self.test_user, self.test_project)
 
         pre_delete_servers = ComputeServer.objects.all()
 
