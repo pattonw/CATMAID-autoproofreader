@@ -4,7 +4,7 @@ from guardian.shortcuts import assign_perm
 from autoproofreader.tests.common import AutoproofreaderTestCase
 from autoproofreader.models import ComputeServer
 
-COMPUTE_SERVER_URL = "/ext/autoproofreader/{}/compute_server"
+COMPUTE_SERVER_URL = "/ext/autoproofreader/{}/compute_servers"
 
 
 class ComputeServerTest(AutoproofreaderTestCase):
