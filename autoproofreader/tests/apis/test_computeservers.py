@@ -70,11 +70,11 @@ class ComputeServerTest(AutoproofreaderTestCase):
         )
         self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
-        expected_result = {"success": True}
-        self.assertEqual(expected_result, parsed_response)
+        self.assertTrue(parsed_response.get("success", False))
+        put_server = parsed_response.get("server_id")
 
         response = self.client.get(
-            COMPUTE_SERVER_URL.format(self.test_project_id), {"server_id": 3}
+            COMPUTE_SERVER_URL.format(self.test_project_id), {"server_id": put_server}
         )
         self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
@@ -117,7 +117,9 @@ class ComputeServerTest(AutoproofreaderTestCase):
 
         # Delete the second server
         response = self.client.delete(
-            COMPUTE_SERVER_URL.format(self.test_project_id), {"server_id": 2}
+            COMPUTE_SERVER_URL.format(self.test_project_id),
+            data={"server_id": 2},
+            content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
@@ -126,7 +128,9 @@ class ComputeServerTest(AutoproofreaderTestCase):
 
         # Attempt to delete it again
         response = self.client.delete(
-            COMPUTE_SERVER_URL.format(self.test_project_id), {"server_id": 2}
+            COMPUTE_SERVER_URL.format(self.test_project_id),
+            data={"server_id": 2},
+            content_type="application/json",
         )
         self.assertEqual(response.status_code, 404)
 

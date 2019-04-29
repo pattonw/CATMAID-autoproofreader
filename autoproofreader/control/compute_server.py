@@ -1,4 +1,4 @@
-from django.http import JsonResponse, QueryDict
+from django.http import JsonResponse
 from django.db import connection
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
@@ -34,7 +34,7 @@ class ComputeServerAPI(APIView):
         )
         server.save()
 
-        return JsonResponse({"success": True})
+        return JsonResponse({"success": True, "server_id": server.id})
 
     @method_decorator(requires_user_role(UserRole.Browse))
     def get(self, request, project_id):
