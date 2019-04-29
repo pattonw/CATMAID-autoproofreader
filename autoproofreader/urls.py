@@ -8,6 +8,7 @@ from autoproofreader.control import (
     is_installed,
     diluvian_model,
     image_volume_config,
+    tests,
 )
 
 app_name = "autoproofreader"
@@ -54,3 +55,6 @@ urlpatterns += [
         image_volume_config.ImageVolumeConfigAPI.as_view(),
     )
 ]
+
+# Examples showing strange behavior with respect to the parameters sent to an APIView
+urlpatterns += [url(r"^(?P<project_id>\d+)/tests$", tests.TestAPI.as_view())]
