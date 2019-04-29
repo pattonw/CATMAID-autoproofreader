@@ -96,6 +96,36 @@ class ComputeServerTest(AutoproofreaderTestCase):
 
     def test_delete(self):
         self.fake_authentication()
+
+        # Copy from working script
+        test_server = ComputeServer(
+            name="test_server",
+            address="test_server.org",
+            diluvian_path="test_diluvian",
+            results_directory="test_results",
+            environment_source_path="test_env",
+            editor_id=1,
+        )
+        test_server.save()
+
+        url = "/ext/autoproofreader/1/compute-servers"
+
+        test_servers = ComputeServer.objects.filter(name="test_server")
+        server_id = test_servers[0].id
+
+        response = self.client.delete(
+            COMPUTE_SERVER_URL.format(self.test_project_id),
+            data={"server_id": server_id},
+            content_type="application/json",
+        )
+        print(response.status_code)
+        print(json.loads(response.content.decode("utf-8")))
+
+        test_servers = ComputeServer.objects.filter(name="test_server")
+        print(test_servers)
+
+        # regular test
+
         assign_perm("can_administer", self.test_user, self.test_project)
 
         pre_delete_servers = ComputeServer.objects.all()
