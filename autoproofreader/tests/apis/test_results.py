@@ -32,6 +32,8 @@ class ResultsTest(AutoproofreaderTestCase):
                 "volume_id": None,
                 "private": False,
                 "permanent": True,
+                "uuid": "11111111-1111-1111-1111-111111111111",
+                "errors": "1 error",
             },
             {
                 "id": 2,
@@ -50,6 +52,7 @@ class ResultsTest(AutoproofreaderTestCase):
                 "volume_id": None,
                 "private": False,
                 "permanent": True,
+                "errors": "2 errors",
             },
         ]
         self.assertEqual(expected_result, parsed_response)
@@ -77,8 +80,25 @@ class ResultsTest(AutoproofreaderTestCase):
                 "volume_id": None,
                 "private": False,
                 "permanent": True,
+                "errors": "1 error",
             }
         ]
+        self.assertEqual(expected_result, parsed_response)
+
+        response = self.client.get(
+            RESULTS_URL.format(self.test_project_id), {"result_id": 1, "uuid": True}
+        )
+        self.assertEqual(response.status_code, 200)
+        parsed_response = json.loads(response.content.decode("utf-8"))
+        expected_result = ["11111111-1111-1111-1111-111111111111"]
+        self.assertEqual(expected_result, parsed_response)
+
+        response = self.client.get(
+            RESULTS_URL.format(self.test_project_id), {"result_id": 1, "uuid": True}
+        )
+        self.assertEqual(response.status_code, 200)
+        parsed_response = json.loads(response.content.decode("utf-8"))
+        expected_result = ["22222222-2222-2222-2222-222222222222"]
         self.assertEqual(expected_result, parsed_response)
 
     def test_delete(self):

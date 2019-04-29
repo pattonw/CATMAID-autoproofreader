@@ -370,6 +370,9 @@ class AutoproofreaderResultAPI(APIView):
             required: false
             defaultValue: false
         """
+        if request.query_params.get("uuid", request.data.get("uuid", False)):
+            return self.get_uuid(request, project_id)
+
         result_id = request.query_params.get(
             "result_id", request.data.get("result_id", None)
         )
@@ -377,6 +380,17 @@ class AutoproofreaderResultAPI(APIView):
 
         return JsonResponse(
             result, safe=False, json_dumps_params={"sort_keys": True, "indent": 4}
+        )
+
+    @method_decorator(requires_user_role(UserRole.Browse))
+    def get_uuid(self, request, project_id):
+        result_id = request.query_params.get(
+            "result_id", request.data.get("result_id", None)
+        )
+        result = get_object_or_404(AutoproofreaderResult, id=result_id)
+
+        return JsonResponse(
+            result.uuid, safe=False, json_dumps_params={"sort_keys": True, "indent": 4}
         )
 
     @method_decorator(requires_user_role(UserRole.QueueComputeTask))
