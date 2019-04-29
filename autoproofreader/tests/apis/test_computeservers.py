@@ -91,22 +91,8 @@ class ComputeServerTest(AutoproofreaderTestCase):
         }
         # edition time can't be known exactly so check the rest
         self.assertEqual(len(parsed_response), 1)
-        for k, v in expected_result[0].items():
-            self.assertEqual(v, parsed_response[k])
-
-    def test_delete_0(self):
-        self.fake_authentication()
-        assign_perm("can_administer", self.test_user, self.test_project)
-
-        # Delete a server
-        response = self.client.delete(
-            COMPUTE_SERVER_URL.format(self.test_project_id),
-            data={"server_id": 1},
-        )
-        # self.assertEqual(response.status_code, 200)
-        parsed_response = json.loads(response.content.decode("utf-8"))
-        expected_result = {"success": True}
-        print(expected_result, parsed_response)
+        for k, v in expected_result.items():
+            self.assertEqual(v, parsed_response[0][k])
 
     def test_delete(self):
         self.fake_authentication()
@@ -116,7 +102,7 @@ class ComputeServerTest(AutoproofreaderTestCase):
         response = self.client.delete(
             COMPUTE_SERVER_URL.format(self.test_project_id),
             data={"server_id": 1},
-            content_type="multipart/form-data",
+            content_type="application/json",
         )
         # self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
@@ -153,9 +139,4 @@ class ComputeServerTest(AutoproofreaderTestCase):
         # Assert that there are no more servers
         response = self.client.get(COMPUTE_SERVER_URL.format(self.test_project_id))
         self.assertEqual(len(json.loads(response.content.decode("utf-8"))), 0)
-
-        # Re-save the servers so that they are available for other tests:
-        pre_delete_servers.save()
-        response = self.client.get(COMPUTE_SERVER_URL.format(self.test_project_id))
-        self.assertEqual(len(json.loads(response.content.decode("utf-8"))), 2)
 
