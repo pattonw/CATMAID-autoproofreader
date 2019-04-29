@@ -81,6 +81,7 @@ class ComputeServerAPI(APIView):
     @method_decorator(requires_user_role(UserRole.Admin))
     def delete(self, request, project_id):
         # can_edit_or_fail(request.user, point_id, "point")
+        return JsonResponse({"data": str(request.data)})
         server_id = request.query_params.get(
             "server_id", request.data.get("server_id", None)
         )
