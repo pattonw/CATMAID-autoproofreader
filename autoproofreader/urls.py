@@ -47,7 +47,7 @@ urlpatterns += [
     )
 ]
 
-# Volume Configs
+# Image Volume Configs
 urlpatterns += [
     url(
         r"^(?P<project_id>\d+)/image-volume-configs$",

@@ -76,6 +76,30 @@
         }
     },
     {
+        "model": "autoproofreader.imagevolumeconfig",
+        "pk": 1,
+        "fields": {
+            "name": "test_volume_1",
+            "config": 1,
+            "user": 3,
+            "project": 3,
+            "creation_time": "2001-01-01T01:01:01.001Z",
+            "edition_time": "2002-01-01T01:01:01.001Z"
+        }
+    },
+    {
+        "model": "autoproofreader.imagevolumeconfig",
+        "pk": 2,
+        "fields": {
+            "name": "test_volume_2",
+            "config": 2,
+            "user": 3,
+            "project": 3,
+            "creation_time": "2002-02-02T02:02:02.002Z",
+            "edition_time": "2003-02-02T02:02:02.002Z"
+        }
+    },
+    {
         "model": "autoproofreader.autoproofreaderresult",
         "pk": 1,
         "fields": {
@@ -93,16 +117,4 @@
             "edition_time": "2017-05-31T19:57:35.142Z"
         }
     },
-    {
-        "model": "autoproofreader.imagevolumeconfig",
-        "pk": 1,
-        "fields": {
-            "name": "test_volume",
-            "config": "volume",
-            "user": 3,
-            "project": 3,
-            "creation_time": "2017-05-31T19:57:35.142Z",
-            "edition_time": "2017-05-31T19:57:35.142Z"
-        }
-    }
 ]
