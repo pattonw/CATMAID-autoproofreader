@@ -94,6 +94,50 @@ class ComputeServerTest(AutoproofreaderTestCase):
         for k, v in expected_result[0].items():
             self.assertEqual(v, parsed_response[k])
 
+    def test_delete_0(self):
+        self.fake_authentication()
+        assign_perm("can_administer", self.test_user, self.test_project)
+
+        # Delete a server
+        response = self.client.delete(
+            COMPUTE_SERVER_URL.format(self.test_project_id),
+            data={"server_id": 1},
+        )
+        # self.assertEqual(response.status_code, 200)
+        parsed_response = json.loads(response.content.decode("utf-8"))
+        expected_result = {"success": True}
+        print(expected_result, parsed_response)
+
+        # Attempt to delete it again
+        response = self.client.delete(
+            COMPUTE_SERVER_URL.format(self.test_project_id),
+            data={"server_id": 1},
+        )
+        print(response.status_code, 404)
+
+        # Delete the second server
+        response = self.client.delete(
+            COMPUTE_SERVER_URL.format(self.test_project_id),
+            data={"server_id": 2},
+            content_type="application/json",
+        )
+        print(response.status_code, 200)
+        parsed_response = json.loads(response.content.decode("utf-8"))
+        expected_result = {"success": True}
+        print(expected_result, parsed_response)
+
+        # Attempt to delete it again
+        response = self.client.delete(
+            COMPUTE_SERVER_URL.format(self.test_project_id),
+            data={"server_id": 2},
+            content_type="application/json",
+        )
+        print(response.status_code, 404)
+
+        # Assert that there are no more servers
+        response = self.client.get(COMPUTE_SERVER_URL.format(self.test_project_id))
+        print(len(json.loads(response.content.decode("utf-8"))), 0)
+
     def test_delete(self):
         self.fake_authentication()
         assign_perm("can_administer", self.test_user, self.test_project)
