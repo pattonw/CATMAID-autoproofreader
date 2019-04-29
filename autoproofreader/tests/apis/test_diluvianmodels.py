@@ -10,7 +10,7 @@ class DiluvianModelTest(AutoproofreaderTestCase):
     def test_get(self):
         self.fake_authentication()
         assign_perm("can_queue_compute_task", self.test_user, self.test_project)
-        
+
         response = self.client.get(DILUVIAN_MODEL_URL.format(self.test_project_id))
         self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
@@ -18,22 +18,22 @@ class DiluvianModelTest(AutoproofreaderTestCase):
             {
                 "id": 1,
                 "name": "test_diluvian_model_1",
-                "server": 1,
+                "server_id": 1,
                 "model_source_path": "test_1",
-                "config": 1,
-                "user": 3,
-                "project": 3,
+                "config_id": 1,
+                "user_id": 3,
+                "project_id": 3,
                 "creation_time": "2001-01-01T01:01:01.001Z",
                 "edition_time": "2002-01-01T01:01:01.001Z",
             },
             {
                 "id": 2,
                 "name": "test_diluvian_model_2",
-                "server": 2,
+                "server_id": 2,
                 "model_source_path": "test_2",
-                "config": 2,
-                "user": 3,
-                "project": 3,
+                "config_id": 2,
+                "user_id": 3,
+                "project_id": 3,
                 "creation_time": "2002-02-02T02:02:02.002Z",
                 "edition_time": "2003-02-02T02:02:02.002Z",
             },
@@ -49,11 +49,11 @@ class DiluvianModelTest(AutoproofreaderTestCase):
             {
                 "id": 1,
                 "name": "test_diluvian_model_1",
-                "server": 1,
+                "server_id": 1,
                 "model_source_path": "test_1",
-                "config": 1,
-                "user": 3,
-                "project": 3,
+                "config_id": 1,
+                "user_id": 3,
+                "project_id": 3,
                 "creation_time": "2001-01-01T01:01:01.001Z",
                 "edition_time": "2002-01-01T01:01:01.001Z",
             }
@@ -89,11 +89,11 @@ class DiluvianModelTest(AutoproofreaderTestCase):
         expected_result = {
             "id": 3,
             "name": "test_diluvian_model_3",
-            "server": 2,
+            "server_id": 2,
             "model_source_path": "test_3_source_path",
-            # "config": 2,
-            "user": self.test_user_id,
-            "project": self.test_project_id,
+            # "config_id": 2,
+            "user_id": self.test_user_id,
+            "project_id": self.test_project_id,
             # "creation_time": "2001-01-01T01:01:01.001Z",
             # "edition_time": "2002-01-01T01:01:01.001Z",
         }
@@ -147,4 +147,3 @@ class DiluvianModelTest(AutoproofreaderTestCase):
         # Assert that there are no more servers
         response = self.client.get(DILUVIAN_MODEL_URL.format(self.test_project_id))
         self.assertEqual(len(json.loads(response.content.decode("utf-8"))), 0)
-

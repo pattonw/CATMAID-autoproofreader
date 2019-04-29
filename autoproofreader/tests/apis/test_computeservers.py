@@ -138,4 +138,3 @@ class ComputeServerTest(AutoproofreaderTestCase):
         # Assert that there are no more servers
         response = self.client.get(COMPUTE_SERVER_URL.format(self.test_project_id))
         self.assertEqual(len(json.loads(response.content.decode("utf-8"))), 0)
-
