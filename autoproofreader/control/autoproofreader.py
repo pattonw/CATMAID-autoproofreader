@@ -424,7 +424,7 @@ class AutoproofreaderResultAPI(APIView):
             )
         desc = cursor.description
         columns = [col[0] for col in desc]
-        uuid_index = desc.index("uuid")
+        uuid_index = columns.index("uuid")
         columns_without_uuid = [
             columns[i] for i in range(len(columns)) if i != uuid_index
         ]
