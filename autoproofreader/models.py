@@ -85,7 +85,7 @@ class AutoproofreaderResult(UserFocusedModel):
     data = models.TextField(null=True, blank=True)  # will contain results or errors
 
 
-class ProofreadTreeNodes(models.Model):
+class ProofreadTreeNodes(UserFocusedModel):
     """
     Stores all proofread nodes allong with their scores for connectivity and missing branches.
     Also keeps track of which nodes have been visited
