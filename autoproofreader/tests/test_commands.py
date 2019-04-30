@@ -44,8 +44,8 @@ class CommandsTests(AutoproofreaderTestCase):
             private=False,
             permanent=True,
             errors="None",
-            creation_time=datetime.datetime.now() - datetime.delta(days=7),
-            edition_time=datetime.datetime.now() - datetime.delta(days=7),
+            creation_time=datetime.datetime.now() - datetime.timedelta(days=7),
+            edition_time=datetime.datetime.now() - datetime.timedelta(days=7),
             user_id=3,
             project_id=3,
         ).save()
