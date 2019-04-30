@@ -22,7 +22,7 @@ class CommandsTests(AutoproofreaderTestCase):
         AutoproofreaderResult(
             name="test_recent",
             status="complete",
-            config="None",
+            config_id=1,
             skeleton=1,
             skeleton_csv="None",
             model=1,
@@ -35,14 +35,14 @@ class CommandsTests(AutoproofreaderTestCase):
             project_id=3,
         ).save()
         AutoproofreaderResult(
-            name="test_recent",
+            name="test_old_permanent",
             status="complete",
-            config="None",
-            skeleton=1,
+            config_id=2,
+            skeleton=2,
             skeleton_csv="None",
-            model=1,
+            model=2,
             private=False,
-            permanent=False,
+            permanent=True,
             errors="None",
             creation_time=datetime.datetime.now() - datetime.delta(days=7),
             edition_time=datetime.datetime.now() - datetime.delta(days=7),

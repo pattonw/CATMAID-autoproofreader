@@ -379,21 +379,23 @@ class AutoproofreaderResultAPI(APIView):
             query_set = AutoproofreaderResult.objects.filter(
                 Q(id=result_id) & (Q(user=request.user.id) | Q(private=False))
             )
+            if len(query_set) == 0:
+                return HttpResponseNotFound(
+                    "No results found with id {}".format(result_id)
+                )
         else:
             query_set = AutoproofreaderResult.objects.filter(
                 Q(user=request.user.id) | Q(private=False)
             )
-        if len(query_set) == 0:
-            return HttpResponseNotFound("No results found")
+            if len(query_set) == 0 and result_id is not None:
+                return JsonResponse([])
 
         get_uuid = request.query_params.get("uuid", request.data.get("uuid", False))
         if get_uuid and result_id is not None and len(query_set) == 1:
             return JsonResponse(query_set[0].uuid)
         elif len(query_set) > 0:
             return JsonResponse(
-                AutoproofreaderResultSerializer(
-                    query_set, many=True if len(query_set) > 1 else False
-                ).data,
+                AutoproofreaderResultSerializer(query_set, many=True).data,
                 safe=False,
                 json_dumps_params={"sort_keys": True, "indent": 4},
             )
