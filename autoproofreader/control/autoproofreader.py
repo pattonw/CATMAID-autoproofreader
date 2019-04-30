@@ -382,7 +382,6 @@ class AutoproofreaderResultAPI(APIView):
             result, safe=False, json_dumps_params={"sort_keys": True, "indent": 4}
         )
 
-    @method_decorator(requires_user_role(UserRole.Browse))
     def get_uuid(self, request, project_id):
         result_id = request.query_params.get(
             "result_id", request.data.get("result_id", None)
