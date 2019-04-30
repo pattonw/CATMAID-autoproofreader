@@ -40,10 +40,10 @@ class ProofreadTreeNodeAPI(APIView):
             "result_id", request.data.get("result_id", None)
         )
         if result_id is not None:
-            nodes = [
-                ProofreadTreeNodesSerializer(node).data
-                for node in ProofreadTreeNodes.objects.filter(result_id=result_id)
-            ]
+            nodes = ProofreadTreeNodesSerializer(
+                ProofreadTreeNodes.objects.filter(result_id=result_id), many=True
+            )
+
         else:
             nodes = []
 
