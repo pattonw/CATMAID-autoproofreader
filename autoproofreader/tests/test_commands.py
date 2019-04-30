@@ -54,12 +54,12 @@ class CommandsTests(AutoproofreaderTestCase):
         old = Q(
             completion_time__lt=datetime.datetime.now() - datetime.timedelta(days=1)
         )
-        self.assertEqual(len(AutoproofreaderResult.objects.all()), 4)
+        self.assertEqual(len(AutoproofreaderResult.objects.all()), 5)
         self.assertEqual(
             len(AutoproofreaderResult.objects.filter(old & Q(permanent=False))), 1
         )
         call_command("clear_old_results", "-y")
-        self.assertEqual(len(AutoproofreaderResult.objects.all()), 3)
+        self.assertEqual(len(AutoproofreaderResult.objects.all()), 4)
         self.assertEqual(
             len(AutoproofreaderResult.objects.filter(old & Q(permanent=False))), 0
         )
