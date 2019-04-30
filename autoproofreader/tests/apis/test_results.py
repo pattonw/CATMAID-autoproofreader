@@ -94,7 +94,7 @@ class ResultsTest(AutoproofreaderTestCase):
         self.assertEqual(expected_result, parsed_response)
 
         response = self.client.get(
-            RESULTS_URL.format(self.test_project_id), {"result_id": 1, "uuid": True}
+            RESULTS_URL.format(self.test_project_id), {"result_id": 2, "uuid": True}
         )
         self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
