@@ -1,11 +1,7 @@
 import datetime
 
 from django.core.management.base import BaseCommand
-from django.apps import apps
-from django.db import connection
 from django.db.models import Q
-
-from psycopg2.extensions import AsIs
 
 from autoproofreader.models import AutoproofreaderResult
 
@@ -40,4 +36,3 @@ class Command(BaseCommand):
             return
         else:
             old_results.delete()
-
