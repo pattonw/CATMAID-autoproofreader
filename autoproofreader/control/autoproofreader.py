@@ -392,7 +392,7 @@ class AutoproofreaderResultAPI(APIView):
 
         get_uuid = request.query_params.get("uuid", request.data.get("uuid", False))
         if get_uuid and result_id is not None and len(query_set) == 1:
-            return JsonResponse(query_set[0].uuid)
+            return JsonResponse(query_set[0].uuid, safe=False)
         elif len(query_set) > 0:
             return JsonResponse(
                 AutoproofreaderResultSerializer(query_set, many=True).data,
