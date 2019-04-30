@@ -406,11 +406,11 @@ class AutoproofreaderResultAPI(APIView):
         result_id = request.query_params.get(
             "result_id", request.data.get("result_id", None)
         )
-        if result_id is not None:
-            result = get_object_or_404(AutoproofreaderResult, id=result_id)
-            result.delete()
-            return JsonResponse({"success": True})
-        return JsonResponse({"success": False})
+        result = get_object_or_404(
+            AutoproofreaderResult, id=result_id, user_id=request.user.id
+        )
+        result.delete()
+        return JsonResponse({"success": True})
 
     def get_results(self, result_id=None):
         cursor = connection.cursor()

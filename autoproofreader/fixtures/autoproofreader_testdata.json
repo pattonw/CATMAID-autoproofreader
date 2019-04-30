@@ -148,6 +148,28 @@
         }
     },
     {
+        "model": "autoproofreader.autoproofreaderresult",
+        "pk": 3,
+        "fields": {
+            "name": "test_result_3",
+            "status": "computing",
+            "config": 2,
+            "skeleton": 2,
+            "skeleton_csv": "0,0,1,2,3",
+            "model": 2,
+            "data": "test_2",
+            "completion_time": "2002-06-01T01:01:01.001Z",
+            "user": 5,
+            "project": 3,
+            "creation_time": "2002-02-02T02:02:02.002Z",
+            "edition_time": "2003-02-02T02:02:02.002Z",
+            "private": true,
+            "permanent": true,
+            "uuid": "22222222-2222-2222-2222-222222222222",
+            "errors": "2 errors"
+        }
+    },
+    {
         "model": "autoproofreader.proofreadtreenodes",
         "pk": 1,
         "fields": {
