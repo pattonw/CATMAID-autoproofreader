@@ -6,6 +6,7 @@ from django.utils import timezone
 from catmaid.models import User, Volume, UserFocusedModel, ClassInstance
 import uuid
 from rest_framework import serializers
+import pytz
 
 
 class ComputeServer(models.Model):
@@ -110,6 +111,9 @@ class ProofreadTreeNodes(UserFocusedModel):
 
 
 class ProofreadTreeNodesSerializer(serializers.ModelSerializer):
+    creation_time = serializers.DateTimeField(default_timezone=pytz.timezone("UTC"))
+    edition_time = serializers.DateTimeField(default_timezone=pytz.timezone("UTC"))
+
     class Meta:
         model = ProofreadTreeNodes
         fields = "__all__"
