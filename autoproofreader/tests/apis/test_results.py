@@ -90,7 +90,6 @@ class ResultsTest(AutoproofreaderTestCase):
         self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
         expected_result = "11111111-1111-1111-1111-111111111111"
-        print(parsed_response)
         self.assertEqual(expected_result, parsed_response)
 
         response = self.client.get(
