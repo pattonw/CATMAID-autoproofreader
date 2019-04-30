@@ -433,4 +433,3 @@ class AutoproofreaderResultAPI(APIView):
         ]
 
         return [dict(zip(columns_without_uuid, row)) for row in rows_without_uuid]
-
