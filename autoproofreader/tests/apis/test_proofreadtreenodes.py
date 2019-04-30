@@ -34,8 +34,8 @@ class ProofreadTreeNodesTest(AutoproofreaderTestCase):
                 "editor": 3,
                 "user": 3,
                 "project": 3,
-                "creation_time": "1001-01-01T01:01:01.001Z",
-                "edition_time": "1002-01-01T01:01:01.001Z",
+                "creation_time": "1001-01-01T01:01:01.001000Z",
+                "edition_time": "1002-01-01T01:01:01.001000Z",
             },
             {
                 "id": 2,
@@ -54,8 +54,8 @@ class ProofreadTreeNodesTest(AutoproofreaderTestCase):
                 "editor": 3,
                 "user": 3,
                 "project": 3,
-                "creation_time": "1002-01-01T01:01:01.001Z",
-                "edition_time": "1003-01-01T01:01:01.001Z",
+                "creation_time": "1002-01-01T01:01:01.001000Z",
+                "edition_time": "1003-01-01T01:01:01.001000Z",
             },
             {
                 "id": 3,
@@ -74,8 +74,8 @@ class ProofreadTreeNodesTest(AutoproofreaderTestCase):
                 "editor": 3,
                 "user": 3,
                 "project": 3,
-                "creation_time": "1003-01-01T01:01:01.001Z",
-                "edition_time": "1004-01-01T01:01:01.001Z",
+                "creation_time": "1003-01-01T01:01:01.001000Z",
+                "edition_time": "1004-01-01T01:01:01.001000Z",
             },
             {
                 "id": 4,
@@ -94,8 +94,8 @@ class ProofreadTreeNodesTest(AutoproofreaderTestCase):
                 "editor": 3,
                 "user": 3,
                 "project": 3,
-                "creation_time": "1004-01-01T01:01:01.001Z",
-                "edition_time": "1005-01-01T01:01:01.001Z",
+                "creation_time": "1004-01-01T01:01:01.001000Z",
+                "edition_time": "1005-01-01T01:01:01.001000Z",
             },
         ]
         self.assertEqual(expected_result, parsed_response)
@@ -123,8 +123,8 @@ class ProofreadTreeNodesTest(AutoproofreaderTestCase):
                 "editor": 3,
                 "user": 3,
                 "project": 3,
-                "creation_time": "1001-01-01T01:01:01.001Z",
-                "edition_time": "1002-01-01T01:01:01.001Z",
+                "creation_time": "1001-01-01T01:01:01.001000Z",
+                "edition_time": "1002-01-01T01:01:01.001000Z",
             },
             {
                 "id": 2,
@@ -143,8 +143,8 @@ class ProofreadTreeNodesTest(AutoproofreaderTestCase):
                 "editor": 3,
                 "user": 3,
                 "project": 3,
-                "creation_time": "1002-01-01T01:01:01.001Z",
-                "edition_time": "1003-01-01T01:01:01.001Z",
+                "creation_time": "1002-01-01T01:01:01.001000Z",
+                "edition_time": "1003-01-01T01:01:01.001000Z",
             },
         ]
         self.assertEqual(expected_result, parsed_response)
