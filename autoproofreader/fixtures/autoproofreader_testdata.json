@@ -152,7 +152,7 @@
         "pk": 1,
         "fields": {
             "node_id": 1,
-            "parent": null,
+            "parent_id": null,
             "x": 1,
             "y": 1,
             "z": 1,
@@ -170,7 +170,7 @@
         "pk": 2,
         "fields": {
             "node_id": 2,
-            "parent": 1,
+            "parent_id": 1,
             "x": 2,
             "y": 2,
             "z": 2,
@@ -188,7 +188,7 @@
         "pk": 3,
         "fields": {
             "node_id": 1,
-            "parent": null,
+            "parent_id": null,
             "x": 3,
             "y": 3,
             "z": 3,
