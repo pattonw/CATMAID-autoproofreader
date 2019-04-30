@@ -42,12 +42,12 @@ class ProofreadTreeNodeAPI(APIView):
         if result_id is not None:
             nodes = ProofreadTreeNodesSerializer(
                 ProofreadTreeNodes.objects.filter(result_id=result_id), many=True
-            )
+            ).data
 
         else:
             nodes = ProofreadTreeNodesSerializer(
                 ProofreadTreeNodes.objects.all(), many=True
-            )
+            ).data
 
         return JsonResponse(
             nodes, safe=False, json_dumps_params={"sort_keys": True, "indent": 4}
