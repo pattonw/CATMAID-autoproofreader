@@ -92,7 +92,7 @@ class ProofreadTreeNodes(models.Model):
     """
 
     node_id = models.IntegerField()
-    parent = models.ForeignKey("self", on_delete=models.CASCADE)
+    parent_id = models.IntegerField()
     x = models.FloatField()
     y = models.FloatField()
     z = models.FloatField()

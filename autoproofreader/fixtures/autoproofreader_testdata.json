@@ -146,5 +146,77 @@
             "uuid": "22222222-2222-2222-2222-222222222222",
             "errors": "2 errors"
         }
+    },
+    {
+        "model": "autoproofreader.proofreadtreenodes",
+        "pk": 1,
+        "fields": {
+            "node_id": 1,
+            "parent": null,
+            "x": 1,
+            "y": 1,
+            "z": 1,
+            "branch_score": 1,
+            "branch_dx": 1,
+            "branch_dy": 1,
+            "branch_dz": 1,
+            "connectivity_score": 1,
+            "reviewed": false,
+            "result": 1
+        }
+    },
+    {
+        "model": "autoproofreader.proofreadtreenodes",
+        "pk": 2,
+        "fields": {
+            "node_id": 2,
+            "parent": 1,
+            "x": 2,
+            "y": 2,
+            "z": 2,
+            "branch_score": 2,
+            "branch_dx": 2,
+            "branch_dy": 2,
+            "branch_dz": 2,
+            "connectivity_score": 2,
+            "reviewed": false,
+            "result": 1
+        }
+    },
+    {
+        "model": "autoproofreader.proofreadtreenodes",
+        "pk": 3,
+        "fields": {
+            "node_id": 1,
+            "parent": null,
+            "x": 3,
+            "y": 3,
+            "z": 3,
+            "branch_score": 3,
+            "branch_dx": 3,
+            "branch_dy": 3,
+            "branch_dz": 3,
+            "connectivity_score": 3,
+            "reviewed": false,
+            "result": 2
+        }
+    },
+    {
+        "model": "autoproofreader.proofreadtreenodes",
+        "pk": 4,
+        "fields": {
+            "node_id": 2,
+            "parent_id": 1,
+            "x": 4,
+            "y": 4,
+            "z": 4,
+            "branch_score": 4,
+            "branch_dx": 4,
+            "branch_dy": 4,
+            "branch_dz": 4,
+            "connectivity_score": 4,
+            "reviewed": false,
+            "result": 2
+        }
     }
 ]

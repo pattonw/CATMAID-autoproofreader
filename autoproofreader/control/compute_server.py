@@ -30,7 +30,7 @@ class ComputeServerAPI(APIView):
             "results_directory", request.data.get("results_directory", None)
         )
         ssh_user = request.POST.get("ssh_user", request.data.get("ssh_user", None))
-        ssh_key = request.POST.get("ssh_key", request.data.get("ssh_key", None))
+        ssh_key = request.POST.get("ssh_key", request.data.get("ssh_key", name))
 
         server = ComputeServer(
             name=name,
