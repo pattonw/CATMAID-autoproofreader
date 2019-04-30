@@ -35,14 +35,14 @@ class CommandsTests(AutoproofreaderTestCase):
             project_id=3,
         ).save()
         AutoproofreaderResult(
-            name="test_old_permanent",
+            name="test_old",
             status="complete",
             config_id=2,
             skeleton_id=2,
             skeleton_csv="None",
             model_id=2,
             private=False,
-            permanent=True,
+            permanent=False,
             errors="None",
             creation_time=datetime.datetime.now() - datetime.timedelta(days=7),
             edition_time=datetime.datetime.now() - datetime.timedelta(days=7),
@@ -52,12 +52,12 @@ class CommandsTests(AutoproofreaderTestCase):
         old = Q(
             completion_time__lt=datetime.datetime.now() - datetime.timedelta(days=1)
         )
-        self.assertEqual(
-            len(AutoproofreaderResult.objects.filter(old & Q(permanent=False))), 2
-        )
         self.assertEqual(len(AutoproofreaderResult.objects.all()), 4)
-        call_command("clear_old_results", "-y")
         self.assertEqual(
-            len(AutoproofreaderResult.objects.filter(old & Q(permanent=False))), 0
+            len(AutoproofreaderResult.objects.filter(old & Q(permanent=False))), 1
         )
-        self.assertEqual(len(AutoproofreaderResult.objects.all()), 2)
+        call_command("clear_old_results", "-y")
+        self.assertEqual(len(AutoproofreaderResult.objects.all()), 3)
+        self.assertEqual(
+            len(AutoproofreaderResult.objects.filter(old & Q(permanent=False))), 1
+        )
