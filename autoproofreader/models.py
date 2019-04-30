@@ -88,6 +88,7 @@ class AutoproofreaderResult(UserFocusedModel):
 
 
 class AutoproofreaderResultSerializer(serializers.ModelSerializer):
+    completion_time = serializers.DateTimeField(default_timezone=pytz.timezone("UTC"))
     creation_time = serializers.DateTimeField(default_timezone=pytz.timezone("UTC"))
     edition_time = serializers.DateTimeField(default_timezone=pytz.timezone("UTC"))
 
