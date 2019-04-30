@@ -166,8 +166,8 @@
             "editor_id": 3,
             "user_id": 3,
             "project_id": 3,
-            "creation_time": "1001-01-01T01:01:01.001+05:00",
-            "edition_time": "1002-01-01T01:01:01.001+05:00"
+            "creation_time": "1001-01-01T01:01:01.001Z",
+            "edition_time": "1002-01-01T01:01:01.001Z"
         }
     },
     {
@@ -189,8 +189,8 @@
             "editor_id": 3,
             "user_id": 3,
             "project_id": 3,
-            "creation_time": "1002-01-01T01:01:01.001+05:00",
-            "edition_time": "1003-01-01T01:01:01.001+05:00"
+            "creation_time": "1002-01-01T01:01:01.001Z",
+            "edition_time": "1003-01-01T01:01:01.001Z"
         }
     },
     {
@@ -212,8 +212,8 @@
             "editor_id": 3,
             "user_id": 3,
             "project_id": 3,
-            "creation_time": "1003-01-01T01:01:01.001+05:00",
-            "edition_time": "1004-01-01T01:01:01.001+05:00"
+            "creation_time": "1003-01-01T01:01:01.001Z",
+            "edition_time": "1004-01-01T01:01:01.001Z"
         }
     },
     {
@@ -235,8 +235,8 @@
             "editor_id": 3,
             "user_id": 3,
             "project_id": 3,
-            "creation_time": "1004-01-01T01:01:01.001+05:00",
-            "edition_time": "1005-01-01T01:01:01.001+05:00"
+            "creation_time": "1004-01-01T01:01:01.001Z",
+            "edition_time": "1005-01-01T01:01:01.001Z"
         }
     }
 ]
