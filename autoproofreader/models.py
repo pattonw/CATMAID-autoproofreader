@@ -103,7 +103,9 @@ class ProofreadTreeNodes(UserFocusedModel):
     connectivity_score = models.FloatField()
     reviewed = models.BooleanField(default=False)
     result = models.ForeignKey(AutoproofreaderResult, on_delete=models.CASCADE)
-    editor = models.ForeignKey(User, on_delete=models.CASCADE)
+    editor = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="proofread_node_editor"
+    )
 
 
 class ImageVolumeConfig(UserFocusedModel):
