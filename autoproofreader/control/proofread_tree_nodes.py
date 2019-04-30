@@ -3,7 +3,7 @@ from django.utils.decorators import method_decorator
 
 from catmaid.control.authentication import requires_user_role
 from catmaid.models import UserRole
-from autoproofreader.models import ProofreadTreeNodes
+from autoproofreader.models import ProofreadTreeNodes, ProofreadTreeNodesSerializer
 from rest_framework.views import APIView
 
 
@@ -40,9 +40,12 @@ class ProofreadTreeNodeAPI(APIView):
             "result_id", request.data.get("result_id", None)
         )
         if result_id is not None:
-            nodes = ProofreadTreeNodes.objects.filter(result_id=result_id)
+            nodes = [
+                ProofreadTreeNodesSerializer(node).data
+                for node in ProofreadTreeNodes.objects.filter(result_id=result_id)
+            ]
         else:
-            nodes = ProofreadTreeNodes.objects.all()
+            nodes = []
 
         return JsonResponse(
             nodes, safe=False, json_dumps_params={"sort_keys": True, "indent": 4}

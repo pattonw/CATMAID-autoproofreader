@@ -5,6 +5,7 @@ from django.db import models
 from django.utils import timezone
 from catmaid.models import User, Volume, UserFocusedModel, ClassInstance
 import uuid
+from rest_framework import serializers
 
 
 class ComputeServer(models.Model):
@@ -106,6 +107,12 @@ class ProofreadTreeNodes(UserFocusedModel):
     editor = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="proofread_node_editor"
     )
+
+
+class ProofreadTreeNodesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProofreadTreeNodes
+        fields = "__all__"
 
 
 class ImageVolumeConfig(UserFocusedModel):
