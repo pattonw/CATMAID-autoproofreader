@@ -45,7 +45,9 @@ class ProofreadTreeNodeAPI(APIView):
             )
 
         else:
-            nodes = []
+            nodes = ProofreadTreeNodesSerializer(
+                ProofreadTreeNodes.objects.all(), many=True
+            )
 
         return JsonResponse(
             nodes, safe=False, json_dumps_params={"sort_keys": True, "indent": 4}
