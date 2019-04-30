@@ -1,4 +1,5 @@
 import datetime
+import pytz
 
 from django.core.management.base import BaseCommand
 from django.db.models import Q
@@ -19,7 +20,10 @@ class Command(BaseCommand):
         selection = "y" if options["yes"] else "not an option"
 
         old_results = AutoproofreaderResult.objects.filter(
-            Q(completion_time__lt=datetime.datetime.now() - datetime.timedelta(days=1))
+            Q(
+                completion_time__lt=datetime.datetime.now(pytz.utc)
+                - datetime.timedelta(days=1)
+            )
             & Q(permanent=False)
         )
 

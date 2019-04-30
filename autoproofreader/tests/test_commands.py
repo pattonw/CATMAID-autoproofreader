@@ -5,6 +5,7 @@ import datetime
 
 from autoproofreader.tests.common import AutoproofreaderTestCase
 from autoproofreader.models import AutoproofreaderResult
+import pytz
 
 
 class CommandsTests(AutoproofreaderTestCase):
@@ -29,9 +30,9 @@ class CommandsTests(AutoproofreaderTestCase):
             private=False,
             permanent=False,
             errors="None",
-            completion_time=datetime.datetime.now(),
-            creation_time=datetime.datetime.now(),
-            edition_time=datetime.datetime.now(),
+            completion_time=datetime.datetime.now(pytz.utc),
+            creation_time=datetime.datetime.now(pytz.utc),
+            edition_time=datetime.datetime.now(pytz.utc),
             user_id=3,
             project_id=3,
         ).save()
@@ -45,14 +46,16 @@ class CommandsTests(AutoproofreaderTestCase):
             private=False,
             permanent=False,
             errors="None",
-            completion_time=datetime.datetime.now() - datetime.timedelta(days=7),
-            creation_time=datetime.datetime.now() - datetime.timedelta(days=7),
-            edition_time=datetime.datetime.now() - datetime.timedelta(days=7),
+            completion_time=datetime.datetime.now(pytz.utc)
+            - datetime.timedelta(days=7),
+            creation_time=datetime.datetime.now(pytz.utc) - datetime.timedelta(days=7),
+            edition_time=datetime.datetime.now(pytz.utc) - datetime.timedelta(days=7),
             user_id=3,
             project_id=3,
         ).save()
         old = Q(
-            completion_time__lt=datetime.datetime.now() - datetime.timedelta(days=1)
+            completion_time__lt=datetime.datetime.now(pytz.utc)
+            - datetime.timedelta(days=1)
         )
         self.assertEqual(len(AutoproofreaderResult.objects.all()), 5)
         self.assertEqual(

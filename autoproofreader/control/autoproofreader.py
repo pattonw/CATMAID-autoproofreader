@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 import json
 import pickle
+import pytz
 
 from django.conf import settings
 from django.http import JsonResponse, HttpResponseNotFound
@@ -162,7 +163,7 @@ class AutoproofreaderTaskAPI(APIView):
         name = config.get("job_name", "")
         if len(name) == 0:
             skid = str(config.get("skeleton_id", None))
-            date = str(datetime.datetime.now().date())
+            date = str(datetime.datetime.now(pytz.utc).date())
             if skid is None:
                 raise Exception("missing skeleton id!")
             name = skid + "_" + date
@@ -342,7 +343,7 @@ def query_segmentation_async(
 
     notify_user(user_id, msg.id, msg.title)
 
-    result.completion_time = datetime.datetime.now()
+    result.completion_time = datetime.datetime.now(pytz.utc)
     with open("{}/{}/{}.csv".format(local_temp_dir, job_name, "rankings")) as f:
         result.data = f.read()
     result.status = "complete"
