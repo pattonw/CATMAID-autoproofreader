@@ -32,7 +32,6 @@ class ResultsTest(AutoproofreaderTestCase):
                 "volume_id": None,
                 "private": False,
                 "permanent": True,
-                "uuid": "11111111-1111-1111-1111-111111111111",
                 "errors": "1 error",
             },
             {
