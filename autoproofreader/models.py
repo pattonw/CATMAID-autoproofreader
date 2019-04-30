@@ -87,6 +87,15 @@ class AutoproofreaderResult(UserFocusedModel):
     data = models.TextField(null=True, blank=True)  # will contain results or errors
 
 
+class AutoproofreaderResultSerializer(serializers.ModelSerializer):
+    creation_time = serializers.DateTimeField(default_timezone=pytz.timezone("UTC"))
+    edition_time = serializers.DateTimeField(default_timezone=pytz.timezone("UTC"))
+
+    class Meta:
+        model = AutoproofreaderResult
+        exclude = ("uuid",)
+
+
 class ProofreadTreeNodes(UserFocusedModel):
     """
     Stores all proofread nodes allong with their scores for connectivity and missing branches.

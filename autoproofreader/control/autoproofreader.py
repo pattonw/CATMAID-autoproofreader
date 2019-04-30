@@ -6,9 +6,10 @@ import json
 import pickle
 
 from django.conf import settings
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseNotFound
 from django.utils.decorators import method_decorator
 from django.db import connection
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 
 from catmaid.consumers import msg_user
@@ -22,6 +23,7 @@ from rest_framework.views import APIView
 
 from autoproofreader.models import (
     AutoproofreaderResult,
+    AutoproofreaderResultSerializer,
     ConfigFile,
     ComputeServer,
     DiluvianModel,
@@ -370,27 +372,31 @@ class AutoproofreaderResultAPI(APIView):
             required: false
             defaultValue: false
         """
-        if request.query_params.get("uuid", request.data.get("uuid", False)):
-            return self.get_uuid(request, project_id)
-
         result_id = request.query_params.get(
             "result_id", request.data.get("result_id", None)
         )
-        result = self.get_results(result_id)
+        if result_id is not None:
+            query_set = AutoproofreaderResult.objects.filter(
+                Q(id=result_id) & (Q(user=request.user.id) | Q(private=False))
+            )
+        else:
+            query_set = AutoproofreaderResult.objects.filter(
+                Q(user=request.user.id) | Q(private=False)
+            )
+        if len(query_set) == 0:
+            return HttpResponseNotFound("No results found")
 
-        return JsonResponse(
-            result, safe=False, json_dumps_params={"sort_keys": True, "indent": 4}
-        )
-
-    def get_uuid(self, request, project_id):
-        result_id = request.query_params.get(
-            "result_id", request.data.get("result_id", None)
-        )
-        result = get_object_or_404(AutoproofreaderResult, id=result_id)
-
-        return JsonResponse(
-            result.uuid, safe=False, json_dumps_params={"sort_keys": True, "indent": 4}
-        )
+        get_uuid = request.query_params.get("uuid", request.data.get("uuid", False))
+        if get_uuid and result_id is not None and len(query_set) == 1:
+            return JsonResponse(query_set[0].uuid)
+        elif len(query_set) > 0:
+            return JsonResponse(
+                AutoproofreaderResultSerializer(
+                    query_set, many=True if len(query_set) > 1 else False
+                ).data,
+                safe=False,
+                json_dumps_params={"sort_keys": True, "indent": 4},
+            )
 
     @method_decorator(requires_user_role(UserRole.QueueComputeTask))
     def delete(self, request, project_id):
