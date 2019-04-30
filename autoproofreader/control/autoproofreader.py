@@ -388,17 +388,17 @@ class AutoproofreaderResultAPI(APIView):
                 Q(user=request.user.id) | Q(private=False)
             )
             if len(query_set) == 0 and result_id is not None:
-                return JsonResponse([])
+                return JsonResponse([], safe=False)
 
         get_uuid = request.query_params.get("uuid", request.data.get("uuid", False))
         if get_uuid and result_id is not None and len(query_set) == 1:
             return JsonResponse(query_set[0].uuid, safe=False)
-        elif len(query_set) > 0:
-            return JsonResponse(
-                AutoproofreaderResultSerializer(query_set, many=True).data,
-                safe=False,
-                json_dumps_params={"sort_keys": True, "indent": 4},
-            )
+
+        return JsonResponse(
+            AutoproofreaderResultSerializer(query_set, many=True).data,
+            safe=False,
+            json_dumps_params={"sort_keys": True, "indent": 4},
+        )
 
     @method_decorator(requires_user_role(UserRole.QueueComputeTask))
     def delete(self, request, project_id):

@@ -59,5 +59,5 @@ class CommandsTests(AutoproofreaderTestCase):
         call_command("clear_old_results", "-y")
         self.assertEqual(len(AutoproofreaderResult.objects.all()), 3)
         self.assertEqual(
-            len(AutoproofreaderResult.objects.filter(old & Q(permanent=False))), 1
+            len(AutoproofreaderResult.objects.filter(old & Q(permanent=False))), 0
         )
