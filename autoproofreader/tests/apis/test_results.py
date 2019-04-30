@@ -144,4 +144,8 @@ class ResultsTest(AutoproofreaderTestCase):
 
         # Assert that there are no more image_volumes
         response = self.client.get(RESULTS_URL.format(self.test_project_id))
-        self.assertEqual(len(json.loads(response.content.decode("utf-8"))), 0)
+        self.assertEqual(
+            len(json.loads(response.content.decode("utf-8"))),
+            0,
+            json.loads(response.content.decode("utf-8")),
+        )
