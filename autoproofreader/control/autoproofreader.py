@@ -428,12 +428,10 @@ class AutoproofreaderResultAPI(APIView):
         columns_without_uuid = [
             columns[i] for i in range(len(columns)) if i != uuid_index
         ]
-        rows = [
-            row[i]
+        rows_without_uuid = [
+            [row[i] for i in range(len(row)) if i != uuid_index]
             for row in cursor.fetchall()
-            for i in range(len(row))
-            if i != uuid_index
         ]
 
-        return [dict(zip(columns_without_uuid, row)) for row in rows]
+        return [dict(zip(columns_without_uuid, row)) for row in rows_without_uuid]
 
