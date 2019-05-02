@@ -4,11 +4,14 @@ import subprocess
 from pathlib import Path
 import json
 import pickle
+import pytz
+import numpy as np
 
 from django.conf import settings
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseNotFound
 from django.utils.decorators import method_decorator
 from django.db import connection
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 
 from catmaid.consumers import msg_user
@@ -22,9 +25,11 @@ from rest_framework.views import APIView
 
 from autoproofreader.models import (
     AutoproofreaderResult,
+    AutoproofreaderResultSerializer,
     ConfigFile,
     ComputeServer,
     DiluvianModel,
+    ProofreadTreeNodes,
 )
 from autoproofreader.control.compute_server import GPUUtilAPI
 
@@ -46,6 +51,8 @@ class AutoproofreaderTaskAPI(APIView):
         """
 
         files = {f.name: f.read().decode("utf-8") for f in request.FILES.values()}
+
+        # Files are dependent on the job type
         for x in [
             "job_config.json",
             "volume.toml",
@@ -76,10 +83,6 @@ class AutoproofreaderTaskAPI(APIView):
             file_path = local_temp_dir / f
             file_path.write_text(files[f])
 
-        # Get the ssh key
-        # TODO: determine the most suitable location for ssh keys/paths
-        ssh_key_path = settings.SSH_KEY_PATH
-
         # create a floodfill config object if necessary and pass
         # it to the floodfill results object
         diluvian_config = self._get_diluvian_config(
@@ -100,6 +103,10 @@ class AutoproofreaderTaskAPI(APIView):
             "model_file": model.model_source_path,
         }
 
+        # Get the ssh key for the desired server
+        ssh_key = settings.SSH_KEY_PATH + "/" + server.ssh_key
+        ssh_user = server.ssh_user
+
         # store a job in the database now so that information about
         # ongoing jobs can be retrieved.
         gpus = self._get_gpus(job_config)
@@ -117,6 +124,7 @@ class AutoproofreaderTaskAPI(APIView):
             gpus=gpus,
         )
         result.save()
+        segmentations_dir = media_folder / "proofreading_segmentations" / result.uuid
 
         msg_user(request.user.id, "autoproofreader-result-update", {"status": "queued"})
 
@@ -140,8 +148,10 @@ class AutoproofreaderTaskAPI(APIView):
                 result,
                 project_id,
                 request.user.id,
-                ssh_key_path,
+                ssh_key,
+                ssh_user,
                 local_temp_dir,
+                segmentations_dir,
                 server_paths,
                 job_name,
                 job_config["segmentation_type"],
@@ -160,7 +170,7 @@ class AutoproofreaderTaskAPI(APIView):
         name = config.get("job_name", "")
         if len(name) == 0:
             skid = str(config.get("skeleton_id", None))
-            date = str(datetime.datetime.now().date())
+            date = str(datetime.datetime.now(pytz.utc).date())
             if skid is None:
                 raise Exception("missing skeleton id!")
             name = skid + "_" + date
@@ -215,8 +225,10 @@ def query_segmentation_async(
     result,
     project_id,
     user_id,
-    ssh_key_path,
+    ssh_key,
+    ssh_user,
     local_temp_dir,
+    segmentations_dir,
     server,
     job_name,
     job_type,
@@ -227,15 +239,16 @@ def query_segmentation_async(
 
     # copy temp files from django local temp media storage to server temp storage
     setup = (
-        "scp -i {ssh_key_path} -pr {local_dir} "
-        + "{server_address}:{server_results_dir}/{job_dir}"
+        "scp -i {ssh_key} -pr {local_dir} "
+        + "{ssh_user}@{server_address}:{server_results_dir}/{job_dir}"
     ).format(
         **{
             "local_dir": local_temp_dir,
             "server_address": server["address"],
             "server_results_dir": server["results_dir"],
             "job_dir": job_name,
-            "ssh_key_path": ssh_key_path,
+            "ssh_key": ssh_key,
+            "ssh_user": ssh_user,
         }
     )
     files = {}
@@ -263,7 +276,7 @@ def query_segmentation_async(
 
     # connect to the server and run the autoproofreader algorithm on the provided skeleton
     query_seg = (
-        "ssh -i {ssh_key_path} {server}\n"
+        "ssh -i {ssh_key} {ssh_user}@{server}\n"
         + "source {server_ff_env_path}\n"
         + "sarbor-error-detector "
         + "--skeleton-csv {skeleton_file} "
@@ -273,7 +286,8 @@ def query_segmentation_async(
         + "{type_parameters}"
     ).format(
         **{
-            "ssh_key_path": ssh_key_path,
+            "ssh_key": ssh_key,
+            "ssh_user": ssh_user,
             "server": server["address"],
             "server_ff_env_path": server["env_source"],
             "skeleton_file": files["skeleton"],
@@ -289,16 +303,19 @@ def query_segmentation_async(
 
     #    "rm -r {server_working_dir}/{server_results_dir}/{server_job_dir}\n"
     cleanup = (
-        "scp -i {ssh_key_path} -r {server}:"
+        "scp -i {ssh_key} -r {ssh_user}@{server}:"
         + "{server_results_dir}/{server_job_dir}/* {local_temp_dir}\n"
+        + "mv {local_temp_dir}/outputs/segmentations.n5 {segmentations_dir}"
     ).format(
         **{
-            "ssh_key_path": ssh_key_path,
+            "ssh_key": ssh_key,
+            "ssh_user": ssh_user,
             "server": server["address"],
             "server_results_dir": server["results_dir"],
             "server_job_dir": job_name,
             "output_file_name": job_name + "_output",
             "local_temp_dir": local_temp_dir,
+            "segmentations_dir": segmentations_dir,
         }
     )
 
@@ -340,9 +357,32 @@ def query_segmentation_async(
 
     notify_user(user_id, msg.id, msg.title)
 
-    result.completion_time = datetime.datetime.now()
+    result.completion_time = datetime.datetime.now(pytz.utc)
     with open("{}/{}/{}.csv".format(local_temp_dir, job_name, "rankings")) as f:
-        result.data = f.read()
+        rankings = np.loadtxt(f)  # nid, pid, con, branch, b_dx, b_dy, b_dz
+        sampled_nodes = np.array(new_nodes)  # nid, pid, x, y, z
+        rankings.sort(axis=0)
+        sampled_nodes.sort(axis=0)
+        node_data = np.concatenate([sampled_nodes, rankings], axis=1)
+        proofread_nodes = [
+            ProofreadTreeNodes(
+                node_id=row[0],
+                parent_id=row[1],
+                x=row[2],
+                y=row[3],
+                z=row[4],
+                connectivity_score=row[7],
+                branch_score=row[8],
+                branch_dx=row[9],
+                branch_dy=row[10],
+                branch_dz=row[11],
+                reviewed=False,
+                result=result,
+            )
+            for row in node_data
+        ]
+        ProofreadTreeNodes.objects.bulk_create(proofread_nodes)
+
     result.status = "complete"
     result.save()
 
@@ -373,10 +413,29 @@ class AutoproofreaderResultAPI(APIView):
         result_id = request.query_params.get(
             "result_id", request.data.get("result_id", None)
         )
-        result = self.get_results(result_id)
+        if result_id is not None:
+            query_set = AutoproofreaderResult.objects.filter(
+                Q(id=result_id) & (Q(user=request.user.id) | Q(private=False))
+            )
+            if len(query_set) == 0:
+                return HttpResponseNotFound(
+                    "No results found with id {}".format(result_id)
+                )
+        else:
+            query_set = AutoproofreaderResult.objects.filter(
+                Q(user=request.user.id) | Q(private=False)
+            )
+            if len(query_set) == 0 and result_id is not None:
+                return JsonResponse([], safe=False)
+
+        get_uuid = request.query_params.get("uuid", request.data.get("uuid", False))
+        if get_uuid and result_id is not None and len(query_set) == 1:
+            return JsonResponse(query_set[0].uuid, safe=False)
 
         return JsonResponse(
-            result, safe=False, json_dumps_params={"sort_keys": True, "indent": 4}
+            AutoproofreaderResultSerializer(query_set, many=True).data,
+            safe=False,
+            json_dumps_params={"sort_keys": True, "indent": 4},
         )
 
     @method_decorator(requires_user_role(UserRole.QueueComputeTask))
@@ -385,11 +444,11 @@ class AutoproofreaderResultAPI(APIView):
         result_id = request.query_params.get(
             "result_id", request.data.get("result_id", None)
         )
-        if result_id is not None:
-            result = get_object_or_404(AutoproofreaderResult, id=result_id)
-            result.delete()
-            return JsonResponse({"success": True})
-        return JsonResponse({"success": False})
+        result = get_object_or_404(
+            AutoproofreaderResult, id=result_id, user_id=request.user.id
+        )
+        result.delete()
+        return JsonResponse({"success": True})
 
     def get_results(self, result_id=None):
         cursor = connection.cursor()
@@ -409,4 +468,14 @@ class AutoproofreaderResultAPI(APIView):
                 """
             )
         desc = cursor.description
-        return [dict(zip([col[0] for col in desc], row)) for row in cursor.fetchall()]
+        columns = [col[0] for col in desc]
+        uuid_index = columns.index("uuid")
+        columns_without_uuid = [
+            columns[i] for i in range(len(columns)) if i != uuid_index
+        ]
+        rows_without_uuid = [
+            [row[i] for i in range(len(row)) if i != uuid_index]
+            for row in cursor.fetchall()
+        ]
+
+        return [dict(zip(columns_without_uuid, row)) for row in rows_without_uuid]

@@ -19,33 +19,39 @@ class ResultsTest(AutoproofreaderTestCase):
                 "id": 1,
                 "name": "test_result_1",
                 "status": "queued",
-                "config_id": 1,
-                "skeleton_id": 1,
+                "config": 1,
+                "skeleton": 1,
                 "skeleton_csv": "0,0,1,2,3",
-                "model_id": 1,
+                "model": 1,
                 "data": "test_1",
-                "completion_time": "2001-01-01T01:01:01.001Z",
-                "user_id": 3,
-                "project_id": 3,
-                "creation_time": "2001-06-01T01:01:01.001Z",
-                "edition_time": "2002-01-01T01:01:01.001Z",
-                "volume_id": None,
+                "completion_time": "2001-01-01T01:01:01.001000Z",
+                "user": 3,
+                "project": 3,
+                "creation_time": "2001-06-01T01:01:01.001000Z",
+                "edition_time": "2002-01-01T01:01:01.001000Z",
+                "volume": None,
+                "private": False,
+                "permanent": True,
+                "errors": "1 error",
             },
             {
                 "id": 2,
                 "name": "test_result_2",
                 "status": "computing",
-                "config_id": 2,
-                "skeleton_id": 2,
+                "config": 2,
+                "skeleton": 2,
                 "skeleton_csv": "0,0,1,2,3",
-                "model_id": 2,
+                "model": 2,
                 "data": "test_2",
-                "completion_time": "2002-06-01T01:01:01.001Z",
-                "user_id": 3,
-                "project_id": 3,
-                "creation_time": "2002-02-02T02:02:02.002Z",
-                "edition_time": "2003-02-02T02:02:02.002Z",
-                "volume_id": None,
+                "completion_time": "2002-06-01T01:01:01.001000Z",
+                "user": 3,
+                "project": 3,
+                "creation_time": "2002-02-02T02:02:02.002000Z",
+                "edition_time": "2003-02-02T02:02:02.002000Z",
+                "volume": None,
+                "private": False,
+                "permanent": True,
+                "errors": "2 errors",
             },
         ]
         self.assertEqual(expected_result, parsed_response)
@@ -60,19 +66,38 @@ class ResultsTest(AutoproofreaderTestCase):
                 "id": 1,
                 "name": "test_result_1",
                 "status": "queued",
-                "config_id": 1,
-                "skeleton_id": 1,
+                "config": 1,
+                "skeleton": 1,
                 "skeleton_csv": "0,0,1,2,3",
-                "model_id": 1,
+                "model": 1,
                 "data": "test_1",
-                "completion_time": "2001-01-01T01:01:01.001Z",
-                "user_id": 3,
-                "project_id": 3,
-                "creation_time": "2001-06-01T01:01:01.001Z",
-                "edition_time": "2002-01-01T01:01:01.001Z",
-                "volume_id": None,
+                "completion_time": "2001-01-01T01:01:01.001000Z",
+                "user": 3,
+                "project": 3,
+                "creation_time": "2001-06-01T01:01:01.001000Z",
+                "edition_time": "2002-01-01T01:01:01.001000Z",
+                "volume": None,
+                "private": False,
+                "permanent": True,
+                "errors": "1 error",
             }
         ]
+        self.assertEqual(expected_result, parsed_response)
+
+        response = self.client.get(
+            RESULTS_URL.format(self.test_project_id), {"result_id": 1, "uuid": True}
+        )
+        self.assertEqual(response.status_code, 200)
+        parsed_response = json.loads(response.content.decode("utf-8"))
+        expected_result = "11111111-1111-1111-1111-111111111111"
+        self.assertEqual(expected_result, parsed_response)
+
+        response = self.client.get(
+            RESULTS_URL.format(self.test_project_id), {"result_id": 2, "uuid": True}
+        )
+        self.assertEqual(response.status_code, 200)
+        parsed_response = json.loads(response.content.decode("utf-8"))
+        expected_result = "22222222-2222-2222-2222-222222222222"
         self.assertEqual(expected_result, parsed_response)
 
     def test_delete(self):
@@ -119,4 +144,8 @@ class ResultsTest(AutoproofreaderTestCase):
 
         # Assert that there are no more image_volumes
         response = self.client.get(RESULTS_URL.format(self.test_project_id))
-        self.assertEqual(len(json.loads(response.content.decode("utf-8"))), 0)
+        self.assertEqual(
+            len(json.loads(response.content.decode("utf-8"))),
+            0,
+            json.loads(response.content.decode("utf-8")),
+        )

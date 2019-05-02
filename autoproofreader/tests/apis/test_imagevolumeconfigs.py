@@ -67,7 +67,6 @@ class ImageVolumeConfigTest(AutoproofreaderTestCase):
         )
         self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
-        print(parsed_response)
         self.assertTrue(parsed_response.get("success", False))
         put_ivc = parsed_response.get("image_volume_config_id")
 

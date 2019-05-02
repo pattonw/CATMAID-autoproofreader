@@ -8,6 +8,7 @@ from autoproofreader.control import (
     is_installed,
     diluvian_model,
     image_volume_config,
+    proofread_tree_nodes,
 )
 
 app_name = "autoproofreader"
@@ -52,5 +53,13 @@ urlpatterns += [
     url(
         r"^(?P<project_id>\d+)/image-volume-configs$",
         image_volume_config.ImageVolumeConfigAPI.as_view(),
+    )
+]
+
+# Proofread tree nodes
+urlpatterns += [
+    url(
+        r"^(?P<project_id>\d+)/proofread-tree-nodes$",
+        proofread_tree_nodes.ProofreadTreeNodeAPI.as_view(),
     )
 ]
