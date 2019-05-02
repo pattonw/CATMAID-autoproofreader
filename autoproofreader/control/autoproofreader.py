@@ -122,6 +122,7 @@ class AutoproofreaderTaskAPI(APIView):
             gpus=gpus,
         )
         result.save()
+        segmentations_dir = media_folder / "proofreading_segmentations" / result.uuid
 
         msg_user(request.user.id, "autoproofreader-result-update", {"status": "queued"})
 
@@ -148,6 +149,7 @@ class AutoproofreaderTaskAPI(APIView):
                 ssh_key,
                 ssh_user,
                 local_temp_dir,
+                segmentations_dir,
                 server_paths,
                 job_name,
                 job_config["segmentation_type"],
@@ -224,6 +226,7 @@ def query_segmentation_async(
     ssh_key,
     ssh_user,
     local_temp_dir,
+    segmentations_dir,
     server,
     job_name,
     job_type,
@@ -300,6 +303,7 @@ def query_segmentation_async(
     cleanup = (
         "scp -i {ssh_key} -r {ssh_user}@{server}:"
         + "{server_results_dir}/{server_job_dir}/* {local_temp_dir}\n"
+        + "mv {local_temp_dir}/outputs/segmentations.n5 {segmentations_dir}"
     ).format(
         **{
             "ssh_key": ssh_key,
@@ -309,6 +313,7 @@ def query_segmentation_async(
             "server_job_dir": job_name,
             "output_file_name": job_name + "_output",
             "local_temp_dir": local_temp_dir,
+            "segmentations_dir": segmentations_dir,
         }
     )
 
