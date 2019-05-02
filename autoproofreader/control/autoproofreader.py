@@ -5,6 +5,7 @@ from pathlib import Path
 import json
 import pickle
 import pytz
+import numpy as np
 
 from django.conf import settings
 from django.http import JsonResponse, HttpResponseNotFound
@@ -28,6 +29,7 @@ from autoproofreader.models import (
     ConfigFile,
     ComputeServer,
     DiluvianModel,
+    ProofreadTreeNodes,
 )
 from autoproofreader.control.compute_server import GPUUtilAPI
 
@@ -357,7 +359,30 @@ def query_segmentation_async(
 
     result.completion_time = datetime.datetime.now(pytz.utc)
     with open("{}/{}/{}.csv".format(local_temp_dir, job_name, "rankings")) as f:
-        result.data = f.read()
+        rankings = np.loadtxt(f)  # nid, pid, con, branch, b_dx, b_dy, b_dz
+        sampled_nodes = np.array(new_nodes)  # nid, pid, x, y, z
+        rankings.sort(axis=0)
+        sampled_nodes.sort(axis=0)
+        node_data = np.concatenate([sampled_nodes, rankings], axis=1)
+        proofread_nodes = [
+            ProofreadTreeNodes(
+                node_id=row[0],
+                parent_id=row[1],
+                x=row[2],
+                y=row[3],
+                z=row[4],
+                connectivity_score=row[7],
+                branch_score=row[8],
+                branch_dx=row[9],
+                branch_dy=row[10],
+                branch_dz=row[11],
+                reviewed=False,
+                result=result,
+            )
+            for row in node_data
+        ]
+        ProofreadTreeNodes.objects.bulk_create(proofread_nodes)
+
     result.status = "complete"
     result.save()
 
