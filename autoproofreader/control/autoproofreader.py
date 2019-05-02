@@ -49,6 +49,8 @@ class AutoproofreaderTaskAPI(APIView):
         """
 
         files = {f.name: f.read().decode("utf-8") for f in request.FILES.values()}
+
+        # Files are dependent on the job type
         for x in [
             "job_config.json",
             "volume.toml",
@@ -79,10 +81,6 @@ class AutoproofreaderTaskAPI(APIView):
             file_path = local_temp_dir / f
             file_path.write_text(files[f])
 
-        # Get the ssh key
-        # TODO: determine the most suitable location for ssh keys/paths
-        ssh_key_path = settings.SSH_KEY_PATH
-
         # create a floodfill config object if necessary and pass
         # it to the floodfill results object
         diluvian_config = self._get_diluvian_config(
@@ -102,6 +100,10 @@ class AutoproofreaderTaskAPI(APIView):
             "env_source": server.environment_source_path,
             "model_file": model.model_source_path,
         }
+
+        # Get the ssh key for the desired server
+        ssh_key = settings.SSH_KEY_PATH + "/" + server.ssh_key
+        ssh_user = server.ssh_user
 
         # store a job in the database now so that information about
         # ongoing jobs can be retrieved.
@@ -143,7 +145,8 @@ class AutoproofreaderTaskAPI(APIView):
                 result,
                 project_id,
                 request.user.id,
-                ssh_key_path,
+                ssh_key,
+                ssh_user,
                 local_temp_dir,
                 server_paths,
                 job_name,
@@ -218,7 +221,8 @@ def query_segmentation_async(
     result,
     project_id,
     user_id,
-    ssh_key_path,
+    ssh_key,
+    ssh_user,
     local_temp_dir,
     server,
     job_name,
@@ -230,15 +234,16 @@ def query_segmentation_async(
 
     # copy temp files from django local temp media storage to server temp storage
     setup = (
-        "scp -i {ssh_key_path} -pr {local_dir} "
-        + "{server_address}:{server_results_dir}/{job_dir}"
+        "scp -i {ssh_key} -pr {local_dir} "
+        + "{ssh_user}@{server_address}:{server_results_dir}/{job_dir}"
     ).format(
         **{
             "local_dir": local_temp_dir,
             "server_address": server["address"],
             "server_results_dir": server["results_dir"],
             "job_dir": job_name,
-            "ssh_key_path": ssh_key_path,
+            "ssh_key": ssh_key,
+            "ssh_user": ssh_user,
         }
     )
     files = {}
@@ -266,7 +271,7 @@ def query_segmentation_async(
 
     # connect to the server and run the autoproofreader algorithm on the provided skeleton
     query_seg = (
-        "ssh -i {ssh_key_path} {server}\n"
+        "ssh -i {ssh_key} {ssh_user}@{server}\n"
         + "source {server_ff_env_path}\n"
         + "sarbor-error-detector "
         + "--skeleton-csv {skeleton_file} "
@@ -276,7 +281,8 @@ def query_segmentation_async(
         + "{type_parameters}"
     ).format(
         **{
-            "ssh_key_path": ssh_key_path,
+            "ssh_key": ssh_key,
+            "ssh_user": ssh_user,
             "server": server["address"],
             "server_ff_env_path": server["env_source"],
             "skeleton_file": files["skeleton"],
@@ -292,11 +298,12 @@ def query_segmentation_async(
 
     #    "rm -r {server_working_dir}/{server_results_dir}/{server_job_dir}\n"
     cleanup = (
-        "scp -i {ssh_key_path} -r {server}:"
+        "scp -i {ssh_key} -r {ssh_user}@{server}:"
         + "{server_results_dir}/{server_job_dir}/* {local_temp_dir}\n"
     ).format(
         **{
-            "ssh_key_path": ssh_key_path,
+            "ssh_key": ssh_key,
+            "ssh_user": ssh_user,
             "server": server["address"],
             "server_results_dir": server["results_dir"],
             "server_job_dir": job_name,
