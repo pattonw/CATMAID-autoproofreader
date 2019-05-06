@@ -6,6 +6,7 @@ import json
 import pickle
 import pytz
 import numpy as np
+import pandas as pd
 
 from django.conf import settings
 from django.http import JsonResponse, HttpResponseNotFound
@@ -124,7 +125,9 @@ class AutoproofreaderTaskAPI(APIView):
             # gpus=gpus,
         )
         result.save()
-        segmentations_dir = media_folder / "proofreading_segmentations" / result.uuid
+        segmentations_dir = (
+            media_folder / "proofreading_segmentations" / str(result.uuid)
+        )
 
         msg_user(request.user.id, "autoproofreader-result-update", {"status": "queued"})
 
@@ -273,6 +276,8 @@ def query_segmentation_async(
         )
     elif job_type == "watershed":
         extra_parameters = ""
+    else:
+        extra_parameters = ""
 
     # connect to the server and run the autoproofreader algorithm on the provided skeleton
     query_seg = (
@@ -292,7 +297,7 @@ def query_segmentation_async(
             "server_ff_env_path": server["env_source"],
             "skeleton_file": files["skeleton"],
             "sarbor_config": files["sarbor_config"],
-            "output_file": Path(server["results_dir"], job_name, job_name),
+            "output_file": Path(server["results_dir"], job_name, "outputs"),
             "segmentation_type": job_type,
             "type_parameters": extra_parameters,
         }
@@ -305,6 +310,7 @@ def query_segmentation_async(
     cleanup = (
         "scp -i {ssh_key} -r {ssh_user}@{server}:"
         + "{server_results_dir}/{server_job_dir}/* {local_temp_dir}\n"
+        + "mkdir -p {segmentations_dir}\n"
         + "mv {local_temp_dir}/outputs/segmentations.n5 {segmentations_dir}"
     ).format(
         **{
@@ -337,8 +343,11 @@ def query_segmentation_async(
     out, err = process.communicate(cleanup)
     print(out)
 
-    new_nodes = pickle.load(
-        open("{}/{}/{}".format(local_temp_dir, job_name, "nodes.obj"), "rb")
+    new_nodes = pd.DataFrame(
+        pickle.load(
+            open("{}/{}/{}".format(local_temp_dir, "outputs", "nodes.obj"), "rb")
+        ),
+        columns=["nid", "pid", "x", "y", "z"],
     )
 
     # overwrite input skeleton csv
@@ -358,28 +367,32 @@ def query_segmentation_async(
     notify_user(user_id, msg.id, msg.title)
 
     result.completion_time = datetime.datetime.now(pytz.utc)
-    with open("{}/{}/{}.csv".format(local_temp_dir, job_name, "rankings")) as f:
-        rankings = np.loadtxt(f)  # nid, pid, con, branch, b_dx, b_dy, b_dz
-        sampled_nodes = np.array(new_nodes)  # nid, pid, x, y, z
-        rankings.sort(axis=0)
-        sampled_nodes.sort(axis=0)
-        node_data = np.concatenate([sampled_nodes, rankings], axis=1)
+    with open("{}/{}/{}.csv".format(local_temp_dir, "outputs", "rankings")) as f:
+        rankings = pd.read_csv(f)  # nid, pid, con, branch, b_dx, b_dy, b_dz
+        node_data = new_nodes.join(
+            rankings.set_index("nid"), lsuffix="_other", on="nid"
+        )
         proofread_nodes = [
             ProofreadTreeNodes(
-                node_id=row[0],
-                parent_id=row[1],
-                x=row[2],
-                y=row[3],
-                z=row[4],
-                connectivity_score=row[7],
-                branch_score=row[8],
-                branch_dx=row[9],
-                branch_dy=row[10],
-                branch_dz=row[11],
+                node_id=row["nid"],
+                parent_id=None if row["pid"] == "None" else row["pid"],
+                x=row["x"],
+                y=row["y"],
+                z=row["z"],
+                connectivity_score=None
+                if row["connectivity_score"] == "None"
+                else row["connectivity_score"],
+                branch_score=row["branch_score"],
+                branch_dx=row["branch_dx"],
+                branch_dy=row["branch_dy"],
+                branch_dz=row["branch_dz"],
                 reviewed=False,
                 result=result,
+                user_id=user_id,
+                project_id=project_id,
+                editor_id=user_id,
             )
-            for row in node_data
+            for index, row in node_data.iterrows()
         ]
         ProofreadTreeNodes.objects.bulk_create(proofread_nodes)
 
