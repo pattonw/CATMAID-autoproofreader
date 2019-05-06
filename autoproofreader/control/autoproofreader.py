@@ -109,9 +109,9 @@ class AutoproofreaderTaskAPI(APIView):
 
         # store a job in the database now so that information about
         # ongoing jobs can be retrieved.
-        gpus = self._get_gpus(job_config)
-        if self._check_gpu_conflict(gpus):
-            raise Exception("Not enough compute resources for this job")
+        # gpus = self._get_gpus(job_config)
+        # if self._check_gpu_conflict(gpus):
+        #     raise Exception("Not enough compute resources for this job")
         result = AutoproofreaderResult(
             user_id=request.user.id,
             project_id=project_id,
@@ -121,7 +121,7 @@ class AutoproofreaderTaskAPI(APIView):
             model_id=job_config["model_id"],
             name=job_name,
             status="queued",
-            gpus=gpus,
+            # gpus=gpus,
         )
         result.save()
         segmentations_dir = media_folder / "proofreading_segmentations" / result.uuid
@@ -139,8 +139,8 @@ class AutoproofreaderTaskAPI(APIView):
             file_path = local_temp_dir / "model_config.toml"
             file_path.write_text(model_config)
 
-        if self._check_gpu_conflict():
-            raise Exception("Not enough compute resources for this job")
+        # if self._check_gpu_conflict():
+        #     raise Exception("Not enough compute resources for this job")
 
         if job_config.get("segmentation_type", None) is not None:
             # Retrieve segmentation
