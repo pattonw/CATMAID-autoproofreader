@@ -104,7 +104,7 @@ class ProofreadTreeNodes(UserFocusedModel):
     """
 
     node_id = models.IntegerField()
-    parent_id = models.IntegerField()
+    parent_id = models.IntegerField(null=True)
     x = models.FloatField()
     y = models.FloatField()
     z = models.FloatField()
@@ -112,7 +112,7 @@ class ProofreadTreeNodes(UserFocusedModel):
     branch_dx = models.FloatField()
     branch_dy = models.FloatField()
     branch_dz = models.FloatField()
-    connectivity_score = models.FloatField()
+    connectivity_score = models.FloatField(null=True)
     reviewed = models.BooleanField(default=False)
     result = models.ForeignKey(AutoproofreaderResult, on_delete=models.CASCADE)
     editor = models.ForeignKey(
