@@ -358,24 +358,9 @@
     return table;
   };
 
-  ResultsWindow.prototype.appendRankingTable = function (data) {
-    let ranking_csv = data['data'];
-    let lines = ranking_csv.split ('\n');
-    let trimmed_lines = lines[lines.length - 1] === ''
-      ? lines.slice (0, -1)
-      : lines;
-    let data_arr = trimmed_lines.map (function (e) {
-      return e.split (',');
-    });
-    let headers = data_arr[0];
-    let numeric_data = data_arr.slice (1).map (function (e) {
-      row = {};
-      for (let i = 0; i < headers.length; i++) {
-        row[headers[i]] = e[i];
-      }
-      return row;
-    });
-
+  ResultsWindow.prototype.appendRankingTable = function (data, skeleton_id) {
+    // Data comes in an array of dicts with keys: (node_id, parent_id, branch_dx, ...)
+    headers = ["node_id", "parent_id", "connectivity_score", "branch_score"]
     var table = this.dialog.appendChild (document.createElement ('table'));
     var header = table.appendChild (document.createElement ('thead'));
     var headerRow = header.appendChild (document.createElement ('tr'));
@@ -389,17 +374,17 @@
     var datatable = $ (table)
       .DataTable ({
         order: [],
-        data: numeric_data,
+        data: data,
         autoWidth: false,
         columns: [
           {
-            data: 'nid',
+            data: 'node_id',
             width: '25%',
             class: 'cm-center',
             orderable: false,
           },
           {
-            data: 'pid',
+            data: 'parent_id',
             width: '25%',
             class: 'cm-center',
             orderable: false,
@@ -418,15 +403,11 @@
       })
       .on ('click', 'td', function () {
         index = datatable.cell (this).index ();
-        let nid = datatable.row (index.row).data ().nid;
-        let node = data.skeleton_csv
-          .split ('\n')
-          .find (o => o.startsWith (`${nid}`));
-        let [x, y, z] = node.split (',').slice (2);
+        let row_data = datatable.row (index.row).data ();
         SkeletonAnnotations.staticMoveTo (
-          parseInt (z),
-          parseInt (y),
-          parseInt (x)
+          parseInt (row_data.x),
+          parseInt (row_data.y),
+          parseInt (row_data.z)
         ).then (e => {
           var projectCoordinates = project.focusedStackViewer.projectCoordinates ();
           var parameters = {
@@ -434,12 +415,11 @@
             y: projectCoordinates.y,
             z: projectCoordinates.z,
           };
-          parameters['skeleton_id'] = data.skeleton_id;
+          parameters['skeleton_id'] = skeleton_id;
           CATMAID.fetch (project.id + '/node/nearest', 'POST', parameters)
             .then (function (data) {
-              var nodeIDToSelect = data.treenode_id;
-              SkeletonAnnotations.staticSelectNode (nodeIDToSelect);
-              return nodeIDToSelect;
+              SkeletonAnnotations.staticSelectNode (data.treenode_id);
+              return data.treenode_id;
             })
             .catch (function (e) {
               CATMAID.warn (
@@ -456,9 +436,9 @@
               tracing_layer.tracingOverlay.createNode (
                 pid,
                 null,
-                parameters.x + parseInt (data.branch_dx),
-                parameters.y + parseInt (data.branch_dy),
-                parameters.z + parseInt (data.branch_dz),
+                data.x + data.branch_dx,
+                data.y + data.branch_dy,
+                data.z + data.branch_dz,
                 -1,
                 0,
                 null
