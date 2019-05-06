@@ -284,6 +284,8 @@
     add_file (post_data, files.sarbor_config, 'sarbor_config.toml');
     add_file (post_data, files.job_config, 'job_config.json');
 
+    console.log(files.job_config)
+
     CATMAID.fetch (
       'ext/autoproofreader/' + project.id + '/autoproofreader',
       'PUT',
@@ -876,8 +878,14 @@
   AutoproofreaderWidget.prototype.display_results_data = function (data) {
     console.log (data);
     let display = new CATMAID.ResultsWindow ('RESULTS', undefined, true);
-    display.appendRankingTable (data);
-    display.show (500, 'auto', true);
+    CATMAID.fetch (
+      'ext/autoproofreader/' + project.id + '/proofread-tree-nodes',
+      'GET', {result_id:data.job_id}
+    ).then((ranking_data)=>{
+      display.appendRankingTable (ranking_data, data.skeleton_id);
+      display.show (500, 'auto', true);
+      console.log(ranking_data);
+    });
   };
 
   /*
@@ -1141,19 +1149,18 @@
         creation_time: job.creation_time,
         name: job.name,
         status: job.status,
-        config_id: job.config_id,
-        model_id: job.model_id,
-        model_name: job.model_id,
-        skeleton_id: job.skeleton_id,
+        config_id: job.config,
+        model_id: job.model,
+        skeleton_id: job.skeleton,
         skeleton_csv: job.skeleton_csv,
         completion_time: job.completion_time,
-        volume_id: job.volume_id,
+        volume_id: job.volume,
         data: job.data,
       };
       CATMAID.fetch (
         'ext/autoproofreader/' + project.id + '/diluvian-models',
         'GET',
-        {model_id: job.model_id}
+        {model_id: job.model}
       ).then (function (result) {
         let model = result[0];
         row.model_name = model.name;
@@ -1166,15 +1173,14 @@
         creation_time: job.creation_time,
         name: job.name,
         status: job.status,
-        config_id: job.config_id,
-        model_id: job.model_id,
-        model_name: job.model_id,
-        skeleton_id: job.skeleton_id,
+        config_id: job.config,
+        model_id: job.model,
+        skeleton_id: job.skeleton,
       };
       CATMAID.fetch (
-        'ext/autoproofreader/' + project.id + '/proofreader-models',
+        'ext/autoproofreader/' + project.id + '/diluvian-models',
         'GET',
-        {model_id: job.model_id}
+        {model_id: job.model}
       ).then (function (result) {
         let model = result[0];
         row.model_name = model.name;
@@ -1207,6 +1213,31 @@
 
   AutoproofreaderWidget.prototype.createSettings = function () {
     let self = this;
+
+    let is_visible = function (settings, setting, visible){
+      let is_container = !('type' in settings);
+      if (visible == true){
+        // if a root in settings tree is visible, all children are visible
+        // only exception is advanced settings
+        return true & (is_container || !settings.advanced || settings.advanced == self.settings.run.advanced.value);
+      }
+      if (visible == false){
+        return false;
+      }
+
+      if (!is_container){
+        return true;
+      }
+      if (is_container && ["sarbor", "run"].includes(setting)){
+        return true;
+      }
+
+      if (is_container && self.settings.run.segmentation_type.value === setting){
+        return true;
+      }
+
+      return false;
+    };
 
     let createNumericInputSpinner = function (args) {
       let input = CATMAID.DOM.createInputSetting (
@@ -1396,13 +1427,15 @@
       return section;
     };
 
-    let renderSettings = function (container, settings) {
+    let renderSettings = function (container, settings, visible) {
       for (let setting in settings) {
-        if (!('type' in settings[setting])) {
-          let ds = createSection (container, setting, settings[setting], true);
-          renderSettings (ds, settings[setting]);
-        } else {
-          renderSetting (container, settings[setting]);
+        if (is_visible(settings[setting], setting, visible)){
+          if (!('type' in settings[setting])) {
+            let ds = createSection (container, setting, settings[setting], true);
+            renderSettings (ds, settings[setting], true);
+          } else {
+            renderSetting (container, settings[setting]);
+          }
         }
       }
     };
@@ -1415,7 +1448,7 @@
       $ (space).empty ();
 
       // Add all settings
-      renderSettings (space, this.settings);
+      renderSettings (space, this.settings, null);
 
       // Add collapsing support to all settings containers
       $ ('p.title', space).click (function () {
@@ -1505,29 +1538,41 @@
         async_remove: args.async_remove,
         get_choices: args.get_choices,
         mode: args.mode,
-        change: getChangeFunc (args.type, args.settings, args.label),
+        reset: args.reset,
+        advanced: Boolean(args.advanced),
+        change: getChangeFunc (args.type, args.settings, args.label, args.reset),
       };
       args.settings[args.label] = fields;
     };
 
-    let getChangeFunc = function (type, settings, label) {
+    let getChangeFunc = function (type, settings, label, reset) {
       if (type === 'numeric_spinner_float') {
         self.supported_fields.push ('numeric_spinner_float');
         return function () {
           let newValue = parseFloat (this.value);
           settings[label].value = newValue;
+          if (reset){
+            self.createSettings();
+          }
         };
       } else if (type === 'numeric_spinner_int') {
         self.supported_fields.push ('numeric_spinner_int');
         return function () {
           let newValue = parseFloat (this.value, 10);
           settings[label].value = newValue;
+          if (reset){
+            self.createSettings();
+          }
         };
       } else if (type === 'option_dropdown') {
         self.supported_fields.push ('option_dropdown');
         return function () {
           let newValue = this.value;
           settings[label].value = newValue;
+          console.log(self.settings)
+          if (reset){
+            self.createSettings();
+          }
         };
       } else if (type === 'async_option_dropdown') {
         self.supported_fields.push ('async_option_dropdown');
@@ -1537,6 +1582,9 @@
         return function () {
           let newValue = this.checked;
           settings[label].value = newValue;
+          if (reset){
+            self.createSettings();
+          }
         };
       } else if (type === 'number_list') {
         self.supported_fields.push ('number_list');
@@ -1546,12 +1594,18 @@
             .map (CATMAID.tools.trimString)
             .map (Number);
           settings[label].value = newValue;
+          if (reset){
+            self.createSettings();
+          }
         };
       } else if (type === 'string') {
         self.supported_fields.push ('string');
         return function () {
           let newValue = this.value;
           settings[label].value = newValue;
+          if (reset){
+            self.createSettings();
+          }
         };
       }
     };
@@ -1559,6 +1613,10 @@
     let getSubSettings = function (settings, setting) {
       settings[setting] = {};
       return settings[setting];
+    };
+
+    let createWatershedDefaults = function (settings) {
+      let sub_settings = getSubSettings (settings, 'watershed');
     };
 
     let createDiluvianDefaults = function (settings) {
@@ -1728,7 +1786,7 @@
       let model_id = self.settings.run.model_id.value;
       if (model_id !== undefined) {
         CATMAID.fetch (
-          'ext/autoproofreader/' + project.id + '/proofreader-models',
+          'ext/autoproofreader/' + project.id + '/diluvian-models',
           'GET',
           {model_id: model_id}
         ).then (function (result) {
@@ -1875,7 +1933,7 @@
       self.settings.run.model_id.value = model_id;
       let server_id = self.settings.run.server_id.value;
       CATMAID.fetch (
-        'ext/autoproofreader/' + project.id + '/proofreader-models',
+        'ext/autoproofreader/' + project.id + '/diluvian-models',
         'GET',
         {model_id: model_id}
       ).then (function (result) {
@@ -2053,6 +2111,16 @@
 
       addSettingTemplate ({
         settings: sub_settings,
+        type: 'checkbox',
+        label: 'advanced',
+        name: 'Advanced',
+        value: false,
+        reset: true,
+        helptext: 'Show advanced settings.',
+      });
+
+      addSettingTemplate ({
+        settings: sub_settings,
         type: 'string',
         label: 'job_name',
         name: 'Job name',
@@ -2070,11 +2138,13 @@
         options: [
           {name: 'Diluvian', id: 'diluvian'},
           {name: 'watershed segmentation', id: 'watershed'},
+          {name: 'test', id: 'test'}
         ],
         helptext: 'Type of segmentation to use in the backend. Diluvian ' +
           'will segment the skeleton on demand which will take some time. ' +
           'watershed segmentation is cached and only needs to be retrieved, which ' +
           'will be faster but you have less options for customizing the job.',
+        reset: true,
       });
 
       addSettingTemplate ({
@@ -2236,6 +2306,7 @@
       createRunDefaults (settings);
       createSarborDefaults (settings);
       createDiluvianDefaults (settings);
+      createWatershedDefaults (settings);
     };
 
     createDefaults (this.settings);
