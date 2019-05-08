@@ -30,7 +30,10 @@ libraries_js = OrderedDict([("jsfeat", ["*.js"]), ("toml", ["*.js"])])
 JAVASCRIPT = OrderedDict()
 
 JAVASCRIPT["autoproofreader"] = {
-    "source_filenames": ("autoproofreader/js/widgets/*.js",),
+    "source_filenames": (
+        "autoproofreader/js/widgets/*.js",
+        "autoproofreader/js/layers/*.js",
+    ),
     "output_filename": "js/autoproofreader.js",
 }
 
