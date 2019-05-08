@@ -13,11 +13,33 @@
     this.idPrefix = `autoproofreader-widget${this.widgetID}-`;
 
     this.ongoingTable = null;
-    this.finishedTable = null;
+    this.completedTable = null;
+    this.rankingTable = null;
     this.configJsons = {};
     this.settings = {};
 
     this.supported_fields = [];
+  };
+
+  var toggleProofreadSkeletonProjectionLayers = function () {
+    var key = 'skeletonprojection';
+    var allHaveLayers = project.getStackViewers ().every (function (sv) {
+      return !!sv.getLayer (key);
+    });
+
+    function add (sv) {
+      if (sv.getLayer (key)) return;
+      // Add new layer, defaulting to the active skelton source for input
+      sv.addLayer (key, new CATMAID.ProofreadSkeletonProjectionLayer (sv));
+    }
+    function remove (sv) {
+      if (!sv.getLayer (key)) return;
+      sv.removeLayer (key);
+      sv.redraw ();
+    }
+
+    var fn = allHaveLayers ? remove : add;
+    project.getStackViewers ().forEach (fn);
   };
 
   AutoproofreaderWidget.prototype = Object.create (
@@ -33,8 +55,9 @@
   };
 
   AutoproofreaderWidget.prototype.getWidgetConfiguration = function () {
-    const jobsTableID = this.idPrefix + 'datatable-jobs';
-    const resultsTableID = this.idPrefix + 'datatable-results';
+    const queuedTableId = this.idPrefix + 'datatable-queued';
+    const completedTableId = this.idPrefix + 'datatable-completed';
+    const rankingTableId = this.idPrefix + 'datatable-rankings';
     let self = this;
     return {
       helpText: 'Automated proofreading Widget: ',
@@ -43,8 +66,9 @@
         // Create the tabs
         let tabs = CATMAID.DOM.addTabGroup (controls, this.widgetID, [
           'Run',
-          'Jobs',
-          'Results',
+          'Queued',
+          'Completed',
+          'Rankings',
         ]);
         // Change content based on currently active tab
         controls.firstChild.onclick = this.refocus.bind (this);
@@ -77,14 +101,26 @@
           ],
         ]);
 
-        CATMAID.DOM.appendToTab (tabs['Jobs'], [
+        CATMAID.DOM.appendToTab (tabs['Queued'], [
           ['refresh', this.test_results_refresh.bind (this)],
           ['clear', this.test_results_clear.bind (this)],
         ]);
 
-        CATMAID.DOM.appendToTab (tabs['Results'], [
+        CATMAID.DOM.appendToTab (tabs['Completed'], [
           ['refresh', this.test_results_refresh.bind (this)],
           ['clear', this.test_results_clear.bind (this)],
+        ]);
+
+        CATMAID.DOM.appendToTab (tabs['Rankings'], [
+          {
+            type: 'checkbox',
+            value: self.ProofreadSkeletonVisualizationLayer,
+            label: 'Show proofread layer',
+            onclick: function () {
+              self.visibleProofreadLayer = this.checked;
+              self.updateProofreadSkeletonVisualizationLayer ();
+            },
+          },
         ]);
         $ (controls).tabs ();
       },
@@ -92,22 +128,22 @@
       createContent: function (container) {
         container.innerHTML = `
         <div id="content-wrapper">
-          <div class="jobs">
-            <table cellpadding="0" cellspacing="0" border="0" class="display" id="${jobsTableID}">
+          <div class="queued">
+            <table cellpadding="0" cellspacing="0" border="0" class="display" id="${queuedTableId}">
               <thead>
                 <tr>
                   <th>Run Time (hours)
                   </th>
                   <th>Name
-                    <input type="text" name="searchJobName" id="${jobsTableID}-search-job-name"
+                    <input type="text" name="searchJobName" id="${queuedTableId}-search-job-name"
                       value="" class="search_init"/>
                   </th>
                   <th>Status
-                    <input type="text" name="searchJobStatus" id="${jobsTableID}-search-job-status"
+                    <input type="text" name="searchJobStatus" id="${queuedTableId}-search-job-status"
                       value="" class="search_init"/>
                   </th>
                   <th>Model
-                    <input type="text" name="searchModelName" id="${jobsTableID}-search-model-name"
+                    <input type="text" name="searchModelName" id="${queuedTableId}-search-model-name"
                       value="" class="search_init"/>
                   </th>
                   <th>Skeleton ID
@@ -127,22 +163,22 @@
               </tbody>
             </table>
           </div>
-          <div class="results">
-            <table cellpadding="0" cellspacing="0" border="0" class="display" id="${resultsTableID}">
+          <div class="completed">
+            <table cellpadding="0" cellspacing="0" border="0" class="display" id="${completedTableId}">
               <thead>
                 <tr>
                   <th>Run Time (hours)
                   </th>
                   <th>Name
-                    <input type="text" name="searchJobName" id="${resultsTableID}-search-job-name"
+                    <input type="text" name="searchJobName" id="${completedTableId}-search-job-name"
                       value="" class="search_init"/>
                   </th>
                   <th>Status
-                    <input type="text" name="searchJobStatus" id="${resultsTableID}-search-job-status"
+                    <input type="text" name="searchJobStatus" id="${completedTableId}-search-job-status"
                       value="" class="search_init"/>
                   </th>
                   <th>Model
-                    <input type="text" name="searchModelName" id="${resultsTableID}-search-model-name"
+                    <input type="text" name="searchModelName" id="${completedTableId}-search-model-name"
                       value="" class="search_init"/>
                   </th>
                   <th>Skeleton ID
@@ -156,6 +192,35 @@
                   <th>status</th>
                   <th>model</th>
                   <th>skeleton ID</th>
+                </tr>
+              </tfoot>
+              <tbody>
+              </tbody>
+            </table>
+          </div>
+          <div class="rankings">
+            <table cellpadding="0" cellspacing="0" border="0" class="display" id="${rankingTableId}">
+              <thead>
+                <tr>
+                  <th>node id
+                  </th>
+                  <th>parent id
+                  </th>
+                  <th>Connectivity score
+                  </th>
+                  <th>Branch score
+                  </th>
+                  <th>Reviewed
+                  </th>
+                </tr>
+              </thead>
+              <tfoot>
+                <tr>
+                  <th>node id</th>
+                  <th>parent id</th>
+                  <th>connectivity score</th>
+                  <th>branch score</th>
+                  <th>reviewed</th>
                 </tr>
               </tfoot>
               <tbody>
@@ -188,9 +253,9 @@
     let content = document.getElementById ('content-wrapper');
     let views = {
       Run: 'settings',
-      Jobs: 'jobs',
-      Results: 'results',
-      Test: 'none',
+      Queued: 'queued',
+      Completed: 'completed',
+      Rankings: 'rankings',
     };
     let mode = $ ('ul.ui-tabs-nav').children ('.ui-state-active').text ();
     for (let child of content.childNodes) {
@@ -219,7 +284,9 @@
       .catch (CATMAID.handleError);
   };
 
-  AutoproofreaderWidget.prototype.check_valid_diluvian_job = function (settings) {
+  AutoproofreaderWidget.prototype.check_valid_diluvian_job = function (
+    settings
+  ) {
     if (
       settings.run.server_id === undefined ||
       settings.run.model_id === undefined
@@ -284,7 +351,7 @@
     add_file (post_data, files.sarbor_config, 'sarbor_config.toml');
     add_file (post_data, files.job_config, 'job_config.json');
 
-    console.log(files.job_config)
+    console.log (files.job_config);
 
     CATMAID.fetch (
       'ext/autoproofreader/' + project.id + '/autoproofreader',
@@ -349,9 +416,13 @@
 
   AutoproofreaderWidget.prototype.test_websockets = function () {
     let self = this;
-    CATMAID.fetch ('ext/autoproofreader/' + project.id + '/autoproofreader', 'GET', {
-      server_id: self.getServer (),
-    })
+    CATMAID.fetch (
+      'ext/autoproofreader/' + project.id + '/autoproofreader',
+      'GET',
+      {
+        server_id: self.getServer (),
+      }
+    )
       .then (function (response) {
         console.log (response);
       })
@@ -825,7 +896,10 @@
     saveAs (new Blob ([data], {type: 'text/plain'}), filename);
   };
 
-  AutoproofreaderWidget.prototype.uploadSettingsToml = function (files, settings) {
+  AutoproofreaderWidget.prototype.uploadSettingsToml = function (
+    files,
+    settings
+  ) {
     let self = this;
     if (!CATMAID.containsSingleValidFile (files, 'toml')) {
       return;
@@ -876,16 +950,30 @@
   DATA VIS
   */
   AutoproofreaderWidget.prototype.display_results_data = function (data) {
-    console.log (data);
-    let display = new CATMAID.ResultsWindow ('RESULTS', undefined, true);
+    let self = this;
     CATMAID.fetch (
-      'ext/autoproofreader/' + project.id + '/proofread-tree-nodes',
-      'GET', {result_id:data.job_id}
-    ).then((ranking_data)=>{
-      display.appendRankingTable (ranking_data, data.skeleton_id);
-      display.show (500, 'auto', true);
-      console.log(ranking_data);
-    });
+      'ext/autoproofreader/' + project.id + '/autoproofreader-results',
+      'GET',
+      {result_id: data.job_id}
+    )
+      .then (job => {
+        self.ranking_skeleton_id = job[0].skeleton;
+        self.ranking_result_id = job[0].id;
+        CATMAID.fetch (
+          'ext/autoproofreader/' + project.id + '/proofread-tree-nodes',
+          'GET',
+          {result_id: job[0].id}
+        )
+          .then (ranking_data => {
+            self.rankingTable.clear ();
+            ranking_data.forEach (function (node) {
+              self.appendOneNode (node);
+            });
+            self.rankingTable.draw ();
+          })
+          .catch (CATMAID.handleError);
+      })
+      .catch (CATMAID.handleError);
   };
 
   /*
@@ -893,13 +981,15 @@
   TABLE
   */
   AutoproofreaderWidget.prototype.initTables = function () {
-    this.initJobsTable ();
-    this.initResultsTable ();
+    this.initQueuedTable ();
+    this.initCompletedTable ();
+    this.initRankingTable ();
+    this.get_jobs ();
   };
 
-  AutoproofreaderWidget.prototype.initJobsTable = function () {
+  AutoproofreaderWidget.prototype.initQueuedTable = function () {
     const self = this;
-    const tableID = this.idPrefix + 'datatable-jobs';
+    const tableID = this.idPrefix + 'datatable-queued';
     const $table = $ ('#' + tableID);
 
     this.ongoingTable = $table.DataTable ({
@@ -1009,12 +1099,12 @@
     });
   };
 
-  AutoproofreaderWidget.prototype.initResultsTable = function () {
+  AutoproofreaderWidget.prototype.initCompletedTable = function () {
     const self = this;
-    const tableID = this.idPrefix + 'datatable-results';
+    const tableID = this.idPrefix + 'datatable-completed';
     const $table = $ ('#' + tableID);
 
-    this.finishedTable = $table.DataTable ({
+    this.completedTable = $table.DataTable ({
       // http://www.datatables.net/usage/options
       destroy: true,
       dom: '<"H"lrp>t<"F"ip>',
@@ -1068,7 +1158,7 @@
     });
 
     $ (`#${tableID} tbody`).on ('click', 'tr', function () {
-      self.display_results_data (self.finishedTable.row (this).data ());
+      self.display_results_data (self.completedTable.row (this).data ());
     });
 
     let exactNumSearch = function (event) {
@@ -1079,7 +1169,7 @@
         const filterValue = event.currentTarget.value;
         const regex = filterValue === '' ? '' : `^${filterValue}$`;
 
-        self.finishedTable
+        self.completedTable
           .column (event.currentTarget.closest ('th'))
           .search (regex, true, false)
           .draw ();
@@ -1095,7 +1185,7 @@
       let filterValue = event.currentTarget.value;
       let regex = filterValue === '' ? '' : `.*${filterValue}.*`;
 
-      self.finishedTable
+      self.completedTable
         .column (event.currentTarget.closest ('th'))
         .search (regex, true, false)
         .draw ();
@@ -1119,13 +1209,146 @@
         this.value = '';
       }
     });
+  };
 
-    this.get_jobs ();
+  AutoproofreaderWidget.prototype.initRankingTable = function () {
+    const self = this;
+    const tableID = this.idPrefix + 'datatable-rankings';
+    const $table = $ ('#' + tableID);
+
+    this.rankingTable = $table.DataTable ({
+      // http://www.datatables.net/usage/options
+      destroy: true,
+      dom: '<"H"lrp>t<"F"ip>',
+      serverSide: false,
+      paging: true,
+      lengthChange: true,
+      autoWidth: false,
+      pageLength: CATMAID.pageLengthOptions[0],
+      lengthMenu: [CATMAID.pageLengthOptions, CATMAID.pageLengthLabels],
+      jQueryUI: true,
+      processing: true,
+      deferRender: true,
+      columns: [
+        {
+          data: 'node_id',
+          orderable: true,
+          searchable: true,
+          className: 'node_id',
+        },
+        {
+          data: 'parent_id',
+          orderable: true,
+          searchable: true,
+          className: 'parent_id',
+        },
+        {
+          data: 'connectivity_score',
+          orderable: true,
+          searchable: true,
+          className: 'connectivity_score',
+        },
+        {
+          data: 'branch_score',
+          orderable: true,
+          searchable: true,
+          className: 'branch_score',
+        },
+        {
+          data: 'reviewed',
+          orderable: true,
+          searchable: true,
+          className: 'reviewed',
+        },
+      ],
+    });
+
+    $ (`#${tableID} tbody`).on ('click', 'td', function () {
+      let index = self.rankingTable.cell (this).index ();
+      let row_data = self.rankingTable.row (index.row).data ();
+      SkeletonAnnotations.staticMoveTo (
+        parseInt (row_data.z),
+        parseInt (row_data.y),
+        parseInt (row_data.x)
+      ).then (e => {
+        var projectCoordinates = project.focusedStackViewer.projectCoordinates ();
+        var parameters = {
+          x: projectCoordinates.x,
+          y: projectCoordinates.y,
+          z: projectCoordinates.z,
+        };
+        parameters['skeleton_id'] = self.ranking_skeleton_id;
+        CATMAID.fetch (project.id + '/node/nearest', 'POST', parameters)
+          .then (function (data) {
+            SkeletonAnnotations.staticSelectNode (data.treenode_id);
+            return data.treenode_id;
+          })
+          .catch (function (e) {
+            CATMAID.warn (
+              'Going to skeleton ' + data.skeleton_id + ' failed due to: ' + e
+            );
+          })
+          .then (function (pid) {
+            let data = self.rankingTable.row (index.row).data ();
+            let stack_viewer = project.getStackViewer (1);
+            let tracing_layers = stack_viewer.getLayersOfType (
+              CATMAID.TracingLayer
+            );
+            let tracing_layer = tracing_layers[0];
+            tracing_layer.tracingOverlay.createNode (
+              pid,
+              null,
+              data.x + data.branch_dx,
+              data.y + data.branch_dy,
+              data.z + data.branch_dz,
+              -1,
+              0,
+              null
+            );
+          })
+          .catch (function (e) {
+            console.log (e);
+            CATMAID.warn ('Failed to create node!');
+          });
+      });
+    });
+
+    let exactNumSearch = function (event) {
+      if (event.which == 13) {
+        event.stopPropagation ();
+        event.preventDefault ();
+        // Filter with a regular expression
+        const filterValue = event.currentTarget.value;
+        const regex = filterValue === '' ? '' : `^${filterValue}$`;
+
+        self.rankingTable
+          .column (event.currentTarget.closest ('th'))
+          .search (regex, true, false)
+          .draw ();
+      }
+    };
+
+    let $headerInput = $table.find ('thead input');
+
+    // prevent sorting the column when focusing on the search field
+    $headerInput.click (function (event) {
+      event.stopPropagation ();
+    });
+
+    // remove the 'Search' string when first focusing the search box
+    $headerInput.focus (function () {
+      if (this.className === 'search_init') {
+        this.className = '';
+        this.value = '';
+      }
+    });
+
+    this.ranking;
   };
 
   AutoproofreaderWidget.prototype.get_jobs = function () {
     this.ongoingTable.clear ();
-    this.finishedTable.clear ();
+    this.completedTable.clear ();
     let self = this;
     CATMAID.fetch (
       'ext/autoproofreader/' + project.id + '/autoproofreader-results',
@@ -1133,15 +1356,15 @@
     )
       .then (function (results) {
         results.forEach (function (result) {
-          self.appendOne (result);
+          self.appendOneJob (result);
         });
         self.ongoingTable.draw ();
-        self.finishedTable.draw ();
+        self.completedTable.draw ();
       })
       .catch (CATMAID.handleError);
   };
 
-  AutoproofreaderWidget.prototype.appendOne = function (job) {
+  AutoproofreaderWidget.prototype.appendOneJob = function (job) {
     let self = this;
     if (job.status === 'complete') {
       let row = {
@@ -1164,8 +1387,8 @@
       ).then (function (result) {
         let model = result[0];
         row.model_name = model.name;
-        self.finishedTable.rows.add ([row]);
-        self.finishedTable.draw ();
+        self.completedTable.rows.add ([row]);
+        self.completedTable.draw ();
       });
     } else {
       let row = {
@@ -1188,6 +1411,25 @@
         self.ongoingTable.draw ();
       });
     }
+  };
+
+  AutoproofreaderWidget.prototype.appendOneNode = function (node) {
+    let self = this;
+    let row = {
+      node_id: node.node_id,
+      parent_id: node.parent_id,
+      connectivity_score: node.connectivity_score,
+      branch_score: node.branch_score,
+      reviewed: node.reviewed,
+      x: node.x,
+      y: node.y,
+      z: node.z,
+      branch_dx: node.branch_dx,
+      branch_dy: node.branch_dy,
+      branch_dz: node.branch_dz,
+    };
+    self.rankingTable.rows.add ([row]);
+    self.rankingTable.draw ();
   };
 
   AutoproofreaderWidget.prototype.clear = function () {
@@ -1214,25 +1456,33 @@
   AutoproofreaderWidget.prototype.createSettings = function () {
     let self = this;
 
-    let is_visible = function (settings, setting, visible){
+    let is_visible = function (settings, setting, visible) {
       let is_container = !('type' in settings);
-      if (visible == true){
+      if (visible == true) {
         // if a root in settings tree is visible, all children are visible
         // only exception is advanced settings
-        return true & (is_container || !settings.advanced || settings.advanced == self.settings.run.advanced.value);
+        return (
+          true &
+          (is_container ||
+            !settings.advanced ||
+            settings.advanced == self.settings.run.advanced.value)
+        );
       }
-      if (visible == false){
+      if (visible == false) {
         return false;
       }
 
-      if (!is_container){
+      if (!is_container) {
         return true;
       }
-      if (is_container && ["sarbor", "run"].includes(setting)){
+      if (is_container && ['sarbor', 'run'].includes (setting)) {
         return true;
       }
 
-      if (is_container && self.settings.run.segmentation_type.value === setting){
+      if (
+        is_container &&
+        self.settings.run.segmentation_type.value === setting
+      ) {
         return true;
       }
 
@@ -1429,9 +1679,14 @@
 
     let renderSettings = function (container, settings, visible) {
       for (let setting in settings) {
-        if (is_visible(settings[setting], setting, visible)){
+        if (is_visible (settings[setting], setting, visible)) {
           if (!('type' in settings[setting])) {
-            let ds = createSection (container, setting, settings[setting], true);
+            let ds = createSection (
+              container,
+              setting,
+              settings[setting],
+              true
+            );
             renderSettings (ds, settings[setting], true);
           } else {
             renderSetting (container, settings[setting]);
@@ -1539,8 +1794,13 @@
         get_choices: args.get_choices,
         mode: args.mode,
         reset: args.reset,
-        advanced: Boolean(args.advanced),
-        change: getChangeFunc (args.type, args.settings, args.label, args.reset),
+        advanced: Boolean (args.advanced),
+        change: getChangeFunc (
+          args.type,
+          args.settings,
+          args.label,
+          args.reset
+        ),
       };
       args.settings[args.label] = fields;
     };
@@ -1551,8 +1811,8 @@
         return function () {
           let newValue = parseFloat (this.value);
           settings[label].value = newValue;
-          if (reset){
-            self.createSettings();
+          if (reset) {
+            self.createSettings ();
           }
         };
       } else if (type === 'numeric_spinner_int') {
@@ -1560,8 +1820,8 @@
         return function () {
           let newValue = parseFloat (this.value, 10);
           settings[label].value = newValue;
-          if (reset){
-            self.createSettings();
+          if (reset) {
+            self.createSettings ();
           }
         };
       } else if (type === 'option_dropdown') {
@@ -1569,9 +1829,9 @@
         return function () {
           let newValue = this.value;
           settings[label].value = newValue;
-          console.log(self.settings)
-          if (reset){
-            self.createSettings();
+          console.log (self.settings);
+          if (reset) {
+            self.createSettings ();
           }
         };
       } else if (type === 'async_option_dropdown') {
@@ -1582,8 +1842,8 @@
         return function () {
           let newValue = this.checked;
           settings[label].value = newValue;
-          if (reset){
-            self.createSettings();
+          if (reset) {
+            self.createSettings ();
           }
         };
       } else if (type === 'number_list') {
@@ -1594,8 +1854,8 @@
             .map (CATMAID.tools.trimString)
             .map (Number);
           settings[label].value = newValue;
-          if (reset){
-            self.createSettings();
+          if (reset) {
+            self.createSettings ();
           }
         };
       } else if (type === 'string') {
@@ -1603,8 +1863,8 @@
         return function () {
           let newValue = this.value;
           settings[label].value = newValue;
-          if (reset){
-            self.createSettings();
+          if (reset) {
+            self.createSettings ();
           }
         };
       }
@@ -2138,7 +2398,7 @@
         options: [
           {name: 'Diluvian', id: 'diluvian'},
           {name: 'watershed segmentation', id: 'watershed'},
-          {name: 'test', id: 'test'}
+          {name: 'test', id: 'test'},
         ],
         helptext: 'Type of segmentation to use in the backend. Diluvian ' +
           'will segment the skeleton on demand which will take some time. ' +
@@ -2215,7 +2475,7 @@
     let createSarborDefaults = function (settings) {
       let sub_settings = getSubSettings (settings, 'sarbor');
 
-      let skeleton_settings = getSubSettings(sub_settings, "skeleton");
+      let skeleton_settings = getSubSettings (sub_settings, 'skeleton');
 
       addSettingTemplate ({
         settings: skeleton_settings,
@@ -2273,7 +2533,10 @@
         step: 1,
       });
 
-      let segmentation_settings = getSubSettings(sub_settings, "segmentations");
+      let segmentation_settings = getSubSettings (
+        sub_settings,
+        'segmentations'
+      );
 
       addSettingTemplate ({
         settings: segmentation_settings,
@@ -2282,10 +2545,8 @@
         name: 'Downsample',
         helptext: 'How much to downsample the segmentations on each axis. ' +
           'Full resolution is often not necessary for finding high order branches ' +
-          'so you can downsample to save memory if you like.', 
-        value: [
-          1,1,1
-        ],
+          'so you can downsample to save memory if you like.',
+        value: [1, 1, 1],
       });
 
       addSettingTemplate ({
@@ -2294,10 +2555,8 @@
         label: 'fov_shape',
         name: 'Field of view shape',
         helptext: 'The field of view in nanometers around each node that you would ' +
-          'like to consider when looking for missing branches.', 
-        value: [
-          1240,1240,1240
-        ],
+          'like to consider when looking for missing branches.',
+        value: [1240, 1240, 1240],
       });
     };
 
@@ -2310,6 +2569,36 @@
     };
 
     createDefaults (this.settings);
+  };
+
+  /*
+  --------------------------------------------------------------------------------
+  LAYERS
+  */
+  AutoproofreaderWidget.prototype.updateProofreadSkeletonVisualizationLayer = function () {
+    var options = {
+      visible: this.visibleProofreadLayer,
+      result_id: this.ranking_result_id,
+    };
+    // Create a skeleton projection layer for all stack viewers that
+    // don't have one already.
+    let transformations = new Set (this.displayTransformations);
+    project.getStackViewers ().forEach (function (sv) {
+      var layer = sv.getLayer ('proofread skeleton projection');
+      if (options.visible) {
+        if (!layer) {
+          // Create new if not already present
+          layer = new CATMAID.ProofreadSkeletonVisualizationLayer (sv, options);
+          sv.addLayer ('proofread skeleton projection', layer);
+        }
+
+        // Update other options and display
+        layer.updateOptions (options, false, true);
+      } else if (layer) {
+        sv.removeLayer ('proofread skeleton projection');
+        sv.redraw ();
+      }
+    });
   };
 
   /*
