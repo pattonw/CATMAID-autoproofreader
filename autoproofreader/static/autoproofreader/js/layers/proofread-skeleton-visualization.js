@@ -207,7 +207,6 @@
                 self.max_connectivity_score = nodes.reduce((acc, next) => {
                     return Math.max(acc, next.connectivity_score);
                 }, 0);
-                console.log(self.node_map)
                 self.arborParserMap = {};
                 self.arborParserMap[result_id] = ap;
                 return ap;
@@ -398,9 +397,14 @@
     function renderSloppedEdge(n, above, below, parent_first, branch, connectivity, options) {
         let ndistabove = above[options.normalDim] - options.stackViewer.plane.constant;
         let ndistbelow = below[options.normalDim] - options.stackViewer.plane.constant;
+        if (ndistabove < ndistbelow) {
+            CATMAID.Error("Something went wrong with rendering the proofread skeleton!")
+        }
         let abs_slope = { x: above.x - below.x, y: above.y - below.y, z: above.z - below.z };
         let slope = { x: abs_slope.x / abs_slope.z, y: abs_slope.y / abs_slope.z, z: abs_slope.z / abs_slope.z };
         let plane_intercept = { x: above.x - ndistabove * slope.x, y: above.y - ndistabove * slope.y, z: above.z - ndistabove * slope.z };
+        let top_edge = above.z < plane_intercept.z ? above : plane_intercept;
+        let bottom_edge = below.z > plane_intercept.z ? below : plane_intercept;
 
         let ndista = Math.min(ndistabove, options.stackViewer.primaryStack.resolution[options.normalDim]);
         let ndistb = Math.max(ndistbelow, -options.stackViewer.primaryStack.resolution[options.normalDim]);
@@ -410,7 +414,7 @@
             let opacity = options.opacity(n, up_line, up_line[options.normalDim]);
             let edge = new PIXI.Graphics();
             edge.lineStyle(options.edgeWidth, 0xffffff, opacity);
-            edge.moveTo(plane_intercept[options.planeDims.x], plane_intercept[options.planeDims.y]);
+            edge.moveTo(bottom_edge[options.planeDims.x], bottom_edge[options.planeDims.y]);
             edge.lineTo(up_line[options.planeDims.x], up_line[options.planeDims.y]);
             edge.tint = color;
             options.graphics.containers.lines.addChild(edge);
@@ -421,7 +425,7 @@
             let opacity = options.opacity(n, down_line, down_line[options.normalDim]);
             let edge = new PIXI.Graphics();
             edge.lineStyle(options.edgeWidth, 0xffffff, opacity);
-            edge.moveTo(plane_intercept[options.planeDims.x], plane_intercept[options.planeDims.y]);
+            edge.moveTo(top_edge[options.planeDims.x], top_edge[options.planeDims.y]);
             edge.lineTo(down_line[options.planeDims.x], down_line[options.planeDims.y]);
             edge.tint = color;
             options.graphics.containers.lines.addChild(edge);
@@ -441,12 +445,13 @@
 
         // render node that are not in this layer
         var stack = this.stackViewer.primaryStack;
+        var z_res = stack.resolution.z;
         // Positions are in project space
         var pos1 = this.positions[n];
         let ndist1 = pos1[this.normalDim] - this.stackViewer.plane.constant
 
         // draw node
-        if (ndist1 === 0) {
+        if (Math.abs(ndist1) <= z_res / 2) {
             var c = new PIXI.Sprite(this.graphics.Node.prototype.NODE_TEXTURE);
             c.anchor.set(0.5);
             c.x = pos1[this.planeDims.x];
@@ -465,17 +470,19 @@
 
             let ndist2 = pos2[this.normalDim] - this.stackViewer.plane.constant
 
-            let display_needed = (ndist1 <= 0 && ndist2 >= 0) || (ndist1 >= 0 && ndist2 <= 0)
+            let display_needed = (ndist1 <= z_res / 2 && ndist2 >= -z_res / 2) || (ndist1 >= -z_res / 2 && ndist2 <= z_res / 2)
             if (display_needed) {
-                if (ndist1 === ndist2) {
+                if (Math.abs(ndist1) <= z_res / 2 && Math.abs(ndist2) <= z_res / 2) {
                     renderFlatEdge(n, pos1, pos2, true, undefined, this);
                 } else {
                     if (ndist1 > ndist2) {
+                        renderSloppedEdge(n, pos1, pos2, false, true, undefined, this);
+                    } else {
                         renderSloppedEdge(n, pos2, pos1, false, true, undefined, this);
                     }
                 }
 
-                if (ndist2 === 0) {
+                if (Math.abs(ndist2) <= z_res / 2) {
                     var c = new PIXI.Sprite(this.graphics.Node.prototype.NODE_TEXTURE);
                     c.anchor.set(0.5);
                     c.x = pos2[this.planeDims.x];
@@ -498,9 +505,9 @@
 
             let ndist2 = pos2[this.normalDim] - this.stackViewer.plane.constant
 
-            let display_needed = (ndist1 <= 0 && ndist2 >= 0) || (ndist1 >= 0 && ndist2 <= 0)
+            let display_needed = (ndist1 <= z_res / 2 && ndist2 >= -z_res / 2) || (ndist1 >= -z_res / 2 && ndist2 <= z_res / 2)
             if (display_needed) {
-                if (ndist1 === ndist2) {
+                if (Math.abs(ndist1) <= z_res / 2 && Math.abs(ndist2) <= z_res / 2) {
                     renderFlatEdge(n, pos1, pos2, false, connectivity, this);
                 } else {
                     if (ndist1 > ndist2) {
