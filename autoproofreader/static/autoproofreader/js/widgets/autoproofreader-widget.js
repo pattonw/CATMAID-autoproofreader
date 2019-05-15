@@ -2423,7 +2423,6 @@
                 options: [
                     { name: 'Diluvian', id: 'diluvian' },
                     { name: 'watershed segmentation', id: 'watershed' },
-                    { name: 'test', id: 'test' },
                 ],
                 helptext: 'Type of segmentation to use in the backend. Diluvian ' +
                     'will segment the skeleton on demand which will take some time. ' +
