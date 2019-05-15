@@ -2565,13 +2565,79 @@
 
             addSettingTemplate({
                 settings: segmentation_settings,
+                type: 'checkbox',
+                label: 'use_sphere',
+                name: 'Use Sphere',
+                helptext: 'Whether to use the full field of view, shrink it to a spherical field of view.' +
+                    'Using the sphere means losing some data, but not using it means weighting the missing branch ' +
+                    'score in the corners of each field of view due to the distance weighting.',
+                advanced: true,
+                value: true,
+            });
+
+            let res = project.focusedStackViewer.primaryStack.resolution;
+            addSettingTemplate({
+                settings: segmentation_settings,
+                type: 'number_list',
+                label: 'resolution_phys',
+                name: 'Resolution',
+                helptext: 'Resolution of each voxel.',
+                value: [res.x, res.y, res.z,],
+            });
+
+            addSettingTemplate({
+                settings: segmentation_settings,
+                type: 'number_list',
+                label: 'start_phys',
+                name: 'Start',
+                helptext: 'The minimum physical coordinate along each axis.',
+                advanced: true,
+                value: [
+                    project.focusedStackViewer.primaryStack.translation.x,
+                    project.focusedStackViewer.primaryStack.translation.y,
+                    project.focusedStackViewer.primaryStack.translation.z,
+                ],
+            });
+
+            addSettingTemplate({
+                settings: segmentation_settings,
+                type: 'number_list',
+                label: 'shape_phys',
+                name: 'Shape',
+                helptext: 'The size of the volume to consider.',
+                advanced: true,
+                value: [
+                    res.x * project.focusedStackViewer.primaryStack.dimension.x,
+                    res.y * project.focusedStackViewer.primaryStack.dimension.y,
+                    res.z * project.focusedStackViewer.primaryStack.dimension.z,
+                ],
+            });
+
+            addSettingTemplate({
+                settings: segmentation_settings,
                 type: 'number_list',
                 label: 'downsample',
                 name: 'Downsample',
                 helptext: 'How much to downsample the segmentations on each axis. ' +
                     'Full resolution is often not necessary for finding high order branches ' +
-                    'so you can downsample to save memory if you like.',
-                value: [1, 1, 1],
+                    'so you can downsample to save memory if you like. The default takes makes ' +
+                    'volume isotropic.',
+                value: [
+                    Math.max(res.x, res.y, res.z) / res.x,
+                    Math.max(res.x, res.y, res.z) / res.y,
+                    Math.max(res.x, res.y, res.z) / res.z,
+                ],
+            });
+
+            addSettingTemplate({
+                settings: segmentation_settings,
+                type: 'number_list',
+                label: 'leaf_shape_voxels',
+                name: 'Block Shape',
+                helptext: 'The shape of each each block in the blockwise sparse datastructures. ' +
+                    'This includes an in-memory Octree and the n5 filesystem for data storage.',
+                advanced: true,
+                value: [64, 64, 64,],
             });
 
             addSettingTemplate({
@@ -2581,7 +2647,33 @@
                 name: 'Field of view shape',
                 helptext: 'The field of view in nanometers around each node that you would ' +
                     'like to consider when looking for missing branches.',
-                value: [1240, 1240, 1240],
+                value: [3000, 3000, 3000],
+            });
+
+            addSettingTemplate({
+                settings: segmentation_settings,
+                type: 'numeric_spinner_float',
+                label: 'incr_denom',
+                name: 'Increment Denominator',
+                helptext: 'The amount to increment the denominator when calculating segmentation confidence ' +
+                    'from (# of times segmented) / (# of times seen). Some segmentation algorithms are sensitive ' +
+                    'to initial conditions or have some stocastisity so this term aims to balance areas of the ' +
+                    'segmentation with a high distance weight with those that have a high consensus weight ' +
+                    'incrementing the denominator more gives more weight to areas with more field of view overlap.',
+                advanced: true,
+                value: 0.5,
+            });
+
+            addSettingTemplate({
+                settings: segmentation_settings,
+                type: 'numeric_spinner_int',
+                label: 'interpolate_distance_nodes',
+                name: 'Interpolate Distance Nodes',
+                helptext: 'Whether to use the full field of view, shrink it to a spherical field of view.' +
+                    'Using the sphere means losing some data, but not using it means weighting the missing branch ' +
+                    'score in the corners of each field of view due to the distance weighting.',
+                advanced: true,
+                value: 1,
             });
         };
 
