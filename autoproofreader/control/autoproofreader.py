@@ -122,6 +122,7 @@ class AutoproofreaderTaskAPI(APIView):
             model_id=job_config["model_id"],
             name=job_name,
             status="queued",
+            private=True,
             # gpus=gpus,
         )
         result.save()
@@ -428,7 +429,9 @@ class AutoproofreaderResultAPI(APIView):
         )
         if result_id is not None:
             query_set = AutoproofreaderResult.objects.filter(
-                Q(id=result_id) & (Q(user=request.user.id) | Q(private=False))
+                Q(project=project_id)
+                & Q(id=result_id)
+                & (Q(user=request.user.id) | Q(private=False))
             )
             if len(query_set) == 0:
                 return HttpResponseNotFound(
@@ -436,7 +439,7 @@ class AutoproofreaderResultAPI(APIView):
                 )
         else:
             query_set = AutoproofreaderResult.objects.filter(
-                Q(user=request.user.id) | Q(private=False)
+                Q(project=project_id) & (Q(user=request.user.id) | Q(private=False))
             )
             if len(query_set) == 0 and result_id is not None:
                 return JsonResponse([], safe=False)
@@ -452,43 +455,49 @@ class AutoproofreaderResultAPI(APIView):
         )
 
     @method_decorator(requires_user_role(UserRole.QueueComputeTask))
+    def patch(self, request, project_id):
+        result_id = request.query_params.get(
+            "result_id", request.data.get("result_id", None)
+        )
+        if request.query_params.get("private", request.data.get("private", False)):
+            # toggle privacy setting if result belongs to this user.
+            result = get_object_or_404(
+                AutoproofreaderResult,
+                id=result_id,
+                user=request.user.id,
+                project=project_id,
+            )
+            result.private = not result.private
+            result.save()
+        if request.query_params.get("permanent", request.data.get("permanent", False)):
+            # toggle permanent setting if result belongs to user or is not private
+            query_set = AutoproofreaderResult.objects.filter(
+                Q(id=result_id)
+                & Q(project=project_id)
+                & (Q(user=request.user.id) | Q(private=False))
+            )
+            if len(query_set) == 0:
+                return HttpResponseNotFound()
+            if len(query_set) > 1:
+                raise ValueError("non unique ids found")
+            result = query_set[0]
+            result.permanent = not result.permanent
+            result.save()
+
+        return JsonResponse({"private": result.private, "permanent": result.permanent})
+
+    @method_decorator(requires_user_role(UserRole.QueueComputeTask))
     def delete(self, request, project_id):
         # can_edit_or_fail(request.user, point_id, "point")
         result_id = request.query_params.get(
             "result_id", request.data.get("result_id", None)
         )
         result = get_object_or_404(
-            AutoproofreaderResult, id=result_id, user_id=request.user.id
+            AutoproofreaderResult,
+            id=result_id,
+            user_id=request.user.id,
+            project=project_id,
         )
         result.delete()
         return JsonResponse({"success": True})
 
-    def get_results(self, result_id=None):
-        cursor = connection.cursor()
-        if result_id is not None:
-            cursor.execute(
-                """
-                SELECT * FROM autoproofreader_autoproofreaderresult
-                WHERE id = {}
-                """.format(
-                    result_id
-                )
-            )
-        else:
-            cursor.execute(
-                """
-                SELECT * FROM autoproofreader_autoproofreaderresult
-                """
-            )
-        desc = cursor.description
-        columns = [col[0] for col in desc]
-        uuid_index = columns.index("uuid")
-        columns_without_uuid = [
-            columns[i] for i in range(len(columns)) if i != uuid_index
-        ]
-        rows_without_uuid = [
-            [row[i] for i in range(len(row)) if i != uuid_index]
-            for row in cursor.fetchall()
-        ]
-
-        return [dict(zip(columns_without_uuid, row)) for row in rows_without_uuid]

@@ -1,26 +1,24 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.utils import timezone
-from catmaid.models import User, Volume, UserFocusedModel, ClassInstance
 import uuid
 from rest_framework import serializers
 import pytz
+
+from catmaid.models import User, Volume, UserFocusedModel, ClassInstance
 
 
 class ComputeServer(models.Model):
     name = models.TextField()
     address = models.TextField()
-    edition_time = models.DateTimeField(default=timezone.now)
     diluvian_path = models.TextField()
     results_directory = models.TextField()
     environment_source_path = models.TextField(null=True)
-    editor = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name="compute_server_editor",
-        db_column="editor_id",
+    project_whitelist = ArrayField(
+        models.IntegerField(null=True, blank=True), null=True
     )
 
     ssh_user = models.TextField(default="guest")
@@ -30,12 +28,30 @@ class ComputeServer(models.Model):
         return self.name
 
 
+class ComputeServerSerializer(serializers.ModelSerializer):
+    creation_time = serializers.DateTimeField(default_timezone=pytz.timezone("UTC"))
+    edition_time = serializers.DateTimeField(default_timezone=pytz.timezone("UTC"))
+
+    class Meta:
+        model = ComputeServer
+        fields = "__all__"
+
+
 class ConfigFile(UserFocusedModel):
     """
     The configurations necessary to run autoproofreader.
     """
 
     config = models.TextField()
+
+
+class ConfigFileSerializer(serializers.ModelSerializer):
+    creation_time = serializers.DateTimeField(default_timezone=pytz.timezone("UTC"))
+    edition_time = serializers.DateTimeField(default_timezone=pytz.timezone("UTC"))
+
+    class Meta:
+        model = ConfigFile
+        fields = "__all__"
 
 
 class DiluvianModel(UserFocusedModel):
@@ -51,6 +67,15 @@ class DiluvianModel(UserFocusedModel):
     # Path to the directory containing the model weights and config files
     model_source_path = models.TextField()
     config = models.ForeignKey(ConfigFile, on_delete=models.CASCADE)
+
+
+class DiluvianModelSerializer(serializers.ModelSerializer):
+    creation_time = serializers.DateTimeField(default_timezone=pytz.timezone("UTC"))
+    edition_time = serializers.DateTimeField(default_timezone=pytz.timezone("UTC"))
+
+    class Meta:
+        model = DiluvianModel
+        fields = "__all__"
 
 
 class AutoproofreaderResult(UserFocusedModel):
@@ -136,3 +161,12 @@ class ImageVolumeConfig(UserFocusedModel):
 
     name = models.TextField()
     config = models.TextField()
+
+
+class ImageVolumeConfigSerializer(serializers.ModelSerializer):
+    creation_time = serializers.DateTimeField(default_timezone=pytz.timezone("UTC"))
+    edition_time = serializers.DateTimeField(default_timezone=pytz.timezone("UTC"))
+
+    class Meta:
+        model = ImageVolumeConfig
+        fields = "__all__"

@@ -5,8 +5,9 @@ from django.utils.decorators import method_decorator
 
 from catmaid.control.authentication import requires_user_role
 from catmaid.models import UserRole
-from autoproofreader.models import DiluvianModel, ConfigFile
 from rest_framework.views import APIView
+
+from autoproofreader.models import DiluvianModel, DiluvianModelSerializer, ConfigFile
 
 
 class DiluvianModelAPI(APIView):
@@ -86,10 +87,16 @@ class DiluvianModelAPI(APIView):
         model_id = request.query_params.get(
             "model_id", request.data.get("model_id", None)
         )
-        result = self.get_models(model_id)
+
+        if model_id is not None:
+            query_set = DiluvianModel.objects.filter(id=model_id, prject=project_id)
+        else:
+            query_set = DiluvianModel.objects.filter(project=project_id)
 
         return JsonResponse(
-            result, safe=False, json_dumps_params={"sort_keys": True, "indent": 4}
+            DiluvianModelSerializer(query_set, many=True).data,
+            safe=False,
+            json_dumps_params={"sort_keys": True, "indent": 4},
         )
 
     @method_decorator(requires_user_role(UserRole.QueueComputeTask))
@@ -103,23 +110,3 @@ class DiluvianModelAPI(APIView):
         model.delete()
 
         return JsonResponse({"success": True})
-
-    def get_models(self, model_id=None):
-        cursor = connection.cursor()
-        if model_id is not None:
-            cursor.execute(
-                """
-                SELECT * FROM autoproofreader_diluvianmodel
-                WHERE id = {}
-                """.format(
-                    model_id
-                )
-            )
-        else:
-            cursor.execute(
-                """
-                SELECT * FROM autoproofreader_diluvianmodel
-                """
-            )
-        desc = cursor.description
-        return [dict(zip([col[0] for col in desc], row)) for row in cursor.fetchall()]

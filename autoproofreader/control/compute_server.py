@@ -1,15 +1,17 @@
 from django.http import JsonResponse
 from django.db import connection
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.conf import settings
 
 from catmaid.control.authentication import requires_user_role
 from catmaid.models import UserRole
-from autoproofreader.models import ComputeServer
 from rest_framework.views import APIView
 
 import subprocess
+
+from autoproofreader.models import ComputeServer, ComputeServerSerializer
 
 
 class ComputeServerAPI(APIView):
@@ -76,10 +78,23 @@ class ComputeServerAPI(APIView):
             ]
         """
         server_id = request.query_params.get("server_id", None)
-        result = self.get_servers(server_id)
+        if server_id is not None:
+            query_set = ComputeServer.objects.filter(
+                Q(id=server_id)
+                & (
+                    Q(project_whitelist__len=0)
+                    | Q(project_whitelist__contains=project_id)
+                )
+            )
+        else:
+            query_set = ComputeServer.objects.filter(
+                Q(project_whitelist__len=0) | Q(project_whitelist__contains=project_id)
+            )
 
         return JsonResponse(
-            result, safe=False, json_dumps_params={"sort_keys": True, "indent": 4}
+            ComputeServerSerializer(query_set, many=True).data,
+            safe=False,
+            json_dumps_params={"sort_keys": True, "indent": 4},
         )
 
     @method_decorator(requires_user_role(UserRole.Admin))
@@ -89,30 +104,12 @@ class ComputeServerAPI(APIView):
             "server_id", request.data.get("server_id", None)
         )
 
-        server = get_object_or_404(ComputeServer, id=server_id)
+        server = get_object_or_404(
+            ComputeServer, id=server_id, project_whitelist__contains=project_id
+        )
         server.delete()
 
         return JsonResponse({"success": True})
-
-    def get_servers(self, server_id=None):
-        cursor = connection.cursor()
-        if server_id is not None:
-            cursor.execute(
-                """
-                SELECT * FROM autoproofreader_computeserver
-                WHERE id = {}
-                """.format(
-                    server_id
-                )
-            )
-        else:
-            cursor.execute(
-                """
-                SELECT * FROM autoproofreader_computeserver
-                """
-            )
-        desc = cursor.description
-        return [dict(zip([col[0] for col in desc], row)) for row in cursor.fetchall()]
 
 
 class GPUUtilAPI(APIView):

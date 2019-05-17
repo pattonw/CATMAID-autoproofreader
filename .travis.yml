@@ -32,7 +32,7 @@ before_install:
 install:
   - cd $CATMAID_DIR
   - bash scripts/travis/install_requirements.sh
-  - pip install coveralls flake8
+  - pip install coveralls flake8 pandas
   - npm install 
   - npm install jshint jsdoc
   - npm bin

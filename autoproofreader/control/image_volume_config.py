@@ -5,8 +5,9 @@ from django.utils.decorators import method_decorator
 
 from catmaid.control.authentication import requires_user_role
 from catmaid.models import UserRole
-from autoproofreader.models import ImageVolumeConfig
 from rest_framework.views import APIView
+
+from autoproofreader.models import ImageVolumeConfig, ImageVolumeConfigSerializer
 
 
 class ImageVolumeConfigAPI(APIView):
@@ -66,10 +67,17 @@ class ImageVolumeConfigAPI(APIView):
         image_volume_config_id = request.query_params.get(
             "image_volume_config_id", request.data.get("image_volume_config_id", None)
         )
-        result = self.get_volume_configs(image_volume_config_id)
+        if image_volume_config_id is not None:
+            query_set = ImageVolumeConfig.objects.filter(
+                id=image_volume_config_id, prject=project_id
+            )
+        else:
+            query_set = ImageVolumeConfig.objects.filter(project=project_id)
 
         return JsonResponse(
-            result, safe=False, json_dumps_params={"sort_keys": True, "indent": 4}
+            ImageVolumeConfigSerializer(query_set, many=True).data,
+            safe=False,
+            json_dumps_params={"sort_keys": True, "indent": 4},
         )
 
     @method_decorator(requires_user_role(UserRole.QueueComputeTask))
@@ -82,23 +90,3 @@ class ImageVolumeConfigAPI(APIView):
         image_volume.delete()
 
         return JsonResponse({"success": True})
-
-    def get_volume_configs(self, volume_config_id=None):
-        cursor = connection.cursor()
-        if volume_config_id is not None:
-            cursor.execute(
-                """
-                SELECT * FROM autoproofreader_imagevolumeconfig
-                WHERE id = {}
-                """.format(
-                    volume_config_id
-                )
-            )
-        else:
-            cursor.execute(
-                """
-                SELECT * FROM autoproofreader_imagevolumeconfig
-                """
-            )
-        desc = cursor.description
-        return [dict(zip([col[0] for col in desc], row)) for row in cursor.fetchall()]
