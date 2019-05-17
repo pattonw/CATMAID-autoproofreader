@@ -18,7 +18,7 @@ class ComputeServer(models.Model):
     results_directory = models.TextField()
     environment_source_path = models.TextField(null=True)
     project_whitelist = ArrayField(
-        models.IntegerField(null=True, blank=True), null=True
+        models.IntegerField(null=True, blank=True), null=True, blank=True
     )
 
     ssh_user = models.TextField(default="guest")

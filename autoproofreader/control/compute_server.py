@@ -88,7 +88,8 @@ class ComputeServerAPI(APIView):
             )
         else:
             query_set = ComputeServer.objects.filter(
-                Q(project_whitelist__len=0) | Q(project_whitelist__contains=project_id)
+                Q(project_whitelist__len=0)
+                | Q(project_whitelist__contains=[project_id])
             )
 
         return JsonResponse(
@@ -105,7 +106,7 @@ class ComputeServerAPI(APIView):
         )
 
         server = get_object_or_404(
-            ComputeServer, id=server_id, project_whitelist__contains=project_id
+            ComputeServer, id=server_id, project_whitelist__contains=[project_id]
         )
         server.delete()
 
