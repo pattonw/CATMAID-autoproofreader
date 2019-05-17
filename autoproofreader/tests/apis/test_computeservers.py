@@ -16,26 +16,24 @@ class ComputeServerTest(AutoproofreaderTestCase):
             {
                 "name": "test_server_1",
                 "address": "test_server_1.org",
-                "edition_time": "2001-01-01T01:01:01.001Z",
                 "diluvian_path": "test_1_diluvian",
                 "results_directory": "test_1_results",
                 "environment_source_path": "test_1_env",
-                "editor_id": 3,
                 "id": 1,
                 "ssh_user": "test_user_1",
                 "ssh_key": "test_key_1",
+                "project_whitelist": [],
             },
             {
                 "name": "test_server_2",
                 "address": "test_server_2.org",
-                "edition_time": "2002-02-02T02:02:02.002Z",
                 "diluvian_path": "test_2_diluvian",
                 "results_directory": "test_2_results",
                 "environment_source_path": "test_2_env",
-                "editor_id": 3,
                 "id": 2,
                 "ssh_user": "test_user_2",
                 "ssh_key": "test_key_2",
+                "project_whitelist": [1, 3],
             },
         ]
         self.assertEqual(expected_result, parsed_response)
@@ -49,14 +47,13 @@ class ComputeServerTest(AutoproofreaderTestCase):
             {
                 "name": "test_server_1",
                 "address": "test_server_1.org",
-                "edition_time": "2001-01-01T01:01:01.001Z",
                 "diluvian_path": "test_1_diluvian",
                 "results_directory": "test_1_results",
                 "environment_source_path": "test_1_env",
-                "editor_id": 3,
                 "id": 1,
                 "ssh_user": "test_user_1",
                 "ssh_key": "test_key_1",
+                "project_whitelist": [],
             }
         ]
         self.assertEqual(expected_result, parsed_response)
@@ -73,6 +70,7 @@ class ComputeServerTest(AutoproofreaderTestCase):
                 "results_directory": "test_3_results",
                 "environment_source_path": "test_3_env",
                 "ssh_user": "test_user_3",
+                "project_whitelist": [3],
             },
             content_type="application/json",
         )
@@ -87,15 +85,15 @@ class ComputeServerTest(AutoproofreaderTestCase):
         self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
         expected_result = {
-            "name": "test_server_3",
-            "address": "test_server_3.org",
-            "diluvian_path": "test_3_diluvian",
-            "results_directory": "test_3_results",
-            "environment_source_path": "test_3_env",
-            "editor_id": 3,
-            "id": 3,
-            "ssh_user": "test_user_3",
-            "ssh_key": "test_server_3",
+            "name": "test_server_4",
+            "address": "test_server_4.org",
+            "diluvian_path": "test_4_diluvian",
+            "results_directory": "test_4_results",
+            "environment_source_path": "test_4_env",
+            "id": 4,
+            "ssh_user": "test_user_4",
+            "ssh_key": "test_server_4",
+            "project_whitelist": [3],
         }
         # edition time can't be known exactly so check the rest
         self.assertEqual(len(parsed_response), 1)
