@@ -10,7 +10,7 @@
             "environment_source_path": "test_1_env",
             "ssh_user": "test_user_1",
             "ssh_key": "test_key_1",
-            "project_whiltelist": []
+            "project_whitelist": []
         }
     },
     {
@@ -24,7 +24,7 @@
             "environment_source_path": "test_2_env",
             "ssh_user": "test_user_2",
             "ssh_key": "test_key_2",
-            "project_whiltelist": [
+            "project_whitelist": [
                 1,
                 3
             ]
@@ -41,7 +41,7 @@
             "environment_source_path": "test_3_env",
             "ssh_user": "test_user_3",
             "ssh_key": "test_key_3",
-            "project_whiltelist": [
+            "project_whitelist": [
                 1,
                 2
             ]
