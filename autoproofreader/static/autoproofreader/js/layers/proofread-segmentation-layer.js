@@ -9,75 +9,71 @@ fsv.addStackLayer(fs, layer);
 
 */
 
-(function (CATMAID) {
-    'use strict';
+(function(CATMAID) {
+  "use strict";
+  /**
+   * This layer can project a complete skeleton into own tracing layer.
+   */
+  class ProofreadSegmentationLayer extends CATMAID.PixiImageBlockLayer {
+    constructor(options, ...args) {
+      super(...args);
+
+      // the result to visualize
+      this.currentResult = null;
+      // retrieve initial result from options
+      var initialSource =
+        options && options.result_id ? options.result_id : undefined;
+      if (initialSource) {
+        this.replaceResult(initialSource);
+      } else {
+        throw CATMAID.Error("No result chosen for visualization!");
+      }
+
+      this.resize(this.stackViewer.viewWidth, this.stackViewer.viewHeight);
+    }
+
     /**
-     * This layer can project a complete skeleton into own tracing layer.
+     * The set of options and defaults.
      */
-    class ProofreadSegmentationLayer extends CATMAID.PixiImageBlockLayer {
-        constructor(options, ...args) {
-            super(...args);
+    options = {
+      result_id: null
+    };
 
-            // the result to visualize
-            this.currentResult = null;
-            // retrieve initial result from options
-            var initialSource = options && options.result_id
-                ? options.result_id
-                : undefined;
-            if (initialSource) {
-                this.replaceResult(initialSource);
-            } else {
-                throw CATMAID.Error("No result chosen for visualization!");
-            }
+    /**
+     * Update default options
+     */
+    updateDefaultOptions(options) {
+      CATMAID.mergeOptions(
+        ProofreadSegmentationLayer.options,
+        options || {},
+        ProofreadSegmentationLayer.options,
+        true
+      );
+    }
 
-            this.resize(this.stackViewer.viewWidth, this.stackViewer.viewHeight);
-        }
+    /**
+     * Update options of this layer, giving preference to option fields in the
+     * passed in object. If a known object key isn't available, the default can
+     * optionally be set.
+     */
+    updateOptions(options, setDefaults) {
+      CATMAID.mergeOptions(
+        this.options,
+        options || {},
+        ProofreadSegmentationLayer.options,
+        setDefaults
+      );
+    }
 
-        /**
-         * The set of options and defaults.
-         */
-        options = {
-            result_id: null,
-        };
+    /* Shouldn't have to keep remaking the layer. Instead just switch stacks.
+            For this to be possible stack creation has to be moved into layer logic
 
-        /**
-         * Update default options
-         */
-        updateDefaultOptions(
-            options
-        ) {
-            CATMAID.mergeOptions(
-                ProofreadSegmentationLayer.options,
-                options || {},
-                ProofreadSegmentationLayer.options,
-                true
-            );
-        };
-
-        /**
-         * Update options of this layer, giving preference to option fields in the
-         * passed in object. If a known object key isn't available, the default can
-         * optionally be set.
-         */
-        updateOptions(
-            options,
-            setDefaults
-        ) {
-            CATMAID.mergeOptions(
-                this.options,
-                options || {},
-                ProofreadSegmentationLayer.options,
-                setDefaults
-            );
-        };
-
-        /**
-         * Returns a stack for displaying the segmentations corresponding
-         * the the currently selected result.
-         */
+         Returns a stack for displaying the segmentations corresponding
+         the the currently selected result.
+        
         getStack() {
             return this.getStackAttrs().then((attrs) => {
-                return
+                return;
 
             })
         }
@@ -102,32 +98,28 @@ fsv.addStackLayer(fs, layer);
                 })
             })
         }
+        */
 
-        /**
-         * Replace the current subsciption with a new one to the given source.
-         *
-         * @param {Object} source The source to subscribe to now
-         */
-        replaceResult(
-            result_id
-        ) {
-            if (result_id) {
-                this.currentResult = result_id;
-            } else {
-                throw Error('visualization layer must have a result to visualize');
-            }
-        };
+    /**
+     * Replace the current subsciption with a new one to the given source.
+     *
+     * @param {Object} source The source to subscribe to now
+     */
+    replaceResult(result_id) {
+      if (result_id) {
+        this.currentResult = result_id;
+      } else {
+        throw Error("visualization layer must have a result to visualize");
+      }
+    }
 
-        /* Iterface methods */
+    /* Iterface methods */
 
-        getLayerName() {
-            return 'proofread segmentation layer';
-        };
+    getLayerName() {
+      return "proofread segmentation layer";
+    }
+  }
 
-
-    };
-
-
-    // Make layer available in CATMAID namespace
-    CATMAID.ProofreadSegmentationLayer = ProofreadSegmentationLayer;
+  // Make layer available in CATMAID namespace
+  CATMAID.ProofreadSegmentationLayer = ProofreadSegmentationLayer;
 })(CATMAID);
