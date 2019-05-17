@@ -60,22 +60,17 @@ class Migration(migrations.Migration):
                 ),
                 ("name", models.TextField()),
                 ("address", models.TextField()),
-                (
-                    "edition_time",
-                    models.DateTimeField(default=django.utils.timezone.now),
-                ),
                 ("diluvian_path", models.TextField()),
                 ("results_directory", models.TextField()),
                 ("environment_source_path", models.TextField(null=True)),
                 ("ssh_user", models.TextField(default="guest")),
                 ("ssh_key", models.TextField(default=models.TextField())),
                 (
-                    "editor",
-                    models.ForeignKey(
-                        db_column="editor_id",
-                        on_delete=django.db.models.deletion.CASCADE,
-                        related_name="compute_server_editor",
-                        to=settings.AUTH_USER_MODEL,
+                    "project_whitelist",
+                    django.contrib.postgres.fields.ArrayField(
+                        base_field=models.IntegerField(null=True, blank=True),
+                        blank=True,
+                        null=True,
                     ),
                 ),
             ],
