@@ -1962,7 +1962,7 @@
         };
 
         let change_volume = function (volume_id) {
-            console.log('changing volume');
+            console.log(`changing volume from ${self.settings.run.volume_id.value} to ${volume_id}`);
             self.settings.run.volume_id.value = volume_id;
         };
 
@@ -2092,7 +2092,7 @@
         }
 
         let change_server = function (server_id) {
-            console.log('changing server');
+            console.log(`changing server from ${self.settings.run.server_id.value}to ${server_id}`);
             self.settings.run.server_id.value = server_id;
             let model_id = self.settings.run.model_id.value;
             if (model_id !== undefined) {
@@ -2240,7 +2240,7 @@
         }
 
         let change_model = function (model_id) {
-            console.log('changing model');
+            console.log(`changing model from ${self.settings.run.model_id.value} to ${model_id}`);
             self.settings.run.model_id.value = model_id;
             let server_id = self.settings.run.server_id.value;
             CATMAID.fetch(

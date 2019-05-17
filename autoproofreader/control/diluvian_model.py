@@ -89,7 +89,7 @@ class DiluvianModelAPI(APIView):
         )
 
         if model_id is not None:
-            query_set = DiluvianModel.objects.filter(id=model_id, prject=project_id)
+            query_set = DiluvianModel.objects.filter(id=model_id, project=project_id)
         else:
             query_set = DiluvianModel.objects.filter(project=project_id)
 

@@ -69,7 +69,7 @@ class ImageVolumeConfigAPI(APIView):
         )
         if image_volume_config_id is not None:
             query_set = ImageVolumeConfig.objects.filter(
-                id=image_volume_config_id, prject=project_id
+                id=image_volume_config_id, project=project_id
             )
         else:
             query_set = ImageVolumeConfig.objects.filter(project=project_id)
