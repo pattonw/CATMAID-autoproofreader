@@ -58,7 +58,7 @@
     // Color of downstream nodes and edges
     dColor: 0xff8800,
     // Color of upstream nodes and edges
-    uColor: 0xff0088,
+    uColor: 0x0088ff,
     // Last used available source
     pColorC: 0x00ff00,
     pColorD: 0xff0000,
@@ -349,7 +349,7 @@
       ),
       opacity: material.opacity(this, arbor, arbor),
       edgeWidth:
-        this.graphics.Node.prototype.EDGE_WIDTH || this.options.edgeWidth,
+        (this.graphics.Node.prototype.EDGE_WIDTH || this.options.edgeWidth) * 3,
       showEdges: this.options.showEdges,
       showNodes: this.options.showNodes,
       planeDims: this.stackViewer.primaryStack.getPlaneDimensions(),
@@ -380,7 +380,7 @@
     if (options.showNodes) {
       // pos1
       var c = new PIXI.Sprite(options.graphics.Node.prototype.NODE_TEXTURE);
-      c.anchor.set(0.5);
+      c.anchor.set(3);
       c.x = pos1[options.planeDims.x];
       c.y = pos1[options.planeDims.y];
       c.scale.set(options.graphics.Node.prototype.stackScaling);

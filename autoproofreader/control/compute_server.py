@@ -1,6 +1,5 @@
 from django.http import JsonResponse, HttpResponseNotFound
 from django.db.models import Q
-from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.conf import settings
 
