@@ -89,7 +89,6 @@ class Migration(migrations.Migration):
                             "edition_time",
                             models.DateTimeField(default=django.utils.timezone.now),
                         ),
-                        ("config", models.TextField()),
                         (
                             "project",
                             models.ForeignKey(

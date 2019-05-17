@@ -24,6 +24,8 @@
         this.ranking_result_id = null;
         this.visibleProofreadLayer = false;
         this.visibleSegmentationLayer = false;
+
+        this.row_highlight_color = "#d6ffb5";
     };
 
     var toggleProofreadSkeletonProjectionLayers = function () {
@@ -146,33 +148,29 @@
             <table cellpadding="0" cellspacing="0" border="0" class="display" id="${queuedTableId}">
               <thead>
                 <tr>
-                  <th>Run Time (hours)
-                  </th>
-                  <th>Name
-                    <input type="text" name="searchJobName" id="${queuedTableId}-search-job-name"
+                  <th title="Remove one or all neurons"></th>
+                  <th>Run time (hours)</th>
+                  <th>Name</th>
+                  <th>Status</th>
+                  <th>Skeleton ID</th>
+                </tr>
+                <tr>
+                  <th><i class="fa fa-remove" id="${queuedTableId}-remove-all-queued" title="Remove all"></i></th>
+                  <th></th>
+                  <th>
+                    <input type="text" name="searchJobName" placeholder="name filter" id="${queuedTableId}-search-job-name"
                       value="" class="search_init"/>
                   </th>
-                  <th>Status
-                    <input type="text" name="searchJobStatus" id="${queuedTableId}-search-job-status"
+                  <th>
+                    <input type="text" name="searchJobStatus" placeholder="status filter" id="${queuedTableId}-search-job-status"
                       value="" class="search_init"/>
                   </th>
-                  <th>Model
-                    <input type="text" name="searchModelName" id="${queuedTableId}-search-model-name"
-                      value="" class="search_init"/>
-                  </th>
-                  <th>Skeleton ID
+                  <th>
+                  <input type="text" name="searchSkeletonId" placeholder="skeleton filter" id="${queuedTableId}-search-skeleton-id"
+                    value="" class="search_init"/>
                   </th>
                 </tr>
               </thead>
-              <tfoot>
-                <tr>
-                  <th>run time</th>
-                  <th>name</th>
-                  <th>status</th>
-                  <th>model</th>
-                  <th>skeleton ID</th>
-                </tr>
-              </tfoot>
               <tbody>
               </tbody>
             </table>
@@ -181,33 +179,34 @@
             <table cellpadding="0" cellspacing="0" border="0" class="display" id="${completedTableId}">
               <thead>
                 <tr>
-                  <th>Run Time (hours)
+                  <th title="Remove one or all neurons">
                   </th>
-                  <th>Name
-                    <input type="text" name="searchJobName" id="${completedTableId}-search-job-name"
+                  <th>Name</th>
+                  <th>Status</th>
+                  <th>Skeleton ID</th>
+                  <th title="Limit data access to yourself or all with browse permission">private</th>
+                  <th title="Mark data as permanent, else it will be wiped after 24 hours">permanent</th>
+                  <th>Actions</th>
+                </tr>
+                <tr>
+                  <th><i class="fa fa-remove" id="${completedTableId}-remove-all-queued" title="Remove all"></i></th>
+                  <th>
+                    <input type="text" name="searchJobName" placeholder="name filter" id="${completedTableId}-search-job-name"
                       value="" class="search_init"/>
                   </th>
-                  <th>Status
-                    <input type="text" name="searchJobStatus" id="${completedTableId}-search-job-status"
+                  <th>
+                    <input type="text" name="searchJobStatus" placeholder="status filter" id="${completedTableId}-search-job-status"
                       value="" class="search_init"/>
                   </th>
-                  <th>Model
-                    <input type="text" name="searchModelName" id="${completedTableId}-search-model-name"
-                      value="" class="search_init"/>
+                  <th>
+                  <input type="text" name="searchSkeletonId" placeholder="skeleton filter" id="${completedTableId}-search-skeleton-id"
+                    value="" class="search_init"/>
                   </th>
-                  <th>Skeleton ID
-                  </th>
+                  <th><input type="checkbox" id="${completedTableId}-mark-all-private" style="float: left" /></th>
+                  <th><input type="checkbox" id="${completedTableId}-mark-all-permanent" style="float: left" /></th>
+                  <th></th>
                 </tr>
               </thead>
-              <tfoot>
-                <tr>
-                  <th>run time</th>
-                  <th>name</th>
-                  <th>status</th>
-                  <th>model</th>
-                  <th>skeleton ID</th>
-                </tr>
-              </tfoot>
               <tbody>
               </tbody>
             </table>
@@ -228,15 +227,6 @@
                   </th>
                 </tr>
               </thead>
-              <tfoot>
-                <tr>
-                  <th>node id</th>
-                  <th>parent id</th>
-                  <th>connectivity score</th>
-                  <th>branch score</th>
-                  <th>reviewed</th>
-                </tr>
-              </tfoot>
               <tbody>
               </tbody>
             </table>
@@ -244,6 +234,44 @@
           <div class="settings" id="settings">
           </div>
         </div>`;
+
+                let completedTableContainer = $(`#${completedTableId}`, container);
+                $(completedTableContainer)
+                    .on("click", "td .action-remove", this, function (e) {
+                        let row = completedTableContainer.DataTable().row(this.closest('tr'));
+                        let result = row.data();
+                        row.remove().draw();
+                        CATMAID.fetch(`ext/autoproofreader/${project.id}/autoproofreader-results`, "DELETE", { result_id: result.id })
+                    })
+                    .on("click", "td .action-select", this, function (e) {
+                        let row = completedTableContainer.DataTable().row(this.closest('tr'));
+                        self.display_results_data(row.data());
+                        // Reset highlighting
+                        $('tbody tr', completedTableContainer).css('background-color', '');
+                        // Add new highlighting
+                        $(row.node()).css('background-color', self.row_highlight_color);
+                    })
+                    .on("click", "td .action-toggle", this, function (e) {
+                        let self = this;
+
+                        // let the browser handle the check
+                        setTimeout(function () {
+                            // then undo it and wait for async behavior to finish
+                            let toggle_prop = $(self).attr("data-action");
+                            let params = { result_id: completedTableContainer.DataTable().row(self.closest('tr')).data().id };
+                            params[toggle_prop] = true;
+                            CATMAID.fetch(`ext/autoproofreader/${project.id}/autoproofreader-results`, "PATCH", params).then((response) => {
+                                // set checkbox appropriately depending on the response.
+                                $(self).prop("checked", response[toggle_prop])
+                            }).catch((e) => {
+                                CATMAID.handleError(e);
+                            })
+                        }, 0);
+
+                        // hopefully prevent checkbox from being checked.
+                        e.preventDefault();
+                        e.stopPropagation();
+                    });
             },
             init: this.init.bind(this),
         };
@@ -963,29 +991,21 @@
     --------------------------------------------------------------------------------
     DATA VIS
     */
-    AutoproofreaderWidget.prototype.display_results_data = function (data) {
+    AutoproofreaderWidget.prototype.display_results_data = function (job) {
         let self = this;
+        self.ranking_skeleton_id = job.skeleton;
+        self.ranking_result_id = job.id;
         CATMAID.fetch(
-            'ext/autoproofreader/' + project.id + '/autoproofreader-results',
+            'ext/autoproofreader/' + project.id + '/proofread-tree-nodes',
             'GET',
-            { result_id: data.job_id }
+            { result_id: job.id }
         )
-            .then(job => {
-                self.ranking_skeleton_id = job[0].skeleton;
-                self.ranking_result_id = job[0].id;
-                CATMAID.fetch(
-                    'ext/autoproofreader/' + project.id + '/proofread-tree-nodes',
-                    'GET',
-                    { result_id: job[0].id }
-                )
-                    .then(ranking_data => {
-                        self.rankingTable.clear();
-                        ranking_data.forEach(function (node) {
-                            self.appendOneNode(node);
-                        });
-                        self.rankingTable.draw();
-                    })
-                    .catch(CATMAID.handleError);
+            .then(ranking_data => {
+                self.rankingTable.clear();
+                ranking_data.forEach(function (node) {
+                    self.appendOneNode(node);
+                });
+                self.rankingTable.draw();
             })
             .catch(CATMAID.handleError);
     };
@@ -1012,6 +1032,7 @@
             dom: '<"H"lrp>t<"F"ip>',
             serverSide: false,
             paging: true,
+            orderCellsTop: true,
             lengthChange: true,
             autoWidth: false,
             pageLength: CATMAID.pageLengthOptions[0],
@@ -1020,6 +1041,13 @@
             processing: true,
             deferRender: true,
             columns: [
+                {
+                    "orderable": false,
+                    "className": "dt-center cm-center",
+                    "render": function (data, type, row, meta) {
+                        return '<i class="fa fa-remove fa-fw clickable action-remove" alt="Remove" title="Remove"></i>';
+                    }
+                },
                 {
                     data: 'creation_time',
                     render: function (time_string) {
@@ -1044,18 +1072,12 @@
                     className: 'status',
                 },
                 {
-                    data: 'model_name',
-                    orderable: true,
-                    searchable: true,
-                    className: 'model_name',
-                },
-                {
-                    data: 'skeleton_id',
+                    data: 'skeleton',
                     render: Math.floor,
                     orderable: true,
                     searchable: true,
                     className: 'skeletonID',
-                },
+                }
             ],
         });
 
@@ -1118,12 +1140,21 @@
         const tableID = this.idPrefix + 'datatable-completed';
         const $table = $('#' + tableID);
 
+
+        var createCheckbox = function (key, result) {
+            var id = `${tableID}-result-${key}-${result.id}`;
+            return `<input type="checkbox" class="action-toggle" id="${id}" ` +
+                `value="${result.id}" data-action="${key}"` +
+                (result[key] ? ' checked' : '') + ' />';
+        };
+
         this.completedTable = $table.DataTable({
             // http://www.datatables.net/usage/options
             destroy: true,
             dom: '<"H"lrp>t<"F"ip>',
             serverSide: false,
             paging: true,
+            orderCellsTop: true,
             lengthChange: true,
             autoWidth: false,
             pageLength: CATMAID.pageLengthOptions[0],
@@ -1133,46 +1164,59 @@
             deferRender: true,
             columns: [
                 {
-                    data: 'creation_time',
-                    render: function (time_string) {
-                        let start = new Date(time_string);
-                        let now = new Date();
-                        return Math.floor((now - start) / (10 * 60 * 60)) / 100;
-                    },
-                    orderable: true,
-                    searchable: true,
-                    className: 'run_time',
+                    "orderable": false,
+                    "className": "dt-center cm-center",
+                    "render": function (data, type, row, meta) {
+                        return '<i class="fa fa-remove fa-fw clickable action-remove" alt="Remove" title="Remove"></i>';
+                    }
                 },
                 {
-                    data: 'name',
-                    orderable: true,
-                    searchable: true,
-                    className: 'name',
+                    "data": 'name',
+                    "searchable": true,
+                    "className": 'name',
+                    "render": {
+                        "display": function (name) {
+                            return '<a href="#" class="result-selection-link action-select">' +
+                                (name ? name : "undefined") + '</a>';
+                        },
+                        "_": function (name) {
+                            return name ? name : "undefined";
+                        }
+                    }
                 },
                 {
-                    data: 'status',
-                    orderable: true,
-                    searchable: true,
-                    className: 'status',
+                    "data": 'status',
+                    "searchable": true,
+                    "className": 'status',
                 },
                 {
-                    data: 'model_name',
-                    orderable: true,
-                    searchable: true,
-                    className: 'model_name',
+                    "data": 'skeleton',
+                    "render": Math.floor,
+                    "searchable": true,
+                    "className": 'skeletonID',
                 },
                 {
-                    data: 'skeleton_id',
-                    render: Math.floor,
-                    orderable: true,
-                    searchable: true,
-                    className: 'skeletonID',
+                    "orderable": false,
+                    "visible": true,
+                    "render": function (data, type, row, meta) {
+                        return createCheckbox('private', row);
+                    }
                 },
+                {
+                    "orderable": false,
+                    "visible": true,
+                    "render": function (data, type, row, meta) {
+                        return createCheckbox('permanent', row);
+                    }
+                },
+                {
+                    "orderable": false,
+                    "render": function (data, type, row, meta) {
+                        return '<i class="fa fa-tag fa-fw clickable action-annotate" ' +
+                            'alt="Annotate" title="Annotate skeleton"></i>'
+                    }
+                }
             ],
-        });
-
-        $(`#${tableID} tbody`).on('click', 'tr', function () {
-            self.display_results_data(self.completedTable.row(this).data());
         });
 
         let exactNumSearch = function (event) {
@@ -1235,7 +1279,8 @@
             destroy: true,
             dom: '<"H"lrp>t<"F"ip>',
             serverSide: false,
-            paging: true,
+            paging: false,
+            scrollY: 400,
             lengthChange: true,
             autoWidth: false,
             pageLength: CATMAID.pageLengthOptions[0],
@@ -1279,13 +1324,13 @@
 
         $(`#${tableID} tbody`).on('click', 'td', function () {
             let index = self.rankingTable.cell(this).index();
+            console.log(index);
             let row_data = self.rankingTable.row(index.row).data();
             if (!self.selected_points.has(row_data.node_id)) {
                 self.selected_points.add(row_data.node_id);
             } else {
                 self.selected_points.delete(row_data.node_id);
             }
-            console.log(self.selected_points);
             SkeletonAnnotations.staticMoveTo(
                 parseInt(row_data.z),
                 parseInt(row_data.y),
@@ -1391,50 +1436,31 @@
 
     AutoproofreaderWidget.prototype.appendOneJob = function (job) {
         let self = this;
+        let row = {
+            completion_time: job.completion_time,
+            config: job.config,
+            creation_time: job.creation_time,
+            data: job.data,
+            edition_time: job.edition_time,
+            errors: job.errors,
+            id: job.id,
+            model: job.model,
+            name: job.name,
+            permanent: job.permanent,
+            private: job.private,
+            project: job.project,
+            skeleton: job.skeleton,
+            skeleton_csv: job.skeleton_csv,
+            status: job.status,
+            user: job.user,
+            volume: job.volume,
+        };
         if (job.status === 'complete') {
-            let row = {
-                job_id: job.id,
-                creation_time: job.creation_time,
-                name: job.name,
-                status: job.status,
-                config_id: job.config,
-                model_id: job.model,
-                skeleton_id: job.skeleton,
-                skeleton_csv: job.skeleton_csv,
-                completion_time: job.completion_time,
-                volume_id: job.volume,
-                data: job.data,
-            };
-            CATMAID.fetch(
-                'ext/autoproofreader/' + project.id + '/diluvian-models',
-                'GET',
-                { model_id: job.model }
-            ).then(function (result) {
-                let model = result[0];
-                row.model_name = model.name;
-                self.completedTable.rows.add([row]);
-                self.completedTable.draw();
-            });
+            self.completedTable.rows.add([row]);
+            self.completedTable.draw();
         } else {
-            let row = {
-                job_id: job.id,
-                creation_time: job.creation_time,
-                name: job.name,
-                status: job.status,
-                config_id: job.config,
-                model_id: job.model,
-                skeleton_id: job.skeleton,
-            };
-            CATMAID.fetch(
-                'ext/autoproofreader/' + project.id + '/diluvian-models',
-                'GET',
-                { model_id: job.model }
-            ).then(function (result) {
-                let model = result[0];
-                row.model_name = model.name;
-                self.ongoingTable.rows.add([row]);
-                self.ongoingTable.draw();
-            });
+            self.ongoingTable.rows.add([row]);
+            self.ongoingTable.draw();
         }
     };
 
@@ -2521,6 +2547,7 @@
                     { name: 'Gaussian', id: 'gaussian' },
                 ],
                 helptext: 'Type of smoothing to apply to skeleton when resampling points.',
+                value: "none",
             });
 
             addSettingTemplate({
