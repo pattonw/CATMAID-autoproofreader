@@ -5,13 +5,11 @@ from pathlib import Path
 import json
 import pickle
 import pytz
-import numpy as np
 import pandas as pd
 
 from django.conf import settings
 from django.http import JsonResponse, HttpResponseNotFound
 from django.utils.decorators import method_decorator
-from django.db import connection
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 
@@ -500,4 +498,3 @@ class AutoproofreaderResultAPI(APIView):
         )
         result.delete()
         return JsonResponse({"success": True})
-

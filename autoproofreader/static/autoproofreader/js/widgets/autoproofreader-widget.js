@@ -2102,7 +2102,7 @@
                     { model_id: model_id }
                 ).then(function (result) {
                     let model = result[0];
-                    if (model.server_id !== server_id) {
+                    if (model.server !== server_id) {
                         CATMAID.msg(
                             'warn',
                             'Server does not match the server the selected ' +
@@ -2251,7 +2251,7 @@
                 let model = result[0];
 
                 if (server_id !== undefined) {
-                    if (model.server_id !== server_id) {
+                    if (model.server !== server_id) {
                         CATMAID.msg(
                             'warn',
                             'Server does not match the server the selected ' +

@@ -27,7 +27,7 @@ fsv.addStackLayer(fs, layer);
             if (initialSource) {
                 this.replaceResult(initialSource);
             } else {
-                throw CATMAID.Error("No result chosen for visualization!")
+                throw CATMAID.Error("No result chosen for visualization!");
             }
 
             this.resize(this.stackViewer.viewWidth, this.stackViewer.viewHeight);
