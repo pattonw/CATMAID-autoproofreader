@@ -19,19 +19,19 @@ class ImageVolumeConfigTest(AutoproofreaderTestCase):
                 "id": 1,
                 "name": "test_volume_1",
                 "config": "1",
-                "user_id": 3,
-                "project_id": 3,
-                "creation_time": "2001-01-01T01:01:01.001Z",
-                "edition_time": "2002-01-01T01:01:01.001Z",
+                "user": 3,
+                "project": 3,
+                "creation_time": "2001-01-01T01:01:01.001000Z",
+                "edition_time": "2002-01-01T01:01:01.001000Z",
             },
             {
                 "id": 2,
                 "name": "test_volume_2",
                 "config": "2",
-                "user_id": 3,
-                "project_id": 3,
-                "creation_time": "2002-02-02T02:02:02.002Z",
-                "edition_time": "2003-02-02T02:02:02.002Z",
+                "user": 3,
+                "project": 3,
+                "creation_time": "2002-02-02T02:02:02.002000Z",
+                "edition_time": "2003-02-02T02:02:02.002000Z",
             },
         ]
         self.assertEqual(expected_result, parsed_response)
@@ -47,10 +47,10 @@ class ImageVolumeConfigTest(AutoproofreaderTestCase):
                 "id": 1,
                 "name": "test_volume_1",
                 "config": "1",
-                "user_id": 3,
-                "project_id": 3,
-                "creation_time": "2001-01-01T01:01:01.001Z",
-                "edition_time": "2002-01-01T01:01:01.001Z",
+                "user": 3,
+                "project": 3,
+                "creation_time": "2001-01-01T01:01:01.001000Z",
+                "edition_time": "2002-01-01T01:01:01.001000Z",
             }
         ]
         self.assertEqual(expected_result, parsed_response)
@@ -80,11 +80,11 @@ class ImageVolumeConfigTest(AutoproofreaderTestCase):
         expected_result = {
             "id": put_ivc,
             "name": "test_volume_3",
-            # "config_id": 1,
-            "user_id": 3,
-            "project_id": 3,
-            # "creation_time": "2001-01-01T01:01:01.001Z",
-            # "edition_time": "2002-01-01T01:01:01.001Z",
+            # "config": 1,
+            "user": 3,
+            "project": 3,
+            # "creation_time": "2001-01-01T01:01:01.001000Z",
+            # "edition_time": "2002-01-01T01:01:01.001000Z",
         }
 
         self.assertEqual(len(parsed_response), 1)
