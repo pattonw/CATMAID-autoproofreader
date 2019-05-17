@@ -29,9 +29,6 @@ class ComputeServer(models.Model):
 
 
 class ComputeServerSerializer(serializers.ModelSerializer):
-    creation_time = serializers.DateTimeField(default_timezone=pytz.timezone("UTC"))
-    edition_time = serializers.DateTimeField(default_timezone=pytz.timezone("UTC"))
-
     class Meta:
         model = ComputeServer
         fields = "__all__"

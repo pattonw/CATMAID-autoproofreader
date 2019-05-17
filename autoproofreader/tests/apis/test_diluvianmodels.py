@@ -18,7 +18,7 @@ class DiluvianModelTest(AutoproofreaderTestCase):
             {
                 "id": 1,
                 "name": "test_diluvian_model_1",
-                "serve": 1,
+                "server": 1,
                 "model_source_path": "test_1",
                 "config": 1,
                 "user": 3,
