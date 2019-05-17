@@ -1,4 +1,4 @@
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseNotFound
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
@@ -33,15 +33,19 @@ class ComputeServerAPI(APIView):
         ssh_user = request.POST.get("ssh_user", request.data.get("ssh_user", None))
         ssh_key = request.POST.get("ssh_key", request.data.get("ssh_key", name))
 
+        project_whitelist = request.POST.get(
+            "project_whitelist", request.data.get("project_whitelist", None)
+        )
+
         server = ComputeServer(
             name=name,
             address=address,
-            editor=request.user,
             environment_source_path=environment_source_path,
             diluvian_path=diluvian_path,
             results_directory=results_directory,
             ssh_key=ssh_key,
             ssh_user=ssh_user,
+            project_whitelist=project_whitelist,
         )
         server.save()
 
@@ -104,12 +108,20 @@ class ComputeServerAPI(APIView):
             "server_id", request.data.get("server_id", None)
         )
 
-        server = get_object_or_404(
-            ComputeServer, id=server_id, project_whitelist__contains=[project_id]
+        query_set = ComputeServer.objects.filter(
+            Q(id=server_id)
+            & (
+                Q(project_whitelist__len=0)
+                | Q(project_whitelist__contains=[project_id])
+            )
         )
-        server.delete()
-
-        return JsonResponse({"success": True})
+        if len(query_set) == 0:
+            return HttpResponseNotFound()
+        elif len(query_set) > 1:
+            return HttpResponseNotFound()
+        else:
+            query_set[0].delete()
+            return JsonResponse({"success": True})
 
 
 class GPUUtilAPI(APIView):

@@ -64,12 +64,12 @@ class ComputeServerTest(AutoproofreaderTestCase):
         response = self.client.put(
             COMPUTE_SERVER_URL.format(self.test_project_id),
             data={
-                "name": "test_server_3",
-                "address": "test_server_3.org",
-                "diluvian_path": "test_3_diluvian",
-                "results_directory": "test_3_results",
-                "environment_source_path": "test_3_env",
-                "ssh_user": "test_user_3",
+                "name": "test_server_4",
+                "address": "test_server_4.org",
+                "diluvian_path": "test_4_diluvian",
+                "results_directory": "test_4_results",
+                "environment_source_path": "test_4_env",
+                "ssh_user": "test_user_4",
                 "project_whitelist": [3],
             },
             content_type="application/json",
