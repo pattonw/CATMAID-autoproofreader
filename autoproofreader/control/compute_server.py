@@ -1,5 +1,4 @@
 from django.http import JsonResponse
-from django.db import connection
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
@@ -83,7 +82,7 @@ class ComputeServerAPI(APIView):
                 Q(id=server_id)
                 & (
                     Q(project_whitelist__len=0)
-                    | Q(project_whitelist__contains=project_id)
+                    | Q(project_whitelist__contains=[project_id])
                 )
             )
         else:

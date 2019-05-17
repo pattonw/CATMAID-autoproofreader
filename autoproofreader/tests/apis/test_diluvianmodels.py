@@ -69,7 +69,7 @@ class DiluvianModelTest(AutoproofreaderTestCase):
             DILUVIAN_MODEL_URL.format(self.test_project_id),
             data={
                 "name": "test_diluvian_model_3",
-                "server": 2,
+                "server_id": 2,
                 "model_source_path": "test_3_source_path",
                 "config": "diluvian model 3",
             },
