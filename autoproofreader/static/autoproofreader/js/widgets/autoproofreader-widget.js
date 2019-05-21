@@ -90,6 +90,9 @@
 
         // create validation tab
         CATMAID.DOM.appendToTab(tabs["Run"], [
+          [document.createTextNode("From")],
+          [CATMAID.skeletonListSources.createSelect(this)],
+          ["Append", this.loadSource.bind(this)],
           ["Segment", this.proofread.bind(this)],
           [
             "Download Settings",
@@ -331,6 +334,31 @@
         child.style.display = "none";
       }
     }
+  };
+
+  /*
+  --------------------------------------------------------------------------------
+  Skeleton Source
+  */
+
+  AutoproofreaderWidget.prototype.append = function(models) {
+    return this._append(models);
+  };
+
+  /**
+   * Append skeleton models, optionally in an ordered fashion.
+   */
+  AutoproofreaderWidget.prototype._append = function(models) {
+    var skeleton_ids = Object.keys(models);
+    if (0 === skeleton_ids.length) {
+      CATMAID.info("No skeletons selected!"); // at source
+      return;
+    } else if (skeleton_ids.length > 1) {
+      CATMAID.info("Multiple skeletons not yet supported!");
+      return;
+    }
+    this.settings.run.skeleton_id.value = skeleton_ids[0];
+    this.createSettings();
   };
 
   /*
