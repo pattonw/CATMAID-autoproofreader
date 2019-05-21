@@ -67,7 +67,8 @@
     result_id: null,
     selected_points: new Set([]),
     visible: false,
-    edgeWidth: 20
+    edgeWidth: 20,
+    focused_connection: undefined
   };
 
   /**
@@ -353,7 +354,8 @@
       showEdges: this.options.showEdges,
       showNodes: this.options.showNodes,
       planeDims: this.stackViewer.primaryStack.getPlaneDimensions(),
-      normalDim: this.stackViewer.primaryStack.getNormalDimension()
+      normalDim: this.stackViewer.primaryStack.getNormalDimension(),
+      focused_connection: this.options.focused_connection
     };
 
     // Render downstream nodes
@@ -376,28 +378,6 @@
     edge.lineTo(pos2[options.planeDims.x], pos2[options.planeDims.y]);
     edge.tint = color;
     options.graphics.containers.lines.addChild(edge);
-
-    if (options.showNodes) {
-      // pos1
-      var c = new PIXI.Sprite(options.graphics.Node.prototype.NODE_TEXTURE);
-      c.anchor.set(3);
-      c.x = pos1[options.planeDims.x];
-      c.y = pos1[options.planeDims.y];
-      c.scale.set(options.graphics.Node.prototype.stackScaling);
-      c.tint = color;
-      c.alpha = opacity;
-      options.graphics.containers.nodes.addChild(c);
-
-      // pos2
-      var c = new PIXI.Sprite(options.graphics.Node.prototype.NODE_TEXTURE);
-      c.anchor.set(0.5);
-      c.x = pos2[options.planeDims.x];
-      c.y = pos2[options.planeDims.y];
-      c.scale.set(options.graphics.Node.prototype.stackScaling);
-      c.tint = color;
-      c.alpha = opacity;
-      options.graphics.containers.nodes.addChild(c);
-    }
   }
 
   function renderSloppedEdge(
@@ -518,7 +498,7 @@
       c.anchor.set(0.5);
       c.x = pos1[this.planeDims.x];
       c.y = pos1[this.planeDims.y];
-      c.scale.set(this.graphics.Node.prototype.stackScaling);
+      c.scale.set(this.graphics.Node.prototype.stackScaling * 2);
       c.tint = this.color(undefined, undefined, undefined, true, 1, false);
       c.alpha = 1;
       this.graphics.containers.nodes.addChild(c);
@@ -572,8 +552,10 @@
       let ndist2 = pos2[this.normalDim] - this.stackViewer.plane.constant;
 
       let display_needed =
-        (ndist1 <= z_res / 2 && ndist2 >= -z_res / 2) ||
-        (ndist1 >= -z_res / 2 && ndist2 <= z_res / 2);
+        (typeof this.focused_connection === "undefined" ||
+          this.focused_connection === parseInt(n)) &&
+        ((ndist1 <= z_res / 2 && ndist2 >= -z_res / 2) ||
+          (ndist1 >= -z_res / 2 && ndist2 <= z_res / 2));
       if (display_needed) {
         if (Math.abs(ndist1) <= z_res / 2 && Math.abs(ndist2) <= z_res / 2) {
           renderFlatEdge(n, pos1, pos2, false, connectivity, this);
