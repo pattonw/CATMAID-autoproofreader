@@ -2756,11 +2756,14 @@
     --------------------------------------------------------------------------------
     LAYERS
     */
-  AutoproofreaderWidget.prototype.updateProofreadSkeletonVisualizationLayer = function() {
+  AutoproofreaderWidget.prototype.updateProofreadSkeletonVisualizationLayer = function(
+    focused_connection
+  ) {
     var options = {
       visible: this.visibleProofreadLayer,
       result_id: this.ranking_result_id,
-      selected_points: this.selected_points
+      selected_points: this.selected_points,
+      focused_connection: focused_connection
     };
     // Create a skeleton projection layer for all stack viewers that
     // don't have one already.
@@ -2785,23 +2788,18 @@
   AutoproofreaderWidget.prototype.getProofreaderSegmentationLayerOptions = function() {
     let self = this;
     return CATMAID.fetch(
-      "ext/autoproofreader/" + project.id + "/autoproofreader-results",
+      `ext/autoproofreader/${project.id}/autoproofreader-results`,
       "GET",
       { result_id: self.ranking_result_id }
     ).then(result => {
-      console.log(result);
       return CATMAID.fetch(
-        "ext/autoproofreader/" + project.id + "/autoproofreader-results",
+        `ext/autoproofreader/${project.id}/autoproofreader-results`,
         "GET",
         { result_id: self.ranking_result_id, uuid: true }
       ).then(uuid => {
-        console.log(uuid);
-        return CATMAID.fetch(
-          "files/proofreading_segmentations/" +
-            uuid +
-            "/segmentations.n5/segmentation_counts/attributes.json",
-          "GET"
-        ).then(attrs_file => {
+        let relative_url = `files/proofreading_segmentations/${uuid}/segmentations.n5/confidence`;
+        return CATMAID.fetch(`${relative_url}/attributes.json`, "GET").then(
+          attrs_file => {
           var options = {
             visible: self.visibleSegmentationLayer,
             result_id: self.ranking_result_id,
@@ -2819,14 +2817,14 @@
               blockSizeZ: attrs_file.blockSize[2],
               blockSize: attrs_file.blockSize,
               tile_source_type: 11,
-              image_base:
-                "http://localhost:8000/files/proofreading_segmentations/" +
-                uuid +
-                "/segmentations.n5/segmentation_counts/0_1_2"
+                image_base: `${window.location.protocol}//${
+                  window.location.host
+                }/${relative_url}/0_1_2`
             }
           };
           return options;
-        });
+          }
+        );
       });
     });
   };
