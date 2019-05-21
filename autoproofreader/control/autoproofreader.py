@@ -310,14 +310,11 @@ def query_segmentation_async(
     # Copy the numpy file containing the volume mesh and the csv containing the node connections
     # predicted by the autoproofreader run.
 
-    cleanup = (
+    fetch_files = (
         "scp -i {ssh_key} -r {ssh_user}@{server}:"
         + "{server_results_dir}/{server_job_dir}/* {local_temp_dir}\n"
         + "mkdir -p {segmentations_dir}\n"
         + "mv {local_temp_dir}/outputs/segmentations.n5 {segmentations_dir}\n"
-#        + "rm -r {local_temp_dir}\n"
-#        + "ssh -i {ssh_key} {ssh_user}@{server}\n"
-#        + "rm -r {server_results_dir}/{server_job_dir}"
     ).format(
         **{
             "ssh_key": ssh_key,
@@ -325,7 +322,6 @@ def query_segmentation_async(
             "server": server["address"],
             "server_results_dir": server["results_dir"],
             "server_job_dir": job_name,
-            "output_file_name": job_name + "_output",
             "local_temp_dir": local_temp_dir,
             "segmentations_dir": segmentations_dir,
         }
@@ -346,7 +342,7 @@ def query_segmentation_async(
     process = subprocess.Popen(
         "/bin/bash", stdin=subprocess.PIPE, stdout=subprocess.PIPE, encoding="utf8"
     )
-    out, err = process.communicate(cleanup)
+    out, err = process.communicate(fetch_files)
     print(out)
 
     new_nodes = pd.DataFrame(
@@ -356,23 +352,6 @@ def query_segmentation_async(
         columns=["nid", "pid", "x", "y", "z"],
     )
 
-    # overwrite input skeleton csv
-    # This should probably be fixed to have input/output skeleton csvs
-    result.skeleton_csv = "\n".join(
-        [",".join([str(c) for c in row]) for row in new_nodes]
-    )
-
-    msg = Message()
-    msg.user = User.objects.get(pk=int(user_id))
-    msg.read = False
-
-    msg.title = "Job {} complete!"
-    msg.text = "IM DOING SOME STUFF, CHECK IT OUT"
-    msg.action = "localhost:8000"
-
-    notify_user(user_id, msg.id, msg.title)
-
-    result.completion_time = datetime.datetime.now(pytz.utc)
     with open("{}/{}/{}.csv".format(local_temp_dir, "outputs", "rankings")) as f:
         rankings = pd.read_csv(f)  # nid, pid, con, branch, b_dx, b_dy, b_dz
         node_data = new_nodes.join(
@@ -402,6 +381,38 @@ def query_segmentation_async(
         ]
         ProofreadTreeNodes.objects.bulk_create(proofread_nodes)
 
+    cleanup = (
+        "rm -r {local_temp_dir}\n"
+        + "ssh -i {ssh_key} {ssh_user}@{server}\n"
+        + "rm -r {server_results_dir}/{server_job_dir}"
+    ).format(
+        **{
+            "ssh_key": ssh_key,
+            "ssh_user": ssh_user,
+            "server": server["address"],
+            "server_results_dir": server["results_dir"],
+            "server_job_dir": job_name,
+            "local_temp_dir": local_temp_dir,
+        }
+    )
+
+    process = subprocess.Popen(
+        "/bin/bash", stdin=subprocess.PIPE, stdout=subprocess.PIPE, encoding="utf8"
+    )
+    out, err = process.communicate(cleanup)
+    print(out)
+
+    msg = Message()
+    msg.user = User.objects.get(pk=int(user_id))
+    msg.read = False
+
+    msg.title = "Job {} complete!"
+    msg.text = "IM DOING SOME STUFF, CHECK IT OUT"
+    msg.action = "localhost:8000"
+
+    notify_user(user_id, msg.id, msg.title)
+
+    result.completion_time = datetime.datetime.now(pytz.utc)
     result.status = "complete"
     result.save()
 
