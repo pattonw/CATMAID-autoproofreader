@@ -1,5 +1,6 @@
 from django.http import JsonResponse, HttpResponseNotFound
 from django.utils.decorators import method_decorator
+from django.shortcuts import get_object_or_404
 
 from catmaid.control.authentication import requires_user_role
 from catmaid.models import UserRole
@@ -67,3 +68,16 @@ class ProofreadTreeNodeAPI(APIView):
         nodes.delete()
 
         return JsonResponse({"success": True})
+
+    @method_decorator(requires_user_role(UserRole.QueueComputeTask))
+    def patch(self, request, project_id):
+        node_pk = request.query_params.get("node_pk", request.data.get("node_pk", None))
+        if request.query_params.get("reviewed", request.data.get("reviewed", False)):
+            # toggle privacy setting if result belongs to this user.
+            result = get_object_or_404(
+                ProofreadTreeNodes, id=node_pk, user=request.user.id, project=project_id
+            )
+            result.reviewed = not result.reviewed
+            result.save()
+
+        return JsonResponse({"reviewed": result.reviewed})
