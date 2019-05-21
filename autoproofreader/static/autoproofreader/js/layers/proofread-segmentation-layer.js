@@ -18,26 +18,44 @@ fsv.addStackLayer(fs, layer);
     constructor(options, ...args) {
       super(...args);
 
-      // the result to visualize
-      this.currentResult = null;
+      this.options = options;
       // retrieve initial result from options
-      var initialSource =
+      this.currentResult =
         options && options.result_id ? options.result_id : undefined;
-      if (initialSource) {
-        this.replaceResult(initialSource);
+      if (this.currentResult) {
+        this.replaceResult(this.currentResult);
       } else {
         throw CATMAID.Error("No result chosen for visualization!");
       }
 
       this.resize(this.stackViewer.viewWidth, this.stackViewer.viewHeight);
-    }
 
-    /**
-     * The set of options and defaults.
-     */
-    options = {
-      result_id: null
-    };
+      this.setBlendMode("add");
+      let filter = new (this.getAvailableFilters())["Color Transform"]();
+      filter.pixiFilter.matrix = [
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0.3",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0.5",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "1",
+        "0"
+      ];
+      this.addFilter(filter);
+    }
 
     /**
      * Update default options
