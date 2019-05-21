@@ -156,6 +156,9 @@
                   <th>Name</th>
                   <th>Status</th>
                   <th>Skeleton ID</th>
+                  <th title="Unless marked private, everyone with browse permissions can see these results">private</th>
+                  <th title="Unless marked permanent, results may be deleted to free up space">permanent</th>
+                  <th>Actions</th>
                 </tr>
                 <tr>
                   <th><i class="fa fa-remove" id="${queuedTableId}-remove-all-queued" title="Remove all"></i></th>
@@ -172,6 +175,9 @@
                   <input type="text" name="searchSkeletonId" placeholder="skeleton filter" id="${queuedTableId}-search-skeleton-id"
                     value="" class="search_init"/>
                   </th>
+                  <th></th>
+                  <th></th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -187,8 +193,8 @@
                   <th>Name</th>
                   <th>Status</th>
                   <th>Skeleton ID</th>
-                  <th title="Limit data access to yourself or all with browse permission">private</th>
-                  <th title="Mark data as permanent, else it will be wiped after 24 hours">permanent</th>
+                  <th title="Unless marked private, everyone with browse permissions can see these results">private</th>
+                  <th title="Unless marked permanent, results may be deleted to free up space">permanent</th>
                   <th>Actions</th>
                 </tr>
                 <tr>
@@ -205,8 +211,8 @@
                   <input type="text" name="searchSkeletonId" placeholder="skeleton filter" id="${completedTableId}-search-skeleton-id"
                     value="" class="search_init"/>
                   </th>
-                  <th><input type="checkbox" id="${completedTableId}-mark-all-private" style="float: left" /></th>
-                  <th><input type="checkbox" id="${completedTableId}-mark-all-permanent" style="float: left" /></th>
+                  <th></th>
+                  <th></th>
                   <th></th>
                 </tr>
               </thead>
@@ -278,6 +284,182 @@
               params[toggle_prop] = true;
               CATMAID.fetch(
                 `ext/autoproofreader/${project.id}/autoproofreader-results`,
+                "PATCH",
+                params
+              )
+                .then(response => {
+                  // set checkbox appropriately depending on the response.
+                  $(self).prop("checked", response[toggle_prop]);
+                })
+                .catch(e => {
+                  CATMAID.handleError(e);
+                });
+            }, 0);
+
+            // hopefully prevent checkbox from being checked.
+            e.preventDefault();
+            e.stopPropagation();
+          });
+
+        let queuedTableContainer = $(`#${queuedTableId}`, container);
+        $(queuedTableContainer)
+          .on("click", "td .action-remove", this, function(e) {
+            let row = queuedTableContainer.DataTable().row(this.closest("tr"));
+            let result = row.data();
+            row.remove().draw();
+            CATMAID.fetch(
+              `ext/autoproofreader/${project.id}/autoproofreader-results`,
+              "DELETE",
+              { result_id: result.id }
+            );
+          })
+          .on("click", "td .action-select", this, function(e) {
+            let row = queuedTableContainer.DataTable().row(this.closest("tr"));
+            self.display_results_data(row.data());
+            // Reset highlighting
+            $("tbody tr", queuedTableContainer).css("background-color", "");
+            // Add new highlighting
+            $(row.node()).css("background-color", self.row_highlight_color);
+          })
+          .on("click", "td .action-toggle", this, function(e) {
+            let self = this;
+
+            // let the browser handle the check
+            setTimeout(function() {
+              // then undo it and wait for async behavior to finish
+              let toggle_prop = $(self).attr("data-action");
+              let params = {
+                result_id: queuedTableContainer
+                  .DataTable()
+                  .row(self.closest("tr"))
+                  .data().id
+              };
+              params[toggle_prop] = true;
+              CATMAID.fetch(
+                `ext/autoproofreader/${project.id}/autoproofreader-results`,
+                "PATCH",
+                params
+              )
+                .then(response => {
+                  // set checkbox appropriately depending on the response.
+                  $(self).prop("checked", response[toggle_prop]);
+                })
+                .catch(e => {
+                  CATMAID.handleError(e);
+                });
+            }, 0);
+
+            // hopefully prevent checkbox from being checked.
+            e.preventDefault();
+            e.stopPropagation();
+          });
+
+        let rankingTableContainer = $(`#${rankingTableId}`, container);
+        $(rankingTableContainer)
+          .on("click", "td .action-select-branch", this, function(e) {
+            let cell = rankingTableContainer
+              .DataTable()
+              .cell(this.closest("td"));
+            let cell_index = cell.index();
+            console.log(cell);
+            let row = rankingTableContainer.DataTable().row(cell_index.row);
+            console.log(row);
+            let row_data = row.data();
+            if (!self.selected_points.has(row_data.node_id)) {
+              self.selected_points.add(row_data.node_id);
+            } else {
+              self.selected_points.delete(row_data.node_id);
+            }
+            SkeletonAnnotations.staticMoveTo(
+              parseInt(row_data.z),
+              parseInt(row_data.y),
+              parseInt(row_data.x)
+            );
+
+            // Toggle displaying missing branch node
+            self.updateProofreadSkeletonVisualizationLayer();
+
+            /* CODE FOR ADDING NODE
+                  .then(e => {
+                      var projectCoordinates = project.focusedStackViewer.projectCoordinates();
+                      var parameters = {
+                          x: projectCoordinates.x,
+                          y: projectCoordinates.y,
+                          z: projectCoordinates.z,
+                      };
+                      parameters['skeleton_id'] = self.ranking_skeleton_id;
+                      CATMAID.fetch(project.id + '/node/nearest', 'POST', parameters)
+                          .then(function (data) {
+                              SkeletonAnnotations.staticSelectNode(data.treenode_id);
+                              return data.treenode_id;
+                          })
+                          .catch(function (e) {
+                              CATMAID.warn(
+                                  'Going to skeleton ' + data.skeleton_id + ' failed due to: ' + e
+                              );
+                          })
+                          .then(function (pid) {
+                              let data = self.rankingTable.row(index.row).data();
+                              let stack_viewer = project.getStackViewer(1);
+                              let tracing_layers = stack_viewer.getLayersOfType(
+                                  CATMAID.TracingLayer
+                              );
+                              let tracing_layer = tracing_layers[0];
+                              tracing_layer.tracingOverlay.createNode(
+                                  pid,
+                                  null,
+                                  data.x + data.branch_dx,
+                                  data.y + data.branch_dy,
+                                  data.z + data.branch_dz,
+                                  -1,
+                                  0,
+                                  null
+                              );
+                          })
+                          .catch(function (e) {
+                              console.log(e);
+                              CATMAID.warn('Failed to create node!');
+                          });
+                  });
+                  */
+            // Add new highlighting
+            $(cell.node()).toggleClass("highlight");
+          })
+          .on("click", "td .action-select-connectivity", this, function(e) {
+            let cell = rankingTableContainer
+              .DataTable()
+              .cell(this.closest("td"));
+            let cell_index = cell.index();
+            let row = rankingTableContainer.DataTable().row(cell_index.row);
+            let row_data = row.data();
+            SkeletonAnnotations.staticMoveTo(
+              parseInt(row_data.z),
+              parseInt(row_data.y),
+              parseInt(row_data.x)
+            );
+
+            // TODO: highlight connecting edge
+            self.updateProofreadSkeletonVisualizationLayer(row_data.node_id);
+
+            // Add new highlighting
+            $(cell.node()).toggleClass("highlight");
+          })
+          .on("click", "td .action-toggle", this, function(e) {
+            let self = this;
+
+            // let the browser handle the check
+            setTimeout(function() {
+              // then undo it and wait for async behavior to finish
+              let toggle_prop = $(self).attr("data-action");
+              let params = {
+                node_pk: rankingTableContainer
+                  .DataTable()
+                  .row(self.closest("tr"))
+                  .data().pk
+              };
+              params[toggle_prop] = true;
+              CATMAID.fetch(
+                `ext/autoproofreader/${project.id}/proofread-tree-nodes`,
                 "PATCH",
                 params
               )
@@ -1074,6 +1256,16 @@
     const tableID = this.idPrefix + "datatable-queued";
     const $table = $("#" + tableID);
 
+    var createCheckbox = function(key, result) {
+      var id = `${tableID}-${key}-${result.id}`;
+      return (
+        `<input type="checkbox" class="action-toggle" id="${id}" ` +
+        `value="${result.id}" data-action="${key}"` +
+        (result[key] ? " checked" : "") +
+        " />"
+      );
+    };
+
     this.ongoingTable = $table.DataTable({
       // http://www.datatables.net/usage/options
       destroy: true,
@@ -1125,6 +1317,29 @@
           orderable: true,
           searchable: true,
           className: "skeletonID"
+        },
+        {
+          orderable: false,
+          visible: true,
+          render: function(data, type, row, meta) {
+            return createCheckbox("private", row);
+          }
+        },
+        {
+          orderable: false,
+          visible: true,
+          render: function(data, type, row, meta) {
+            return createCheckbox("permanent", row);
+          }
+        },
+        {
+          orderable: false,
+          render: function(data, type, row, meta) {
+            return (
+              '<i class="fa fa-tag fa-fw clickable action-annotate" ' +
+              'alt="Annotate" title="Annotate skeleton"></i>'
+            );
+          }
         }
       ]
     });
@@ -1189,7 +1404,7 @@
     const $table = $("#" + tableID);
 
     var createCheckbox = function(key, result) {
-      var id = `${tableID}-result-${key}-${result.id}`;
+      var id = `${tableID}-${key}-${result.id}`;
       return (
         `<input type="checkbox" class="action-toggle" id="${id}" ` +
         `value="${result.id}" data-action="${key}"` +
@@ -1329,6 +1544,16 @@
     const tableID = this.idPrefix + "datatable-rankings";
     const $table = $("#" + tableID);
 
+    var createCheckbox = function(key, result) {
+      var id = `${tableID}-${key}-${result.id}`;
+      return (
+        `<input type="checkbox" class="action-toggle" id="${id}" ` +
+        `value="${result.id}" data-action="${key}"` +
+        (result[key] ? " checked" : "") +
+        " />"
+      );
+    };
+
     this.rankingTable = $table.DataTable({
       // http://www.datatables.net/usage/options
       destroy: true,
@@ -1360,82 +1585,46 @@
           data: "connectivity_score",
           orderable: true,
           searchable: true,
-          className: "connectivity_score"
+          className: "connectivity_score",
+          render: {
+            display: function(name) {
+              return (
+                '<a href="#" class="result-selection-link action-select-connectivity">' +
+                (name ? name : "") +
+                "</a>"
+              );
+        },
+            _: function(name) {
+              return name ? name : "";
+            }
+          }
         },
         {
           data: "branch_score",
           orderable: true,
           searchable: true,
-          className: "branch_score"
+          className: "branch_score",
+          render: {
+            display: function(name) {
+              return (
+                '<a href="#" class="result-selection-link action-select-branch">' +
+                (name ? name : "undefined") +
+                "</a>"
+              );
+            },
+            _: function(name) {
+              return name ? name : "undefined";
+            }
+          }
         },
         {
-          data: "reviewed",
-          orderable: true,
-          searchable: true,
-          className: "reviewed"
+          orderable: false,
+          visible: true,
+          render: function(data, type, row, meta) {
+            return createCheckbox("reviewed", row);
+          }
         }
       ]
-    });
-
-    $(`#${tableID} tbody`).on("click", "td", function() {
-      let index = self.rankingTable.cell(this).index();
-      console.log(index);
-      let row_data = self.rankingTable.row(index.row).data();
-      if (!self.selected_points.has(row_data.node_id)) {
-        self.selected_points.add(row_data.node_id);
-      } else {
-        self.selected_points.delete(row_data.node_id);
-      }
-      SkeletonAnnotations.staticMoveTo(
-        parseInt(row_data.z),
-        parseInt(row_data.y),
-        parseInt(row_data.x)
-      );
-      self.updateProofreadSkeletonVisualizationLayer;
-
-      /* CODE FOR ADDING NODE
-            .then(e => {
-                var projectCoordinates = project.focusedStackViewer.projectCoordinates();
-                var parameters = {
-                    x: projectCoordinates.x,
-                    y: projectCoordinates.y,
-                    z: projectCoordinates.z,
-                };
-                parameters['skeleton_id'] = self.ranking_skeleton_id;
-                CATMAID.fetch(project.id + '/node/nearest', 'POST', parameters)
-                    .then(function (data) {
-                        SkeletonAnnotations.staticSelectNode(data.treenode_id);
-                        return data.treenode_id;
-                    })
-                    .catch(function (e) {
-                        CATMAID.warn(
-                            'Going to skeleton ' + data.skeleton_id + ' failed due to: ' + e
-                        );
-                    })
-                    .then(function (pid) {
-                        let data = self.rankingTable.row(index.row).data();
-                        let stack_viewer = project.getStackViewer(1);
-                        let tracing_layers = stack_viewer.getLayersOfType(
-                            CATMAID.TracingLayer
-                        );
-                        let tracing_layer = tracing_layers[0];
-                        tracing_layer.tracingOverlay.createNode(
-                            pid,
-                            null,
-                            data.x + data.branch_dx,
-                            data.y + data.branch_dy,
-                            data.z + data.branch_dz,
-                            -1,
-                            0,
-                            null
-                        );
-                    })
-                    .catch(function (e) {
-                        console.log(e);
-                        CATMAID.warn('Failed to create node!');
-                    });
-            });
-            */
     });
 
     let exactNumSearch = function(event) {
@@ -1467,8 +1656,6 @@
         this.value = "";
       }
     });
-
-    this.ranking;
   };
 
   AutoproofreaderWidget.prototype.get_jobs = function() {
@@ -1522,6 +1709,7 @@
   AutoproofreaderWidget.prototype.appendOneNode = function(node) {
     let self = this;
     let row = {
+      pk: node.id, // primary key (different from node id since for each proofread skeleton node-ids start at 0)
       node_id: node.node_id,
       parent_id: node.parent_id,
       connectivity_score: node.connectivity_score,
