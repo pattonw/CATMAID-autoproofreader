@@ -579,28 +579,50 @@
   };
 
   AutoproofreaderWidget.prototype.check_valid_cached_job = function(settings) {
-    if (settings.run.segmentation_type != "watershed") {
+    if (settings.run.segmentation_type != "cached_lsd") {
       throw new Error("wierd");
+    }
+  };
+
+  AutoproofreaderWidget.prototype.gatherBasicFiles = function() {
+    let self = this;
+    let setting_values = self.getSettingValues();
+    return self.getSkeleton().then(function(skeleton_csv) {
+      return {
+        skeleton__csv: skeleton_csv,
+        sarbor_config__toml: toml.dump(setting_values.sarbor),
+        job_config__json: JSON.stringify(setting_values.run),
+        all_settings__toml: toml.dump(setting_values)
+      };
+    });
+  };
+
+  AutoproofreaderWidget.prototype.gatherExtraFiles = function() {
+    let self = this;
+    let setting_values = self.getSettingValues();
+    if (setting_values.run.segmentation_type == "diluvian") {
+      self.check_valid_diluvian_job(setting_values);
+      return self.getVolume().then(function(volume_config) {
+        return {
+          volume_toml: toml.dump(volume_config),
+          diluvian_config__toml: toml.dump(setting_values["diluvian"])
+        };
+      });
+    } else if (setting_values.run.segmentation_type == "cached_lsd") {
+      self.check_valid_cached_job(setting_values);
+      return new Promise(function(resolve, reject) {
+        resolve({
+          cached_lsd_config__toml: toml.dump(setting_values["cached_lsd"])
+        });
+      });
     }
   };
 
   AutoproofreaderWidget.prototype.gatherFiles = function() {
     let self = this;
-    let setting_values = self.getSettingValues();
-    if (setting_values.run.segmentation_type == "diluvian") {
-      self.check_valid_diluvian_job(setting_values);
-    } else if (setting_values.run.segmentation_type == "watershed") {
-      self.check_valid_cached_job(setting_values);
-    }
-    return self.getVolume().then(function(volume_config) {
-      return self.getSkeleton().then(function(skeleton_csv) {
-        return {
-          skeleton: skeleton_csv,
-          sarbor_config: toml.dump(setting_values.sarbor),
-          volume: toml.dump(volume_config),
-          job_config: JSON.stringify(setting_values.run),
-          diluvian_config: toml.dump(setting_values["diluvian"])
-        };
+    return self.gatherBasicFiles().then(function(basic_files) {
+      return self.gatherExtraFiles().then(function(extra_files) {
+        return { ...basic_files, ...extra_files };
       });
     });
   };
@@ -618,13 +640,13 @@
       container.append(file.name, file);
     };
     var post_data = new FormData();
-    add_file(post_data, files.diluvian_config, "diluvian_config.toml");
-    add_file(post_data, files.volume, "volume.toml");
-    add_file(post_data, files.skeleton, "skeleton.csv");
-    add_file(post_data, files.sarbor_config, "sarbor_config.toml");
-    add_file(post_data, files.job_config, "job_config.json");
+    let test_keys = ["skeleton.csv", "sarbor_config.toml", "job_config.json"];
+    for (let file_descriptor in files) {
+      let [a, b] = file_descriptor.split("__");
+      add_file(post_data, files[file_descriptor], `${a}.${b}`);
+    }
 
-    console.log(files.job_config);
+    console.log(post_data);
 
     CATMAID.fetch(
       "ext/autoproofreader/" + project.id + "/autoproofreader",
@@ -1064,31 +1086,36 @@
     );
     for (let l = 0; l < tileLayers.length; ++l) {
       let tileLayer = tileLayers[l];
-      let stackInfo = Object.assign(
-        {},
-        tileLayer.stack.mirrors[tileLayer.mirrorIndex]
-      );
-      delete stackInfo.id;
-      delete stackInfo.position;
-      stackInfo["resolution"] = [
-        tileLayer.stack.resolution.x,
-        tileLayer.stack.resolution.y,
-        tileLayer.stack.resolution.z
-      ];
-      stackInfo["bounds"] = [
-        tileLayer.stack.dimension.x,
-        tileLayer.stack.dimension.y,
-        tileLayer.stack.dimension.z
-      ];
-      stackInfo["translation"] = [
-        tileLayer.stack.translation.x,
-        tileLayer.stack.translation.y,
-        tileLayer.stack.translation.z
-      ];
-      stackInfo["broken_slices"] = tileLayer.stack.broken_slices;
-      stackInfo["source_base_url"] = stackInfo["image_base"];
-      return stackInfo;
+      let stack = tileLayer.stack;
+      let mirror = tileLayer.stack.mirrors[tileLayer.mirrorIndex];
+      return this.stackMirrorObj(stack, mirror);
     }
+  };
+
+  AutoproofreaderWidget.prototype.stackMirrorObj = function(stack, mirror) {
+    let stackMirrorInfo = {
+      file_extension: mirror.file_extension,
+      image_base: mirror.image_base,
+      tile_height: mirror.tile_height,
+      tile_width: mirror.tile_width,
+      tile_source_type: mirror.tile_source_type,
+      title: mirror.title,
+
+      resolution: [stack.resolution.x, stack.resolution.y, stack.resolution.z],
+      bounds: [
+        stack.dimension.x + stack.translation.x,
+        stack.dimension.y + stack.translation.y,
+        stack.dimension.z + stack.translation.z
+      ],
+      translation: [
+        stack.translation.x,
+        stack.translation.y,
+        stack.translation.z
+      ],
+      broken_slices: stack.broken_slices,
+      source_base_url: mirror.image_base
+    };
+    return stackMirrorInfo;
   };
 
   /**
@@ -1593,7 +1620,7 @@
                 (name ? name : "") +
                 "</a>"
               );
-        },
+            },
             _: function(name) {
               return name ? name : "";
             }
@@ -1828,31 +1855,32 @@
         )
       );
 
-      let addbutton = $('<button class="add" />')
-        .button({
-          icons: {
-            primary: "ui-icon-plus"
-          },
-          text: false
-        })
-        .click(function() {
-          args.async_add();
-        });
+      if (args.buttons) {
+        let addbutton = $('<button class="add" />')
+          .button({
+            icons: {
+              primary: "ui-icon-plus"
+            },
+            text: false
+          })
+          .click(function() {
+            args.async_add();
+          });
 
-      let removebutton = $('<button class="remove" />')
-        .button({
-          icons: {
-            primary: "ui-icon-minus"
-          },
-          text: false
-        })
-        .click(function() {
-          args.async_remove();
-        });
+        let removebutton = $('<button class="remove" />')
+          .button({
+            icons: {
+              primary: "ui-icon-minus"
+            },
+            text: false
+          })
+          .click(function() {
+            args.async_remove();
+          });
 
-      async_placeholder.find("div.help").before(addbutton);
-      async_placeholder.find("div.help").before(removebutton);
-
+        async_placeholder.find("div.help").before(addbutton);
+        async_placeholder.find("div.help").before(removebutton);
+      }
       /**
        * This function is necessary for refreshing the list when
        * adding or removing servers.
@@ -1896,6 +1924,17 @@
     };
 
     let renderSetting = function(container, setting) {
+      if (
+        setting.hasOwnProperty("depends_on") &
+        (typeof setting.depends_on !== "undefined")
+      ) {
+        if (
+          self.settings.run.segmentation_type.value !==
+          setting.depends_on.segmentation_type
+        ) {
+          return;
+        }
+      }
       let newOption = [];
       if (setting.type === "option_dropdown") {
         newOption.push(createOptionDropdown(setting));
@@ -2088,7 +2127,9 @@
         mode: args.mode,
         reset: args.reset,
         advanced: Boolean(args.advanced),
-        change: getChangeFunc(args.type, args.settings, args.label, args.reset)
+        depends_on: args.depends_on,
+        change: getChangeFunc(args.type, args.settings, args.label, args.reset),
+        buttons: args.buttons
       };
       args.settings[args.label] = fields;
     };
@@ -2163,8 +2204,19 @@
       return settings[setting];
     };
 
-    let createWatershedDefaults = function(settings) {
-      let sub_settings = getSubSettings(settings, "watershed");
+    let createCachedLSDDefaults = function(settings) {
+      let sub_settings = getSubSettings(settings, "cached_lsd");
+
+      addSettingTemplate({
+        settings: sub_settings,
+        type: "string",
+        label: "sensitives_file",
+        name: "Database credentials file",
+        helptext:
+          "A file containing access details for the database containing segmentations.",
+        value: "cached_lsd/sensitives.json",
+        advanced: true
+      });
     };
 
     let createDiluvianDefaults = function(settings) {
@@ -2192,9 +2244,9 @@
           "image stack since upsampling is not supported. You may downsample " +
           "by an arbitrary number of factors of 2 on each axis.",
         value: [
-          self.getImageStackVolume().resolution[2],
-          self.getImageStackVolume().resolution[1],
-          self.getImageStackVolume().resolution[0]
+          project.focusedStackViewer.primaryStack.resolution[2],
+          project.focusedStackViewer.primaryStack.resolution[1],
+          project.focusedStackViewer.primaryStack.resolution[0]
         ]
       });
     };
@@ -2244,6 +2296,18 @@
       });
     };
 
+    let getMirrorList = function() {
+      let mirrors = [];
+      project.getStackViewers().forEach(sv => {
+        sv._stacks.forEach(stack => {
+          stack.mirrors.forEach(mirror => {
+            mirrors.push({ stack: stack, mirror: mirror });
+          });
+        });
+      });
+      return mirrors;
+    };
+
     function add_volume() {
       // Add skeleton source message and controls
       let dialog = new CATMAID.OptionsDialog("Add Volume");
@@ -2251,6 +2315,7 @@
       dialog.appendMessage("Please provide the necessary information:");
       let volume_name = dialog.appendField("Volume name: ", "volume_name", "");
 
+      let config_prompt = dialog.appendMessage("Volume Config File: ");
       let config;
       var fileButton = CATMAID.DOM.createFileButton(undefined, false, function(
         evt
@@ -2271,17 +2336,55 @@
         .click(function() {
           fileButton.click();
         });
-      dialog.appendChild(configbutton[0]);
+      config_prompt.appendChild(configbutton[0]);
+
+      dialog.appendMessage("Or create volume from Mirror:");
+      let mirror;
+      let change_func = function(e) {
+        mirror = this.value;
+      };
+      let seperator = "%&%&%&%&%";
+      let dropdown = $("<select/>");
+      getMirrorList().forEach(function(o) {
+        this.append(
+          new Option(
+            `${o.stack.title} - ${o.mirror.title}`,
+            `${o.stack.title} - ${o.mirror.title}` +
+              seperator +
+              toml.dump(self.stackMirrorObj(o.stack, o.mirror))
+          )
+        );
+      }, dropdown);
+      dropdown[0].value = null;
+
+      dropdown.on("change", change_func);
+
+      let dropdown_menu = CATMAID.DOM.createLabeledControl(
+        "Mirrors",
+        dropdown,
+        "Pick a mirror from this list if you want to use it for segmentation"
+      );
+      dialog.appendChild(dropdown_menu[0]);
 
       // Add handler for creating the server
       dialog.onOK = function() {
+        let params;
+        if (typeof mirror === "undefined") {
+          params = {
+            name: volume_name.value,
+            config: config
+          };
+        } else {
+          let [name, config] = mirror.split(seperator);
+          params = {
+            name: name,
+            config: config
+          };
+        }
         return CATMAID.fetch(
           "ext/autoproofreader/" + project.id + "/image-volume-configs",
           "PUT",
-          {
-            name: volume_name.value,
-            config: config
-          }
+          params
         )
           .then(function(e) {
             // refresh the server list
@@ -2560,19 +2663,24 @@
       let change_func = function(server_id) {
         server = server_id;
       };
-      dialog.appendChild(
-        CATMAID.DOM.createLabeledAsyncPlaceholder(
-          "Compute server",
-          initServerList(change_func),
-          "The server to remove."
-        )
+
+      let compute_server_placeholder = CATMAID.DOM.createLabeledAsyncPlaceholder(
+        "Compute server: ",
+        initServerList(change_func),
+        "The server to remove."
       );
+      $(compute_server_placeholder)
+        .css("min-width", "100%")
+        .css("max-width", "100%");
+      dialog.appendChild(compute_server_placeholder);
       let model_source_path = dialog.appendField(
         "Path to the models weights: ",
         "model_path",
         "trained_models/model.hdf5"
       );
       let config;
+
+      let file_prompt = dialog.appendMessage("Diluvian Config File: ");
       var fileButton = CATMAID.DOM.createFileButton(undefined, false, function(
         evt
       ) {
@@ -2592,7 +2700,7 @@
         .click(function() {
           fileButton.click();
         });
-      dialog.appendChild(configbutton[0]);
+      file_prompt.appendChild(configbutton[0]);
 
       // Add handler for creating the model
       dialog.onOK = function() {
@@ -2693,12 +2801,12 @@
         name: "Segmentation type",
         options: [
           { name: "Diluvian", id: "diluvian" },
-          { name: "watershed segmentation", id: "watershed" }
+          { name: "LSD segmentation", id: "cached_lsd" }
         ],
         helptext:
           "Type of segmentation to use in the backend. Diluvian " +
           "will segment the skeleton on demand which will take some time. " +
-          "watershed segmentation is cached and only needs to be retrieved, which " +
+          "LSD segmentation is cached and only needs to be retrieved, which " +
           "will be faster but you have less options for customizing the job.",
         reset: true
       });
@@ -2712,7 +2820,9 @@
         async_change: change_volume,
         async_add: add_volume,
         async_remove: remove_volume,
-        helptext: "The volume to use for segmenting"
+        helptext: "The volume to use for segmenting",
+        depends_on: { segmentation_type: "diluvian" },
+        buttons: true
       });
 
       addSettingTemplate({
@@ -2724,7 +2834,9 @@
         async_change: change_model,
         async_add: add_model,
         async_remove: remove_model,
-        helptext: "The pretrained model to use for segmenting"
+        helptext: "The pretrained model to use for segmenting",
+        depends_on: { segmentation_type: "diluvian" },
+        buttons: true
       });
 
       addSettingTemplate({
@@ -2962,7 +3074,7 @@
       createRunDefaults(settings);
       createSarborDefaults(settings);
       createDiluvianDefaults(settings);
-      createWatershedDefaults(settings);
+      createCachedLSDDefaults(settings);
     };
 
     createDefaults(this.settings);
@@ -3016,29 +3128,29 @@
         let relative_url = `files/proofreading_segmentations/${uuid}/segmentations.n5/confidence`;
         return CATMAID.fetch(`${relative_url}/attributes.json`, "GET").then(
           attrs_file => {
-          var options = {
-            visible: self.visibleSegmentationLayer,
-            result_id: self.ranking_result_id,
-            selected_points: self.selected_points,
-            stack_attrs: {
-              dimensions: {
-                x: attrs_file.dimensions[0],
-                y: attrs_file.dimensions[1],
-                z: attrs_file.dimensions[2]
-              },
-              scales: [{ x: 1, y: 1, z: 1 }],
-              resolution: { x: 40, y: 40, z: 40 },
-              tile_width: attrs_file.blockSize[0],
-              tile_height: attrs_file.blockSize[1],
-              blockSizeZ: attrs_file.blockSize[2],
-              blockSize: attrs_file.blockSize,
-              tile_source_type: 11,
+            var options = {
+              visible: self.visibleSegmentationLayer,
+              result_id: self.ranking_result_id,
+              selected_points: self.selected_points,
+              stack_attrs: {
+                dimensions: {
+                  x: attrs_file.dimensions[0],
+                  y: attrs_file.dimensions[1],
+                  z: attrs_file.dimensions[2]
+                },
+                scales: [{ x: 1, y: 1, z: 1 }],
+                resolution: { x: 40, y: 40, z: 40 },
+                tile_width: attrs_file.blockSize[0],
+                tile_height: attrs_file.blockSize[1],
+                blockSizeZ: attrs_file.blockSize[2],
+                blockSize: attrs_file.blockSize,
+                tile_source_type: 11,
                 image_base: `${window.location.protocol}//${
                   window.location.host
                 }/${relative_url}/0_1_2`
-            }
-          };
-          return options;
+              }
+            };
+            return options;
           }
         );
       });
