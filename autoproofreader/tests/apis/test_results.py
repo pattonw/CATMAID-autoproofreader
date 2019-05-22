@@ -4,6 +4,7 @@ from guardian.shortcuts import assign_perm
 from autoproofreader.tests.common import AutoproofreaderTestCase
 
 RESULTS_URL = "/ext/autoproofreader/{}/autoproofreader-results"
+RESULTS_UUID_URL = "/ext/autoproofreader/{}/autoproofreader-results-uuid"
 
 
 class ResultsTest(AutoproofreaderTestCase):
@@ -84,8 +85,10 @@ class ResultsTest(AutoproofreaderTestCase):
         ]
         self.assertEqual(expected_result, parsed_response)
 
+    def test_get_uuid(self):
         response = self.client.get(
-            RESULTS_URL.format(self.test_project_id), {"result_id": 1, "uuid": True}
+            RESULTS_UUID_URL.format(self.test_project_id),
+            {"result_id": 1, "uuid": True},
         )
         self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
@@ -93,7 +96,8 @@ class ResultsTest(AutoproofreaderTestCase):
         self.assertEqual(expected_result, parsed_response)
 
         response = self.client.get(
-            RESULTS_URL.format(self.test_project_id), {"result_id": 2, "uuid": True}
+            RESULTS_UUID_URL.format(self.test_project_id),
+            {"result_id": 2, "uuid": True},
         )
         self.assertEqual(response.status_code, 200)
         parsed_response = json.loads(response.content.decode("utf-8"))
