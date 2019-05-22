@@ -86,6 +86,9 @@ class ResultsTest(AutoproofreaderTestCase):
         self.assertEqual(expected_result, parsed_response)
 
     def test_get_uuid(self):
+        self.fake_authentication()
+        assign_perm("can_browse", self.test_user, self.test_project)
+        
         response = self.client.get(
             RESULTS_UUID_URL.format(self.test_project_id),
             {"result_id": 1, "uuid": True},
