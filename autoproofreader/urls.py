@@ -45,7 +45,11 @@ urlpatterns += [
     url(
         r"^(?P<project_id>\d+)/autoproofreader-results$",
         autoproofreader.AutoproofreaderResultAPI.as_view(),
-    )
+    ),
+    url(
+        r"^(?P<project_id>\d+)/autoproofreader-results-uuid$",
+        autoproofreader.get_result_uuid,
+    ),
 ]
 
 # Image Volume Configs

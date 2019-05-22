@@ -15,6 +15,37 @@ from autoproofreader.models import ComputeServer, ComputeServerSerializer
 class ComputeServerAPI(APIView):
     @method_decorator(requires_user_role(UserRole.Admin))
     def put(self, request, project_id):
+        """
+        Create a new ComputeServer
+
+        ---
+        parameters:
+            - name: address
+              description: ssh server address.
+              type: string
+              paramType: form
+              required: true
+            - name: name
+              description: Display name for server.
+              type: string
+              paramType: form
+            - name: environment_source_path
+              description: path to activate a virtual environment.
+              type: path
+              paramType: form
+            - name: diluvian_path
+              description: Depricated, not used
+              type: path
+              paramType: form
+            - name: results_directory
+              description: Where to store temporary data on server.
+              type: path
+              paramType: form
+            - name: project_whitelist
+              description: Projects that have access to this server. All if empty
+              type: array
+              paramType: form
+        """
         address = request.POST.get("address", request.data.get("address", None))
         if "name" in request.POST or "name" in request.data:
             name = request.POST.get("name", request.data.get("name", None))
@@ -66,18 +97,6 @@ class ComputeServerAPI(APIView):
             type: int
             paramType: form
             required: false
-            defaultValue: false
-        returns: List of lists of the form:
-            [
-                id,
-                name,
-                address,
-                editor_id,
-                edition_time,
-                environment_source_path,
-                diluvian_path,
-                results_directory,
-            ]
         """
         server_id = request.query_params.get("server_id", None)
         if server_id is not None:
@@ -102,6 +121,21 @@ class ComputeServerAPI(APIView):
 
     @method_decorator(requires_user_role(UserRole.Admin))
     def delete(self, request, project_id):
+        """
+        delete a compute server
+        ---
+        parameters:
+          - name: project_id
+            description: Project to delete server from.
+            type: integer
+            paramType: path
+            required: true
+          - name: server_id
+            description: server to delete.
+            type: int
+            paramType: form
+            required: false
+        """
         # can_edit_or_fail(request.user, point_id, "point")
         server_id = request.query_params.get(
             "server_id", request.data.get("server_id", None)
@@ -131,22 +165,6 @@ class GPUUtilAPI(APIView):
 
     @method_decorator(requires_user_role(UserRole.Browse))
     def get(self, request, project_id):
-        """
-        get gpu information from a server
-        ---
-        parameters:
-          - name: project_id
-            description: Project of the returned configurations
-            type: integer
-            paramType: path
-            required: true
-          - name: server_id
-            description: If available, return only the server associated with server_id
-            type: int
-            paramType: form
-            required: true
-            defaultValue: false
-        """
 
         out = GPUUtilAPI._query_server(request.query_params.get("server_id", None))
 

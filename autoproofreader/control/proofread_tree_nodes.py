@@ -12,30 +12,19 @@ class ProofreadTreeNodeAPI(APIView):
     @method_decorator(requires_user_role(UserRole.Browse))
     def get(self, request, project_id):
         """
-        List all available volume configurations
+        List proofread tree nodes
         ---
         parameters:
           - name: project_id
-            description: Project of the returned configurations
+            description: Project of the returned tree nodes
             type: integer
             paramType: path
             required: true
-          - name: model_id
-            description: If available, return only the model associated with model_id
+          - name: result_id
+            description: If available, return only the nodes associated with result_id
             type: int
             paramType: form
             required: false
-            defaultValue: false
-        returns: List of lists of the form:
-            [
-                id,
-                user_id,
-                project_id,
-                creation_time,
-                edition_time,
-                name,
-                config,
-            ]
         """
         result_id = request.query_params.get(
             "result_id", request.data.get("result_id", None)
@@ -56,6 +45,21 @@ class ProofreadTreeNodeAPI(APIView):
 
     @method_decorator(requires_user_role(UserRole.QueueComputeTask))
     def delete(self, request, project_id):
+        """
+        delete proofread tree nodes
+        ---
+        parameters:
+          - name: project_id
+            description: Project of the queried tree nodes
+            type: integer
+            paramType: path
+            required: true
+          - name: result_id
+            description: the result from which to delete the treenodes
+            type: int
+            paramType: form
+            required: true
+        """
         result_id = request.query_params.get(
             "result_id", request.data.get("result_id", None)
         )
@@ -71,6 +75,21 @@ class ProofreadTreeNodeAPI(APIView):
 
     @method_decorator(requires_user_role(UserRole.QueueComputeTask))
     def patch(self, request, project_id):
+        """
+        Toggle proofread tree node reviewed tag.
+        ---
+        parameters:
+          - name: project_id
+            description: Project of the queried tree nodes
+            type: integer
+            paramType: path
+            required: true
+          - name: node_pk
+            description: The node for which to toggle reviewed tag.
+            type: int
+            paramType: form
+            required: true
+        """
         node_pk = request.query_params.get("node_pk", request.data.get("node_pk", None))
         if request.query_params.get("reviewed", request.data.get("reviewed", False)):
             # toggle privacy setting if result belongs to this user.
