@@ -6,6 +6,7 @@ import json
 import pickle
 import pytz
 import pandas as pd
+import logging
 
 from django.conf import settings
 from django.http import JsonResponse, HttpResponseNotFound
@@ -21,6 +22,7 @@ from catmaid.control.message import notify_user
 from celery.task import task
 
 from rest_framework.views import APIView
+from rest_framework.decorators import api_view
 
 from autoproofreader.models import (
     AutoproofreaderResult,
@@ -40,13 +42,50 @@ output_path = Path(settings.MEDIA_ROOT, settings.MEDIA_EXPORT_SUBDIRECTORY)
 class AutoproofreaderTaskAPI(APIView):
     @method_decorator(requires_user_role(UserRole.QueueComputeTask))
     def put(self, request, project_id):
-        """
-        Flood fill a skeleton.
-        Files:
-        job_config.json
-        volume.toml
-        diluvian_config.toml
-        skeleton.csv
+        """Create an autoproofreading job.
+
+        If a user has permission to queue compute tasks, this api can be
+        used to submit a skeleton allong with sufficient information to
+        access localized segmentations and retrieve a ranking of which
+        sections of the neuron are most likely to contain errors.
+        
+        ---
+        parameters:
+          - name: job_config.json
+            description: Config file containing job initialization information
+            required: true
+            type: file
+            paramType: form
+          - name: sarbor_config.toml
+            description: File detailing sarbor execution configuration
+            required: true
+            type: file
+            paramType: form
+          - name: skeleton.csv
+            description: Csv file containing rows of (node_id, parent_id, x, y, z)
+            required: true
+            type: file
+            paramType: form
+          - name: all_settings.toml
+            description: File containing a full set of settings for this job
+            required: true
+            type: file
+            paramType: form
+          - name: volume.toml
+            description: Contains configuration for Diluvian volume
+            required: false
+            type: file
+            paramType: form
+          - name: diluvian_config.toml
+            description: Contains job specific changes to a trained models config file
+            required: false
+            type: file
+            paramType: form
+          - name: cached_lsd_config.toml
+            description: Contains configuration for a job running on cached lsd segmentations
+            required: false
+            type: file
+            paramType: form
         """
 
         files = {f.name: f.read().decode("utf-8") for f in request.FILES.values()}
@@ -331,19 +370,19 @@ def query_segmentation_async(
         "/bin/bash", stdin=subprocess.PIPE, stdout=subprocess.PIPE, encoding="utf8"
     )
     out, err = process.communicate(setup)
-    print(out)
+    logging.info(out)
 
     process = subprocess.Popen(
         "/bin/bash", stdin=subprocess.PIPE, stdout=subprocess.PIPE, encoding="utf8"
     )
     out, err = process.communicate(query_seg)
-    print(out)
+    logging.info(out)
 
     process = subprocess.Popen(
         "/bin/bash", stdin=subprocess.PIPE, stdout=subprocess.PIPE, encoding="utf8"
     )
     out, err = process.communicate(fetch_files)
-    print(out)
+    logging.info(out)
 
     new_nodes = pd.DataFrame(
         pickle.load(
@@ -400,7 +439,7 @@ def query_segmentation_async(
         "/bin/bash", stdin=subprocess.PIPE, stdout=subprocess.PIPE, encoding="utf8"
     )
     out, err = process.communicate(cleanup)
-    print(out)
+    logging.info(out)
 
     msg = Message()
     msg.user = User.objects.get(pk=int(user_id))
@@ -421,24 +460,49 @@ def query_segmentation_async(
     return "complete"
 
 
+@api_view(["GET"])
+@requires_user_role(UserRole.Browse)
+def get_result_uuid(request, project_id):
+    """Retrieve the uuid of a result.
+
+    The UUID is used to store the results of a job in a secure
+    location so that only those with permission to obtain
+    the UUID can see the job results.
+    ---
+    parameters:
+      - name: result_id
+        description: ID of result for which you want the uuid.
+        type: integer
+        required: true
+        paramType: form
+    """
+    result_id = request.query_params.get(
+        "result_id", request.data.get("result_id", None)
+    )
+    query_set = AutoproofreaderResult.objects.filter(
+        Q(project=project_id)
+        & Q(id=result_id)
+        & (Q(user=request.user.id) | Q(private=False))
+    )
+    if len(query_set) == 1:
+        return JsonResponse(query_set[0].uuid, safe=False)
+
+    return HttpResponseNotFound("No results found with id {}".format(result_id))
+
+
 class AutoproofreaderResultAPI(APIView):
     @method_decorator(requires_user_role(UserRole.Browse))
     def get(self, request, project_id):
-        """
-        List all available autoproofreader models
+        """Retrieve past job results.
+
+        Retrieve information on previous jobs. This includes jobs
+        that have not yet completed their computations.
         ---
         parameters:
-          - name: project_id
-            description: Project of the returned configurations
+            - name: result_id
+            description: ID of result to retrieve. If not provided retrieve all results
             type: integer
             paramType: path
-            required: true
-          - name: model_id
-            description: If available, return only the model associated with model_id
-            type: int
-            paramType: form
-            required: false
-            defaultValue: false
         """
         result_id = request.query_params.get(
             "result_id", request.data.get("result_id", None)
@@ -460,10 +524,6 @@ class AutoproofreaderResultAPI(APIView):
             if len(query_set) == 0 and result_id is not None:
                 return JsonResponse([], safe=False)
 
-        get_uuid = request.query_params.get("uuid", request.data.get("uuid", False))
-        if get_uuid and result_id is not None and len(query_set) == 1:
-            return JsonResponse(query_set[0].uuid, safe=False)
-
         return JsonResponse(
             AutoproofreaderResultSerializer(query_set, many=True).data,
             safe=False,
@@ -472,6 +532,32 @@ class AutoproofreaderResultAPI(APIView):
 
     @method_decorator(requires_user_role(UserRole.QueueComputeTask))
     def patch(self, request, project_id):
+        """Edit an existing result.
+
+        This api is used to toggle the 'permanent' and 'private' flags
+        of a result.
+        ---
+        parameters:
+            - name: result_id
+            description: ID of result to edit.
+            required: true
+            type: integer
+            paramType: form
+            -name: private
+            description: |
+              Whether to toggle the 'private' flag. If checked
+              only the user who started this job can view its
+              results.
+            type: boolean
+            paramType: form
+            -name: permanent
+            description: |
+              Whether to toggle the 'permanent' flag. If not
+              checked, this result and its data might be
+              deleted to make room for others.
+            type: boolean
+            paramType: form
+        """
         result_id = request.query_params.get(
             "result_id", request.data.get("result_id", None)
         )
@@ -504,6 +590,16 @@ class AutoproofreaderResultAPI(APIView):
 
     @method_decorator(requires_user_role(UserRole.QueueComputeTask))
     def delete(self, request, project_id):
+        """Delete an existing result.
+
+        ---
+        parameters:
+            - name: result_id
+            description: ID of result to delete.
+            required: true
+            type: integer
+            paramType: form
+        """
         # can_edit_or_fail(request.user, point_id, "point")
         result_id = request.query_params.get(
             "result_id", request.data.get("result_id", None)

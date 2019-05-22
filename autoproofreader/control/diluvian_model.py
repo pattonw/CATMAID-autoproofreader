@@ -12,6 +12,41 @@ from autoproofreader.models import DiluvianModel, DiluvianModelSerializer, Confi
 class DiluvianModelAPI(APIView):
     @method_decorator(requires_user_role(UserRole.QueueComputeTask))
     def put(self, request, project_id):
+        """
+        Add a diluvian model
+        ---
+        parameters:
+          - name: project_id
+            description: Project for which the model will be available.
+            type: integer
+            paramType: path
+            required: true
+          - name: name
+            description: Name of the new model.
+            type: string
+            paramType: form
+            required: true
+          - name: server_id
+            description: |
+              The server on which this model was trained. 
+              Holds the model weights.
+            type: integer
+            paramType: form
+            required: true
+          - name: model_source_path
+            description: |
+              File path of trained model on the server
+              it was trained on. Note that if you want to
+              use this model on a different server, the
+              model files must be stored under the same
+              source path.
+            required: true
+            paramType: form
+          - name: config
+            description: This models diluvian config.
+            required: true
+            paramType: form
+        """
         warnings = []
 
         name = request.POST.get("name", request.data.get("name", None))
@@ -56,11 +91,11 @@ class DiluvianModelAPI(APIView):
     @method_decorator(requires_user_role(UserRole.QueueComputeTask))
     def get(self, request, project_id):
         """
-        List all available autoproofreader models
+        List all available diluvian models
         ---
         parameters:
           - name: project_id
-            description: Project of the returned configurations
+            description: Project of the queried models
             type: integer
             paramType: path
             required: true
@@ -69,19 +104,6 @@ class DiluvianModelAPI(APIView):
             type: int
             paramType: form
             required: false
-            defaultValue: false
-        returns: List of lists of the form:
-            [
-                id,
-                user_id,
-                project_id,
-                creation_time,
-                edition_time,
-                name,
-                server_id,
-                model_source_path,
-                config_id,
-            ]
         """
         model_id = request.query_params.get(
             "model_id", request.data.get("model_id", None)
@@ -100,6 +122,21 @@ class DiluvianModelAPI(APIView):
 
     @method_decorator(requires_user_role(UserRole.QueueComputeTask))
     def delete(self, request, project_id):
+        """
+        delete a diluvian model
+        ---
+        parameters:
+          - name: project_id
+            description: Project of the queried models
+            type: integer
+            paramType: path
+            required: true
+          - name: model_id
+            description: model to delete
+            type: int
+            paramType: form
+            required: true
+        """
         # can_edit_or_fail(request.user, point_id, "point")
         model_id = request.query_params.get(
             "model_id", request.data.get("model_id", None)

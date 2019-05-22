@@ -100,7 +100,7 @@ fsv.addStackLayer(fs, layer);
             let self = this;
             return CATMAID.fetch("ext/autoproofreader/" + project.id + "/autoproofreader-results", "GET", { result_id: self.currentResult }).then((result) => {
                 console.log(result);
-                return CATMAID.fetch("ext/autoproofreader/" + project.id + "/autoproofreader-results", "GET", { result_id: self.currentResult, uuid: true }).then((uuid) => {
+                return CATMAID.fetch("ext/autoproofreader/" + project.id + "/autoproofreader-results-uuid", "GET", { result_id: self.currentResult}).then((uuid) => {
                     console.log(uuid);
                     return CATMAID.fetch("files/proofreading_segmentations/" + uuid + "/segmentations.n5/segmentation_counts/attributes.json", "GET").then((attrs_file) => {
                         let attrs = {

@@ -38,30 +38,19 @@ class ImageVolumeConfigAPI(APIView):
     @method_decorator(requires_user_role(UserRole.Browse))
     def get(self, request, project_id):
         """
-        List all available volume configurations
+        List all available image volume configurations
         ---
         parameters:
           - name: project_id
-            description: Project of the returned configurations
+            description: Project of the ImageVolumeConfigs
             type: integer
             paramType: path
             required: true
-          - name: model_id
-            description: If available, return only the model associated with model_id
+          - name: image_volume_config_id
+            description: If available, return only the one ImageVolumeConfig
             type: int
             paramType: form
             required: false
-            defaultValue: false
-        returns: List of lists of the form:
-            [
-                id,
-                user_id,
-                project_id,
-                creation_time,
-                edition_time,
-                name,
-                config,
-            ]
         """
         image_volume_config_id = request.query_params.get(
             "image_volume_config_id", request.data.get("image_volume_config_id", None)
@@ -81,6 +70,21 @@ class ImageVolumeConfigAPI(APIView):
 
     @method_decorator(requires_user_role(UserRole.QueueComputeTask))
     def delete(self, request, project_id):
+        """
+        Delete an image volume configuration
+        ---
+        parameters:
+          - name: project_id
+            description: Project of the ImageVolumeConfigs
+            type: integer
+            paramType: path
+            required: true
+          - name: image_volume_config_id
+            description: ImageVolumeConfig to delete
+            type: int
+            paramType: form
+            required: true
+        """
         image_volume_config_id = request.query_params.get(
             "image_volume_config_id", request.data.get("image_volume_config_id", None)
         )

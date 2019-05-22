@@ -3121,9 +3121,9 @@
       { result_id: self.ranking_result_id }
     ).then(result => {
       return CATMAID.fetch(
-        `ext/autoproofreader/${project.id}/autoproofreader-results`,
+        `ext/autoproofreader/${project.id}/autoproofreader-results-uuid`,
         "GET",
-        { result_id: self.ranking_result_id, uuid: true }
+        { result_id: self.ranking_result_id }
       ).then(uuid => {
         let relative_url = `files/proofreading_segmentations/${uuid}/segmentations.n5/confidence`;
         return CATMAID.fetch(`${relative_url}/attributes.json`, "GET").then(
