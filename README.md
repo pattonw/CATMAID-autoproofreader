@@ -58,7 +58,7 @@ When you add a new server through the admin page you will see the following fiel
 
 8. **ssh key**: The `ssh_user` needs to be set up with a private/public
    key pair to securely access the server. You can read more about how to
-   do this at [https://www.ssh.com/ssh/keygen/]. Once this is done, move
+   do this at https://www.ssh.com/ssh/keygen/. Once this is done, move
    the private key to `django/projects/mysite/.ssh/`. Whatever you name the
    private key file is what goes in this field. When connecting to the server
    the backend will look for a file called **ssh key** in `django/projects/mysite/.ssh/`.
@@ -68,12 +68,12 @@ When you add a new server through the admin page you will see the following fiel
 1. Make sure there is a user called **ssh user** who has a public/private key
    pair configured for this server, with the private key stored in the appropriate
    location.
-2. Create a virtual environment and pip install sarbor from [https://github.com/pattonw/sarbor].
+2. Create a virtual environment and pip install sarbor from https://github.com/pattonw/sarbor.
 3. Make `diluvian` or the `cached lsd` segmentation sources available.
 
 ##### Diluvian
 
-1. pip install `diluvian` into your virtual environment from [https://github.com/pattonw/diluvian].
+1. pip install `diluvian` into your virtual environment from https://github.com/pattonw/diluvian.
 
 ##### Cached lsd
 
@@ -91,3 +91,52 @@ The `sensitives.json` file should look something like this:
     "fragments_dataset": "/zarr/dataset/path",
 }
 ```
+
+### Running a Job
+
+Once you have a server set up to accept proofreading jobs, you can submit a job
+by openning up the autoproofreading widget in catmaid. In the `Run` tab, you
+can fill out the settings that you want.
+
+The `run settings` section contains basic job information such as a name,
+which server to use, which skeleton to proofread, and what source the backend
+should use to obtain segmentations. If you choose a _cached lsd_ job, you
+need only provide the path to the `sensitives.json` file for the mongodb you want to use.
+If you choose a _diluvian_ job, you will also need to configure a diluvian model
+and an image volume, since it needs the raw data and the model weights to
+compute your segmentations, rather than just retrieving it from a database.
+
+The `sarbor settings` section contains configuration for the sarbor package
+which does all of the computations for finding potential errors and ranking them.
+Here you can configure things specific to the skeleton, whether you want to
+downsample the skeleton and by how much, whether you want to smooth the skeleton.
+You can also specify segmentation specific fields such as the amount of downsampling
+you want to use and how large a field of view around each sample point you would like
+to use.
+
+Once you are satisfied with the settings, you can click Download settings to
+store a copy of them to reuse later. Clicking upload settings with the file that
+you downloaded will then repopulate all the fields with the settings you have
+provided.
+Finally clicking Segment will start the job which you will be able to see in
+the Queued job table. Here you will see some basic information about your
+job while you wait for it to complete.
+
+Once a job is complete you can see it in the completed jobs table. Here
+you can see the completed jobs and clicking on a name will select it for you.
+Once selected you can move to the rankings table to view your results.
+The two checkmarks at the top will toggle the proofread skeleton and the
+segmentations. clicking either a branch score or a connectivity score will
+move your field of view to the appropriate location and display the information
+you asked for. 
+
+If you clicked on a branch score and you have the proofread skeleton
+layer active, you should see a black and white virtual node pointing to the location
+of the expected missing branch. If you also display the segmentations you
+can gain some insight as to why that point was chosen. Generally it is a
+point that is confidently segmented, and most distant to all current sample points.
+
+Clicking on the connectivity score will hide the whole proofread skeleton, except the
+edge between the two nodes that you are interested in.
+
+After reviewing a node you can mark it as reviewed for future reference.

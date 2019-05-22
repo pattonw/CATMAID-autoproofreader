@@ -28,7 +28,7 @@ class DiluvianModelAPI(APIView):
             required: true
           - name: server_id
             description: |
-              The server on which this model was trained. 
+              The server on which this model was trained.
               Holds the model weights.
             type: integer
             paramType: form

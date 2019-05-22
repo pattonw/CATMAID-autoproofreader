@@ -371,9 +371,9 @@
               self.selected_points.delete(row_data.node_id);
             }
             SkeletonAnnotations.staticMoveTo(
-              parseInt(row_data.z),
-              parseInt(row_data.y),
-              parseInt(row_data.x)
+              parseInt(row_data.z + row_data.branch_dz),
+              parseInt(row_data.y + row_data.branch_dy),
+              parseInt(row_data.x + row_data.branch_dx)
             );
 
             // Toggle displaying missing branch node
@@ -2214,8 +2214,7 @@
         name: "Database credentials file",
         helptext:
           "A file containing access details for the database containing segmentations.",
-        value: "cached_lsd/sensitives.json",
-        advanced: true
+        value: "cached_lsd/sensitives.json"
       });
     };
 

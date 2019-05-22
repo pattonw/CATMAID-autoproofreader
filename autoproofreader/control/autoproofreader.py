@@ -48,7 +48,7 @@ class AutoproofreaderTaskAPI(APIView):
         used to submit a skeleton allong with sufficient information to
         access localized segmentations and retrieve a ranking of which
         sections of the neuron are most likely to contain errors.
-        
+
         ---
         parameters:
           - name: job_config.json
