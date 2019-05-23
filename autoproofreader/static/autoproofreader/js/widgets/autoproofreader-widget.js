@@ -622,7 +622,7 @@
     let self = this;
     return self.gatherBasicFiles().then(function(basic_files) {
       return self.gatherExtraFiles().then(function(extra_files) {
-        return { ...basic_files, ...extra_files };
+        return Object.assign({}, basic_files, extra_files);
       });
     });
   };
