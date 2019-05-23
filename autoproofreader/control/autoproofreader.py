@@ -16,8 +16,13 @@ from django.shortcuts import get_object_or_404
 
 from catmaid.consumers import msg_user
 from catmaid.control.authentication import requires_user_role
-from catmaid.models import Message, User, UserRole
+from catmaid.models import Message, User, UserRole, Volume
 from catmaid.control.message import notify_user
+from catmaid.control.volume import (
+    TriangleMeshVolume,
+    InvalidSTLError,
+    _stl_ascii_to_indexed_triangles,
+)
 
 from celery.task import task
 
@@ -352,8 +357,6 @@ def query_segmentation_async(
     fetch_files = (
         "scp -i {ssh_key} -r {ssh_user}@{server}:"
         + "{server_results_dir}/{server_job_dir}/* {local_temp_dir}\n"
-        + "mkdir -p {segmentations_dir}\n"
-        + "mv {local_temp_dir}/outputs/segmentations.n5 {segmentations_dir}\n"
     ).format(
         **{
             "ssh_key": ssh_key,
@@ -362,7 +365,6 @@ def query_segmentation_async(
             "server_results_dir": server["results_dir"],
             "server_job_dir": job_name,
             "local_temp_dir": local_temp_dir,
-            "segmentations_dir": segmentations_dir,
         }
     )
 
@@ -384,41 +386,77 @@ def query_segmentation_async(
     out, err = process.communicate(fetch_files)
     logging.info(out)
 
-    new_nodes = pd.DataFrame(
-        pickle.load(
-            open("{}/{}/{}".format(local_temp_dir, "outputs", "nodes.obj"), "rb")
-        ),
-        columns=["nid", "pid", "x", "y", "z"],
-    )
-
-    with open("{}/{}/{}.csv".format(local_temp_dir, "outputs", "rankings")) as f:
-        rankings = pd.read_csv(f)  # nid, pid, con, branch, b_dx, b_dy, b_dz
-        node_data = new_nodes.join(
-            rankings.set_index("nid"), lsuffix="_other", on="nid"
+    nodes_path = Path(local_temp_dir, "outputs", "nodes.obj")
+    # Nodes are mandatory
+    if nodes_path.exists():
+        new_nodes = pd.DataFrame(
+            pickle.load(nodes_path.open("rb")), columns=["nid", "pid", "x", "y", "z"]
         )
-        proofread_nodes = [
-            ProofreadTreeNodes(
-                node_id=row["nid"],
-                parent_id=None if row["pid"] == "None" else row["pid"],
-                x=row["x"],
-                y=row["y"],
-                z=row["z"],
-                connectivity_score=None
-                if row["connectivity_score"] == "None"
-                else row["connectivity_score"],
-                branch_score=row["branch_score"],
-                branch_dx=row["branch_dx"],
-                branch_dy=row["branch_dy"],
-                branch_dz=row["branch_dz"],
-                reviewed=False,
-                result=result,
-                user_id=user_id,
-                project_id=project_id,
-                editor_id=user_id,
+    else:
+        result.status = "failed"
+        result.save()
+        return "failed"
+
+    rankings_path = Path(local_temp_dir, "outputs", "rankings.csv")
+    # Rankings are mandatory
+    if rankings_path.exists():
+        with rankings_path.open("r") as f:
+            rankings = pd.read_csv(f)  # nid, pid, con, branch, b_dx, b_dy, b_dz
+            node_data = new_nodes.join(
+                rankings.set_index("nid"), lsuffix="_other", on="nid"
             )
-            for index, row in node_data.iterrows()
-        ]
-        ProofreadTreeNodes.objects.bulk_create(proofread_nodes)
+            proofread_nodes = [
+                ProofreadTreeNodes(
+                    node_id=row["nid"],
+                    parent_id=None if row["pid"] == "None" else row["pid"],
+                    x=row["x"],
+                    y=row["y"],
+                    z=row["z"],
+                    connectivity_score=None
+                    if row["connectivity_score"] == "None"
+                    else row["connectivity_score"],
+                    branch_score=row["branch_score"],
+                    branch_dx=row["branch_dx"],
+                    branch_dy=row["branch_dy"],
+                    branch_dz=row["branch_dz"],
+                    reviewed=False,
+                    result=result,
+                    user_id=user_id,
+                    project_id=project_id,
+                    editor_id=user_id,
+                )
+                for index, row in node_data.iterrows()
+            ]
+            ProofreadTreeNodes.objects.bulk_create(proofread_nodes)
+    else:
+        result.status = "failed"
+        result.save()
+        return "failed"
+
+    mesh_path = Path(local_temp_dir, "outputs", "mesh.stl")
+    # Mesh is optional
+    if mesh_path.exists():
+        with mesh_path.open("r") as f:
+            stl_str = f.read()
+
+            try:
+                vertices, triangles = _stl_ascii_to_indexed_triangles(stl_str)
+            except InvalidSTLError as e:
+                raise ValueError("Invalid STL file ({})".format(str(e)))
+
+            mesh = TriangleMeshVolume(
+                project_id,
+                user_id,
+                {"type": "trimesh", "title": job_name, "mesh": [vertices, triangles]},
+            )
+            mesh_volume = mesh.save()
+            result.volume = Volume.objects.get(id=mesh_volume)
+
+    segmentation_path = Path(local_temp_dir, "outputs", "segmentations.n5")
+    segmentation_dir = Path(segmentations_dir)
+    if segmentation_path.exists():
+        segmentation_dir.mkdir(parents=True, exist_ok=True)
+        segmentation_path.rename(segmentation_dir / "segmentations.n5")
 
     cleanup = (
         "rm -r {local_temp_dir}\n"
