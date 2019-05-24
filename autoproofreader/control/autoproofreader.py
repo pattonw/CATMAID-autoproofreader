@@ -5,7 +5,8 @@ from pathlib import Path
 import json
 import pickle
 import pytz
-import pandas as pd
+from collections import namedtuple
+import csv
 import logging
 
 from django.conf import settings
@@ -387,45 +388,54 @@ def query_segmentation_async(
     logging.info(out)
 
     nodes_path = Path(local_temp_dir, "outputs", "nodes.obj")
+    Node = namedtuple("Node", ["node_id", "parent_id", "x", "y", "z"])
+    # b is the branch score. c is the connectivity score
+    Ranking = namedtuple(
+        "Ranking", ["node_id", "parent_id", "c", "b", "b_dx", "b_dy", "b_dz"]
+    )
+    Combined = namedtuple(
+        "Combined",
+        ["node_id", "parent_id", "x", "y", "z", "b", "c", "b_dx", "b_dy", "b_dz"],
+    )
+
     # Nodes are mandatory
     if nodes_path.exists():
-        new_nodes = pd.DataFrame(
-            pickle.load(nodes_path.open("rb")), columns=["nid", "pid", "x", "y", "z"]
-        )
+        nodes = {row[0]: Node(*row) for row in pickle.load(nodes_path.open("rb"))}
     else:
         result.status = "failed"
         result.save()
         return "failed"
 
-    rankings_path = Path(local_temp_dir, "outputs", "rankings.csv")
+    rankings_path = Path(local_temp_dir, "outputs", "rankings.obj")
     # Rankings are mandatory
     if rankings_path.exists():
         with rankings_path.open("r") as f:
-            rankings = pd.read_csv(f)  # nid, pid, con, branch, b_dx, b_dy, b_dz
-            node_data = new_nodes.join(
-                rankings.set_index("nid"), lsuffix="_other", on="nid"
-            )
+            rankings = {
+                row[0]: Ranking(*row) for row in pickle.load(rankings_path.open("rb"))
+            }
+            node_data = [
+                Combined(**{**nodes[nid]._asdict(), **rankings[nid]._asdict()})
+                for nid in nodes.keys()
+            ]
             proofread_nodes = [
                 ProofreadTreeNodes(
-                    node_id=row["nid"],
-                    parent_id=None if row["pid"] == "None" else row["pid"],
-                    x=row["x"],
-                    y=row["y"],
-                    z=row["z"],
-                    connectivity_score=None
-                    if row["connectivity_score"] == "None"
-                    else row["connectivity_score"],
-                    branch_score=row["branch_score"],
-                    branch_dx=row["branch_dx"],
-                    branch_dy=row["branch_dy"],
-                    branch_dz=row["branch_dz"],
+                    node_id=row.node_id,
+                    parent_id=row.parent_id,
+                    x=row.x,
+                    y=row.y,
+                    z=row.z,
+                    connectivity_score=row.c,
+                    branch_score=row.b,
+                    branch_dx=row.b_dx,
+                    branch_dy=row.b_dy,
+                    branch_dz=row.b_dz,
                     reviewed=False,
                     result=result,
                     user_id=user_id,
                     project_id=project_id,
                     editor_id=user_id,
                 )
-                for index, row in node_data.iterrows()
+                for row in node_data
             ]
             ProofreadTreeNodes.objects.bulk_create(proofread_nodes)
     else:
