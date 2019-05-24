@@ -6,7 +6,6 @@ import json
 import pickle
 import pytz
 from collections import namedtuple
-import csv
 import logging
 
 from django.conf import settings
