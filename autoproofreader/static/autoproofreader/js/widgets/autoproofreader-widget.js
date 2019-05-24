@@ -188,8 +188,8 @@
             <table cellpadding="0" cellspacing="0" border="0" class="display" id="${completedTableId}">
               <thead>
                 <tr>
-                  <th title="Remove one or all neurons">
-                  </th>
+                  <th title="Remove one or all neurons"></th>
+                  <th>Job Duration</th>
                   <th>Name</th>
                   <th>Status</th>
                   <th>Skeleton ID</th>
@@ -199,6 +199,7 @@
                 </tr>
                 <tr>
                   <th><i class="fa fa-remove" id="${completedTableId}-remove-all-queued" title="Remove all"></i></th>
+                  <th></th>
                   <th>
                     <input type="text" name="searchJobName" placeholder="name filter" id="${completedTableId}-search-job-name"
                       value="" class="search_init"/>
@@ -299,6 +300,12 @@
             // hopefully prevent checkbox from being checked.
             e.preventDefault();
             e.stopPropagation();
+          })
+          .on("click", "td .action-show-volume", this, function(e) {
+            let row = completedTableContainer
+              .DataTable()
+              .row(this.closest("tr"));
+            let row_data = row.data();
           });
 
         let queuedTableContainer = $(`#${queuedTableId}`, container);
@@ -1320,7 +1327,9 @@
           render: function(time_string) {
             let start = new Date(time_string);
             let now = new Date();
-            return Math.floor((now - start) / (10 * 60 * 60)) / 100;
+            let seconds = (now - start) / 1000;
+            let hours = Math.round(seconds / 36) / 100;
+            return `${hours} hours`;
           },
           orderable: true,
           searchable: true,
@@ -1362,10 +1371,7 @@
         {
           orderable: false,
           render: function(data, type, row, meta) {
-            return (
-              '<i class="fa fa-tag fa-fw clickable action-annotate" ' +
-              'alt="Annotate" title="Annotate skeleton"></i>'
-            );
+            return "";
           }
         }
       ]
@@ -1463,6 +1469,22 @@
           }
         },
         {
+          data: {
+            completion_time: "completion_time",
+            creation_time: "creation_time"
+          },
+          render: function(data) {
+            let start = new Date(data.creation_time);
+            let end = new Date(data.completion_time);
+            let seconds = (end - start) / 1000;
+            let hours = Math.round(seconds / 36) / 100;
+            return `${hours} hours`;
+          },
+          orderable: true,
+          searchable: true,
+          className: "run_time"
+        },
+        {
           data: "name",
           searchable: true,
           className: "name",
@@ -1507,10 +1529,9 @@
         {
           orderable: false,
           render: function(data, type, row, meta) {
-            return (
-              '<i class="fa fa-tag fa-fw clickable action-annotate" ' +
-              'alt="Annotate" title="Annotate skeleton"></i>'
-            );
+            return "";
+            //              '<i class="fa fa-cube fa-fw clickable action-show-volume" ' +
+            //              'alt="ShowVolume" title="Show Volume in 3D viewer"></i>'
           }
         }
       ]
@@ -2884,6 +2905,53 @@
       let sub_settings = getSubSettings(settings, "sarbor");
 
       let skeleton_settings = getSubSettings(sub_settings, "skeleton");
+
+      addSettingTemplate({
+        settings: skeleton_settings,
+        type: "checkbox",
+        label: "save_segmentations",
+        name: "Save segmentations",
+        value: true,
+        helptext:
+          "Whether or not you want to save the segmentations. They can be very " +
+          "helpful and nice to look at, but take up a lot of memory."
+      });
+
+      addSettingTemplate({
+        settings: skeleton_settings,
+        type: "checkbox",
+        label: "save_meshes",
+        name: "Save Mesh",
+        value: true,
+        helptext:
+          "Whether or not you want to save the mesh for this volume for display in " +
+          "the 3D viewer. Also very memory costly."
+      });
+
+      addSettingTemplate({
+        settings: skeleton_settings,
+        type: "checkbox",
+        label: "save_masks",
+        name: "Save masks",
+        value: false,
+        helptext:
+          "Whether or not you want to save every segmented field of view, rather than " +
+          "just the final volume. This could allow you to continue processing new sections " +
+          "of a skeleton as it arrives, rather than having to rerun the entire job, but " +
+          "this feature is not yet supported.",
+        advanced: true
+      });
+
+      addSettingTemplate({
+        settings: skeleton_settings,
+        type: "checkbox",
+        label: "resample",
+        name: "Resample",
+        value: true,
+        helptext:
+          "Whether or not you want to resample the skeleton at " +
+          "regular intervals. This is highly recommended for segmenting."
+      });
 
       addSettingTemplate({
         settings: skeleton_settings,
