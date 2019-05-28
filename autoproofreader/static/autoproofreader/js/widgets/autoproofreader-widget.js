@@ -3096,6 +3096,10 @@
         value: [64, 64, 64]
       });
 
+      let voxs = [61, 61, 61];
+      let down = segmentation_settings.downsample.value;
+      let reso = segmentation_settings.resolution_phys.value;
+
       addSettingTemplate({
         settings: segmentation_settings,
         type: "number_list",
@@ -3103,8 +3107,14 @@
         name: "Field of view shape",
         helptext:
           "The field of view in nanometers around each node that you would " +
-          "like to consider when looking for missing branches.",
-        value: [3000, 3000, 3000]
+          "like to consider when looking for missing branches." +
+          "Note this value should be an odd multiple of downsample * resolution." +
+          "The defaule case is 61x61x61 * downsampled * resolution.",
+        value: [
+          voxs[0] * down[0] * reso[0],
+          voxs[1] * down[1] * reso[1],
+          voxs[2] * down[2] * reso[2]
+        ]
       });
 
       addSettingTemplate({
