@@ -1256,6 +1256,8 @@
     let self = this;
     self.ranking_skeleton_id = job.skeleton;
     self.ranking_result_id = job.id;
+    self.updateProofreadSkeletonVisualizationLayer();
+    self.updateProofreadSegmentationLayer();
     CATMAID.fetch(
       "ext/autoproofreader/" + project.id + "/proofread-tree-nodes",
       "GET",
@@ -3170,6 +3172,9 @@
     // don't have one already.
     project.getStackViewers().forEach(function(sv) {
       var layer = sv.getLayer("proofread skeleton projection");
+      if (layer) {
+        layer.removeLayer();
+      }
       if (options.visible) {
         if (!layer) {
           // Create new if not already present
