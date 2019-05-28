@@ -146,7 +146,7 @@
       contentID: this.idPrefix + "content",
       createContent: function(container) {
         container.innerHTML = `
-        <div id="content-wrapper">
+        <div id="${this.idPrefix}content-wrapper">
           <div class="queued">
             <table cellpadding="0" cellspacing="0" border="0" class="display" id="${queuedTableId}">
               <thead>
@@ -503,16 +503,16 @@
    * Change the widget layout to show the appropriate content per tab.
    */
   AutoproofreaderWidget.prototype.refocus = function() {
-    let content = document.getElementById("content-wrapper");
+    let content = document.getElementById(`${this.idPrefix}content-wrapper`);
     let views = {
       Run: "settings",
       Queued: "queued",
       Completed: "completed",
       Rankings: "rankings"
     };
-    let mode = $("ul.ui-tabs-nav")
-      .children(".ui-state-active")
-      .text();
+    let controls = $(`#${this.idPrefix}controls`);
+    let nav_bar = controls.find("ul.ui-tabs-nav");
+    let mode = nav_bar.children(".ui-state-active").text();
     for (let child of content.childNodes) {
       if (
         child.nodeType === Node.ELEMENT_NODE &&
@@ -1015,7 +1015,7 @@
     };
 
     let get_data = function(canvas) {
-      $("#content-wrapper").append(canvas);
+      $(`#${self.idPrefix}content-wrapper`).append(canvas);
       let ctx = canvas.getContext("2d");
       let width = 256;
       let height = 256;
@@ -2046,7 +2046,7 @@
 
     let refresh = function() {
       // get the settings page and clear it
-      let space = $("#content-wrapper > #settings");
+      let space = $(`#${self.idPrefix}content-wrapper > #settings`);
       space.width("100%");
       space.css("margin", "0em .5em .5em .5em");
       $(space).empty();
