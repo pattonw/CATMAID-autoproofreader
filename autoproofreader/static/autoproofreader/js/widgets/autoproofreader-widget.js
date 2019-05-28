@@ -1635,12 +1635,12 @@
             display: function(name) {
               return (
                 '<a href="#" class="result-selection-link action-select-connectivity">' +
-                (name ? name : "") +
+                (typeof name === "undefined" ? "" : name) +
                 "</a>"
               );
             },
             _: function(name) {
-              return name ? name : "";
+              return typeof name === "undefined" ? "" : name;
             }
           }
         },
@@ -1653,12 +1653,12 @@
             display: function(name) {
               return (
                 '<a href="#" class="result-selection-link action-select-branch">' +
-                (name ? name : "undefined") +
+                (typeof name === "undefined" ? "" : name) +
                 "</a>"
               );
             },
             _: function(name) {
-              return name ? name : "undefined";
+              return typeof name === "undefined" ? "" : name;
             }
           }
         },
