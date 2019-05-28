@@ -7,11 +7,14 @@ import pickle
 import pytz
 from collections import namedtuple
 import logging
+import shutil
 
 from django.conf import settings
 from django.http import JsonResponse, HttpResponseNotFound
 from django.utils.decorators import method_decorator
 from django.db.models import Q
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 from django.shortcuts import get_object_or_404
 
 from catmaid.consumers import msg_user
@@ -535,6 +538,25 @@ def get_result_uuid(request, project_id):
         return JsonResponse(query_set[0].uuid, safe=False)
 
     return HttpResponseNotFound("No results found with id {}".format(result_id))
+
+
+@receiver(post_delete, sender=AutoproofreaderResult)
+def result_post_delete_callback(sender, **kwargs):
+    """
+    if an AutoproofreaderResult gets deleted, make sure to delete the
+    mesh/segmentations associated with it as well.
+    """
+    if kwargs["instance"].volume:
+        kwargs["instance"].volume.delete()
+    if kwargs["instance"].uuid:
+        print(kwargs["instance"].uuid)
+        n5_path = (
+            Path(settings.MEDIA_ROOT)
+            / "proofreading_segmentations"
+            / str(kwargs["instance"].uuid)
+        )
+        if n5_path.exists():
+            shutil.rmtree(n5_path)
 
 
 class AutoproofreaderResultAPI(APIView):
