@@ -3172,9 +3172,6 @@
     // don't have one already.
     project.getStackViewers().forEach(function(sv) {
       var layer = sv.getLayer("proofread skeleton projection");
-      if (layer) {
-        layer.removeLayer();
-      }
       if (options.visible) {
         if (!layer) {
           // Create new if not already present
@@ -3184,10 +3181,12 @@
 
         // Update other options and display
         layer.updateOptions(options, false, true);
-      } else if (layer) {
-        sv.removeLayer("proofread skeleton projection");
-        sv.redraw();
+      } else {
+        if (layer) {
+          sv.removeLayer("proofread skeleton projection");
+        }
       }
+      sv.redraw();
     });
   };
 
@@ -3240,63 +3239,57 @@
       // Create a skeleton projection layer for all stack viewers that
       // don't have one already.
       project.getStackViewers().forEach(function(sv) {
-        var layer = sv.getLayer("proofread segmentation");
-        if (layer) {
-          sv.removeLayer();
+        let old_layer = sv.getLayer("proofread segmentation");
+        if (old_layer) {
+          sv.removeLayer("proofread segmentation");
         }
         if (options.visible) {
-          if (!layer) {
-            // Create new if not already present
-            let stack = new CATMAID.Stack(
-              "seg",
-              "Segmenations",
-              options.stack_attrs.dimensions,
-              options.stack_attrs.resolution,
-              { x: 0, y: 0, z: 0 },
-              [],
-              options.stack_attrs.scales,
-              -2,
-              "",
-              "",
-              "",
-              0,
-              { x: 0, y: 0, z: 0 },
-              [0, 0, 0],
-              [
-                {
-                  id: "no-mirror-id",
-                  tile_source_type: options.stack_attrs.tile_source_type,
-                  image_base: options.stack_attrs.image_base,
-                  file_extension: "jpg",
-                  tile_width: options.stack_attrs.tile_width,
-                  tile_height: options.stack_attrs.tile_height,
-                  title: "n5 mirror"
-                }
-              ]
-            );
-            layer = new CATMAID.ProofreadSegmentationLayer(
-              options,
-              sv,
-              "segmenation layer",
-              stack,
-              0,
-              true,
-              1,
-              false,
-              "inherit",
-              false,
-              true
-            );
-            sv.addLayer("proofread segmentation", layer);
-            sv.redraw();
-          }
-
+          // Create new if not already present
+          let stack = new CATMAID.Stack(
+            "seg",
+            "Segmenations",
+            options.stack_attrs.dimensions,
+            options.stack_attrs.resolution,
+            { x: 0, y: 0, z: 0 },
+            [],
+            options.stack_attrs.scales,
+            -2,
+            "",
+            "",
+            "",
+            0,
+            { x: 0, y: 0, z: 0 },
+            [0, 0, 0],
+            [
+              {
+                id: "no-mirror-id",
+                tile_source_type: options.stack_attrs.tile_source_type,
+                image_base: options.stack_attrs.image_base,
+                file_extension: "jpg",
+                tile_width: options.stack_attrs.tile_width,
+                tile_height: options.stack_attrs.tile_height,
+                title: "n5 mirror"
+              }
+            ]
+          );
+          let layer = new CATMAID.ProofreadSegmentationLayer(
+            options,
+            sv,
+            "segmenation layer",
+            stack,
+            0,
+            true,
+            1,
+            false,
+            "inherit",
+            false,
+            true
+          );
+          sv.addLayer("proofread segmentation", layer);
           // Update other options and display
           layer.updateOptions(options, false, true);
-        } else if (layer) {
-          sv.removeLayer("proofread segmentation");
-          sv.redraw();
         }
+        sv.redraw();
       });
     });
   };

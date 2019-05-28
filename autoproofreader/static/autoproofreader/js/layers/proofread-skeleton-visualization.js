@@ -107,6 +107,7 @@
       ProofreadSkeletonVisualizationLayer.options,
       setDefaults
     );
+    this.replaceResult(options.result_id);
   };
 
   /**
