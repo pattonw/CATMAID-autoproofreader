@@ -112,12 +112,12 @@
         ]);
 
         CATMAID.DOM.appendToTab(tabs["Queued"], [
-          // ["refresh", this.test_results_refresh.bind(this)],
+          ["refresh", this.test_results_refresh.bind(this)]
           // ["clear", this.test_results_clear.bind(this)]
         ]);
 
         CATMAID.DOM.appendToTab(tabs["Completed"], [
-          // ["refresh", this.test_results_refresh.bind(this)],
+          ["refresh", this.test_results_refresh.bind(this)]
           // ["clear", this.test_results_clear.bind(this)]
         ]);
 
