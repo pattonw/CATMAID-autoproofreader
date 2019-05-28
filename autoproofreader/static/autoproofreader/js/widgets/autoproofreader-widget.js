@@ -112,13 +112,13 @@
         ]);
 
         CATMAID.DOM.appendToTab(tabs["Queued"], [
-          ["refresh", this.test_results_refresh.bind(this)],
-          ["clear", this.test_results_clear.bind(this)]
+          // ["refresh", this.test_results_refresh.bind(this)],
+          // ["clear", this.test_results_clear.bind(this)]
         ]);
 
         CATMAID.DOM.appendToTab(tabs["Completed"], [
-          ["refresh", this.test_results_refresh.bind(this)],
-          ["clear", this.test_results_clear.bind(this)]
+          // ["refresh", this.test_results_refresh.bind(this)],
+          // ["clear", this.test_results_clear.bind(this)]
         ]);
 
         CATMAID.DOM.appendToTab(tabs["Rankings"], [
@@ -382,6 +382,21 @@
               parseInt(row_data.y + row_data.branch_dy),
               parseInt(row_data.x + row_data.branch_dx)
             );
+            CATMAID.fetch(project.id + "/nodes/nearest", "GET", {
+              x: row_data.x,
+              y: row_data.y,
+              z: row_data.z,
+              skeleton_id: self.ranking_skeleton_id
+            })
+              .then(function(data) {
+                SkeletonAnnotations.staticSelectNode(data.treenode_id);
+                return data.treenode_id;
+              })
+              .catch(function(e) {
+                CATMAID.warn(
+                  "Failed to select closest skeleton_id due to: " + e
+                );
+              });
 
             // Toggle displaying missing branch node
             self.updateProofreadSkeletonVisualizationLayer();
@@ -653,7 +668,7 @@
       add_file(post_data, files[file_descriptor], `${a}.${b}`);
     }
 
-    console.log(post_data);
+    // console.log(post_data);
 
     CATMAID.fetch(
       "ext/autoproofreader/" + project.id + "/autoproofreader",
@@ -666,7 +681,7 @@
       { "Content-type": null }
     )
       .then(function(e) {
-        console.log(e);
+        // console.log(e);
       })
       .catch(function(error) {
         CATMAID.handleError(error);
@@ -710,21 +725,6 @@
     CATMAID.fetch("ext/autoproofreader/" + project.id + "/gpu-util", "GET", {
       server_id: self.getServer()
     })
-      .then(function(response) {
-        console.log(response);
-      })
-      .catch(CATMAID.handleError);
-  };
-
-  AutoproofreaderWidget.prototype.test_websockets = function() {
-    let self = this;
-    CATMAID.fetch(
-      "ext/autoproofreader/" + project.id + "/autoproofreader",
-      "GET",
-      {
-        server_id: self.getServer()
-      }
-    )
       .then(function(response) {
         console.log(response);
       })
@@ -1137,15 +1137,12 @@
         "GET",
         { volume_config_id: setting_values.run.volume_id }
       ).then(function(e) {
-        console.log("getting volume config");
-        console.log(e);
         let config;
         if (e[0].name == "default") {
           config = { ImageStack: [self.getImageStackVolume()] };
         } else {
           config = toml.parse(e[0].config);
         }
-        console.log(config);
         return config;
       });
     } else {
@@ -2179,7 +2176,6 @@
         return function() {
           let newValue = this.value;
           settings[label].value = newValue;
-          console.log(self.settings);
           if (reset) {
             self.createSettings();
           }
@@ -2735,7 +2731,7 @@
           }
         )
           .then(function(e) {
-            console.log(e);
+            // console.log(e);
             // refresh the server list
             let replacement = $("#model_id")[0].rebuild();
             $("#model_id").empty();
