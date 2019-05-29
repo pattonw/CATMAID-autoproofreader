@@ -1254,6 +1254,12 @@
     */
   AutoproofreaderWidget.prototype.display_results_data = function(job) {
     let self = this;
+    if (
+      typeof self.ranking_skeleton_id !== "undefined" &&
+      typeof self.ranking_result_id !== "undefined"
+    ) {
+      self.removeProofreadSegmentationLayer();
+    }
     self.ranking_skeleton_id = job.skeleton;
     self.ranking_result_id = job.id;
     self.updateProofreadSkeletonVisualizationLayer();
@@ -3209,6 +3215,7 @@
               visible: self.visibleSegmentationLayer,
               result_id: self.ranking_result_id,
               selected_points: self.selected_points,
+              result: result[0],
               stack_attrs: {
                 dimensions: {
                   x: attrs_file.dimensions[0],
@@ -3235,19 +3242,20 @@
   };
 
   AutoproofreaderWidget.prototype.updateProofreadSegmentationLayer = function() {
+    let self = this;
     this.getProofreaderSegmentationLayerOptions().then(options => {
       // Create a skeleton projection layer for all stack viewers that
       // don't have one already.
       project.getStackViewers().forEach(function(sv) {
-        let old_layer = sv.getLayer("proofread segmentation");
+        let old_layer = sv.getLayer(`segmentation-${options.result.name}`);
         if (old_layer) {
-          sv.removeLayer("proofread segmentation");
+          sv.removeLayer(`segmentation-${options.result.name}`);
         }
         if (options.visible) {
           // Create new if not already present
           let stack = new CATMAID.Stack(
-            "seg",
-            "Segmenations",
+            `seg-${options.result.name}`,
+            `Segmenations-${options.result.name}`,
             options.stack_attrs.dimensions,
             options.stack_attrs.resolution,
             { x: 0, y: 0, z: 0 },
@@ -3262,20 +3270,20 @@
             [0, 0, 0],
             [
               {
-                id: "no-mirror-id",
+                id: `mirror-${options.result.name}`,
                 tile_source_type: options.stack_attrs.tile_source_type,
                 image_base: options.stack_attrs.image_base,
                 file_extension: "jpg",
                 tile_width: options.stack_attrs.tile_width,
                 tile_height: options.stack_attrs.tile_height,
-                title: "n5 mirror"
+                title: `n5 mirror ${options.result.name}`
               }
             ]
           );
           let layer = new CATMAID.ProofreadSegmentationLayer(
             options,
             sv,
-            "segmenation layer",
+            `segmenation layer ${options.result.name}`,
             stack,
             0,
             true,
@@ -3285,9 +3293,24 @@
             false,
             true
           );
-          sv.addLayer("proofread segmentation", layer);
+          sv.addLayer(`segmentation-${options.result.name}`, layer);
           // Update other options and display
           layer.updateOptions(options, false, true);
+        }
+        sv.redraw();
+      });
+    });
+  };
+
+  AutoproofreaderWidget.prototype.removeProofreadSegmentationLayer = function() {
+    let self = this;
+    this.getProofreaderSegmentationLayerOptions().then(options => {
+      // Create a skeleton projection layer for all stack viewers that
+      // don't have one already.
+      project.getStackViewers().forEach(function(sv) {
+        let old_layer = sv.getLayer(`segmentation-${options.result.name}`);
+        if (old_layer) {
+          sv.removeLayer(`segmentation-${options.result.name}`);
         }
         sv.redraw();
       });
