@@ -32,20 +32,21 @@ fsv.addStackLayer(fs, layer);
 
       this.setBlendMode("add");
       let filter = new (this.getAvailableFilters())["Color Transform"]();
+      this.color = [Math.random(), Math.random(), Math.random()];
       filter.pixiFilter.matrix = [
+        `${this.color[0]}`,
         "0",
         "0",
         "0",
         "0",
         "0",
-        "0",
-        "0.3",
-        "0",
+        `${this.color[1]}`,
         "0",
         "0",
         "0",
         "0",
-        "0.5",
+        "0",
+        `${this.color[2]}`,
         "0",
         "0",
         "0",
